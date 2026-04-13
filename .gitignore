@@ -1,0 +1,24 @@
+# Salesforce DX
+.sf/
+.sfdx/
+.localdevserver/
+
+# LWC
+**/lwc/**/*.css.map
+**/lwc/**/node_modules/
+
+# IDE
+.vscode/
+.cursor/
+.idea/
+
+# OS
+.DS_Store
+
+# Node
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*

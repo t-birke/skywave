@@ -1,0 +1,617 @@
+system:
+  instructions: "You are a support agent for Skywave Airlines. Assist customers with their flight bookings and related inquiries."
+
+  messages:
+    welcome: "Welcome to Skywave Airlines! How can I help you today?"
+    error: "Something went wrong, please try again."
+
+config:
+    developer_name: "Skywave_Airlines_Agent"
+    agent_label: "Skywave Airlines Agent"
+    description: "A support agent for Skywave Airlines that assists customers with their flight bookings and related inquiries."
+
+variables:
+    EndUserId: linked string
+        source: @MessagingSession.MessagingEndUserId
+        description: "MessagingEndUser Id"
+    RoutableId: linked string
+        source: @MessagingSession.Id
+        description: "MessagingSession Id"
+    ContactId: linked string
+        source: @MessagingEndUser.ContactId
+        description: "MessagingEndUser ContactId"
+    EndUserLanguage: linked string
+        source: @MessagingSession.EndUserLanguage
+        description: "MessagingSession EndUserLanguage"
+    VerifiedCustomerId: mutable string
+        description: "Verified customer contact ID"
+    Latest_Flight_Search_Results: mutable object
+        label: "Latest Flight Search Results"
+    flight_booking_detail: mutable object
+        label: "Flight Booking Detail"
+    flight_booking_error_detail: mutable string
+        label: "Flight Booking Error Detail"
+    flight_booking_error_flag: mutable boolean
+        label: "Flight Booking Error Flag"
+    check_imminent_flights_success: mutable boolean = False
+        label: "Check Imminent Flights Success"
+    check_imminent_flight_error_message: mutable string
+        label: "Check Imminent Flight Error Message"
+    flights_within_72hrs: mutable number = 0
+        label: "Flights Within 72hrs"
+    active_bookings: mutable object
+        label: "Active Bookings"
+    retrieve_active_booking_error_message: mutable string
+        label: "Retrieve Active Booking Error Message"
+    retrieve_active_booking_done: mutable boolean = False
+        label: "Retrieve Active Booking Done"
+    Tier_Status: mutable string
+        label: "Tier Status"
+    booking: mutable string
+        label: "Booking"
+    Booking_Outcome: mutable boolean
+        label: "Booking Outcome"
+
+language:
+    default_locale: "en_US"
+    additional_locales: ""
+    all_additional_locales: False
+
+knowledge:
+    citations_enabled: False
+
+start_agent topic_selector:
+    label: "Topic Selector"
+
+    description: "Welcome the user and determine the appropriate topic based on user input"
+
+    reasoning:
+        instructions: ->
+            run @actions.check_upcoming_flights
+                with userId = @variables.EndUserId
+                set @variables.check_imminent_flight_error_message = @outputs.errorMessage
+                set @variables.flights_within_72hrs = @outputs.imminentFlights
+                set @variables.check_imminent_flights_success = @outputs.success
+
+            | Select the best topic based on conversation history and user's intent.
+
+        actions:
+            go_to_flight_management: @utils.transition to @topic.flight_management
+                description: ""
+
+            go_to_escalation: @utils.transition to @topic.escalation
+                description: ""
+
+            go_to_off_topic: @utils.transition to @topic.off_topic
+                description: ""
+
+            go_to_ambiguous_question: @utils.transition to @topic.ambiguous_question
+                description: ""
+
+            go_to_seat_selection: @utils.transition to @topic.seat_selection
+                description: "Select seats for an upcoming flight booking"
+                available when @variables.flights_within_72hrs > 0
+
+            go_to_case_management: @utils.transition to @topic.case_management
+                description: ""
+
+            check_upcoming_flights: @actions.check_upcoming_flights
+                available when @variables.check_imminent_flights_success == False
+                with userId = ...
+                set @variables.check_imminent_flight_error_message = @outputs.errorMessage
+                set @variables.flights_within_72hrs = @outputs.imminentFlights
+                set @variables.check_imminent_flights_success = @outputs.success
+
+    actions:
+        check_upcoming_flights:
+            description: "Checks if the user has flights within the next 72 hours"
+            label: "Check for Upcoming Flights"
+            require_user_confirmation: False
+            include_in_progress_indicator: False
+            target: "apex://Skywave_FlightUpcoming"
+
+            inputs:
+                "userId": string
+                    description: "The user id from the messaging session"
+                    label: "userId"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "errorMessage": string
+                    description: "details in case of an error"
+                    label: "error message"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "imminentFlights": object
+                    description: "flights within the next 72 hours"
+                    label: "imminent flights"
+                    complex_data_type_name: "lightning__integerType"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "success": boolean
+                    description: "true if the action completed without error"
+                    label: "success"
+                    is_displayable: False
+                    is_used_by_planner: True
+
+topic flight_management:
+    label: "Flight Management"
+
+    description: "Assist users with booking, canceling, or changing flights, including checking if they have flights within the next 72 hours."
+
+    reasoning:
+        instructions: ->
+            if @variables.retrieve_active_booking_done is False:
+                run @actions.get_bookings
+                    with contactId = @variables.ContactId
+                    set @variables.active_bookings = @outputs.bookings
+                    set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
+                    set @variables.retrieve_active_booking_done = @outputs.success
+
+            | Assist the user with booking, canceling, or changing flights based on their input.
+
+            if @variables.active_bookings is None:
+                | The user currently has no flights booked.
+            else:
+                | Here are the flights the user has booked: {!@variables.active_bookings}
+                  Seats can be changed using the {!@actions.change_seat} action.
+
+            | If the user wants to book a new flight or reschedule, use {!@actions.Reschedule_Flights} to find available options and check eligibility.
+            | If the user has confirmed a specific flight by number and date/time, use {!@actions.book_flight}.
+
+        actions:
+            Reschedule_Flights: @actions.Reschedule_Flights
+                with "Input:New_Flight_Requested" = ...
+
+            search_flights: @actions.search_flights
+                with departureDate = ...
+                with destination = ...
+                with origin = ...
+                set @variables.Latest_Flight_Search_Results = @outputs.options
+
+            book_flight: @actions.book_flight
+                with flightInfo = ...
+                set @variables.flight_booking_detail = @outputs.booking
+                set @variables.flight_booking_error_detail = @outputs.errorMessage
+                set @variables.flight_booking_error_flag = @outputs.success
+
+            get_bookings: @actions.get_bookings
+                with contactId = ...
+                set @variables.active_bookings = @outputs.bookings
+                set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
+                set @variables.retrieve_active_booking_done = @outputs.success
+
+            change_seat: @actions.change_seat
+                with flightInfo = ...
+
+            change_flight: @actions.change_flight
+                with Flight = ...
+                with requested_change = ...
+
+    actions:
+        Reschedule_Flights:
+            description: "Reschedule flights based on user tier and reservation booking type"
+            label: "Reschedule Flights"
+            require_user_confirmation: False
+            include_in_progress_indicator: False
+            target: "generatePromptResponse://Skywave_RescheduleFlights"
+
+            inputs:
+                "Input:New_Flight_Requested": string
+                    description: "requested flight"
+                    label: "New Flight Requested"
+                    is_required: True
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "promptResponse": string
+                    description: "The prompt response generated by the action based on the specified prompt and input."
+                    label: "Prompt Response"
+                    complex_data_type_name: "lightning__textType"
+                    filter_from_agent: False
+                    is_displayable: True
+
+        search_flights:
+            description: "Searches available flight itineraries"
+            label: "Search Flights"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Looking for available flights"
+            target: "apex://Skywave_FlightSearch"
+
+            inputs:
+                "departureDate": string
+                    description: "The desired departure date formatted in YYYY-MM-DD"
+                    label: "Departure Date (YYYY-MM-DD)"
+                    is_required: True
+                    is_user_input: True
+                    complex_data_type_name: "lightning__textType"
+                "destination": string
+                    description: "The destination Airport Code in 3-Letter IATA format"
+                    label: "Destination Airport Code (IATA)"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "origin": string
+                    description: "The origin Airport Code in 3-Letter IATA format"
+                    label: "Origin Airport Code (IATA)"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "options": list[object]
+                    description: "A list of available flight options and details"
+                    label: "Flight Options"
+                    is_displayable: True
+                    is_used_by_planner: True
+                    complex_data_type_name: "@apexClassType/c__Skywave_FlightSearch$FlightOption"
+
+        book_flight:
+            description: "Books a flight. Requires the exact date, time, and flight number."
+            label: "Book Flight"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Processing booking"
+            target: "apex://Skywave_FlightBook"
+
+            inputs:
+                "flightInfo": string
+                    description: "The flight information including exact date, time, and flight number"
+                    label: "flightInfo"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "booking": object
+                    description: "The flight booking details"
+                    label: "bookingCode"
+                    is_displayable: True
+                    is_used_by_planner: True
+                    complex_data_type_name: "@apexClassType/c__Skywave_FlightBook$Booking"
+                "errorMessage": string
+                    description: "details in case of an error"
+                    label: "error message"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "success": boolean
+                    description: "true if the action completed without error"
+                    label: "success"
+                    is_displayable: True
+                    is_used_by_planner: True
+
+        get_bookings:
+            description: "Gets all active flight bookings for the user"
+            label: "Get Bookings"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Checking your flights"
+            target: "apex://Skywave_FlightBookings"
+
+            inputs:
+                "contactId": string
+                    description: "the contact Id of the user"
+                    label: "contactIds"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "bookings": list[object]
+                    description: "a list of bookings for the customer"
+                    label: "bookings"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "@apexClassType/c__Skywave_FlightBookings$Booking"
+                "errorMessage": string
+                    description: "details in case of an error"
+                    label: "error message"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "success": boolean
+                    description: "true if the action completed without error"
+                    label: "success"
+                    is_displayable: False
+                    is_used_by_planner: True
+
+        change_seat:
+            description: "Add or change seat selection for a flight"
+            label: "Change Seat"
+            require_user_confirmation: False
+            include_in_progress_indicator: False
+            target: "apex://Skywave_FlightBook"
+
+            inputs:
+                "flightInfo": string
+                    description: "flight info"
+                    label: "flightInfo"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "booking": object
+                    description: "The flight booking details"
+                    label: "bookingCode"
+                    complex_data_type_name: "@apexClassType/c__Skywave_FlightBook$Booking"
+                    is_used_by_planner: True
+                    is_displayable: False
+                "errorMessage": string
+                    description: "details in case of an error"
+                    label: "error message"
+                    complex_data_type_name: "lightning__textType"
+                    is_used_by_planner: True
+                    is_displayable: False
+                "success": boolean
+                    description: "true if the action completed without error"
+                    label: "success"
+                    complex_data_type_name: "lightning__booleanType"
+                    is_used_by_planner: True
+                    is_displayable: False
+
+        change_flight:
+            description: "Change a flight by providing the original flight info and the desired change"
+            label: "Change Flight"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Requesting flight change"
+            target: "flow://Skywave_ChangeFlight"
+
+            inputs:
+                "Flight": string
+                    description: "The original flight that needs to be changed"
+                    label: "Flight"
+                    is_required: True
+                    is_user_input: False
+                "requested_change": string
+                    description: "The requested change: route, time, or date change"
+                    label: "requested_change"
+                    is_required: True
+                    is_user_input: False
+
+            outputs:
+                "available_options": string
+                    description: "Options available based on the requested change"
+                    label: "available_options"
+                    filter_from_agent: False
+                    is_displayable: True
+                "changed_flight_information": string
+                    description: "The new flight with changed information"
+                    label: "changed_flight_information"
+                    filter_from_agent: False
+                    is_displayable: True
+
+topic escalation:
+    label: "Escalation"
+    description: "Handles requests from users who want to transfer to a live human agent."
+
+    reasoning:
+        instructions: ->
+            | If a user explicitly asks to transfer to a live agent, escalate the conversation.
+              If escalation fails, acknowledge the issue and ask if they would like to log a support case instead.
+        actions:
+            escalate_to_human: @utils.escalate
+                description: "Escalate to a human agent."
+
+topic off_topic:
+    label: "Off Topic"
+    description: "Redirect conversation to relevant topics when user request goes off-topic"
+
+    reasoning:
+        instructions: ->
+            | Your job is to redirect the conversation to relevant topics politely and succinctly.
+              NEVER answer general knowledge questions. Only respond to general greetings and questions about your capabilities.
+              Do not acknowledge the off-topic question. Redirect by asking how you can help with flight bookings or support cases.
+
+topic ambiguous_question:
+    label: "Ambiguous Question"
+    description: "Redirect conversation to relevant topics when user request is too ambiguous"
+
+    reasoning:
+        instructions: ->
+            | Help the user provide clearer, more focused requests for better assistance.
+              Do not answer ambiguous questions. Do not invoke any actions.
+              Politely guide the user to provide more specific details about their request.
+
+topic seat_selection:
+    label: "Seat Selection"
+
+    description: "Helps users select or change seats on their flights"
+
+    reasoning:
+        instructions: ->
+            | Help the customer book a seat on their flight based on the plane model and seats available.
+              For upgraded seat options, check the loyalty tier status.
+              If the user has a preferred seat, suggest it if available.
+
+        actions:
+            change_seat: @actions.change_seat
+                available when @variables.Tier_Status == "A-List Preferred"
+                with flightInfo = ...
+                set @variables.booking = @outputs.booking
+                set @variables.flight_booking_error_detail = @outputs.errorMessage
+                set @variables.Booking_Outcome = @outputs.success
+
+    actions:
+        change_seat:
+            description: "Add or change seat selection for a flight"
+            label: "Change Seat"
+            target: "apex://Skywave_FlightBook"
+
+            inputs:
+                flightInfo: string
+                    description: "flight info"
+                    label: "flightInfo"
+                    is_required: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                booking: object
+                    description: "The flight booking details"
+                    label: "bookingCode"
+                    complex_data_type_name: "@apexClassType/c__Skywave_FlightBook$Booking"
+                    is_used_by_planner: True
+                    is_displayable: False
+                errorMessage: string
+                    description: "details in case of an error"
+                    label: "error message"
+                    complex_data_type_name: "lightning__textType"
+                    is_used_by_planner: True
+                    is_displayable: False
+                success: boolean
+                    description: "true if the action completed without error"
+                    label: "success"
+                    complex_data_type_name: "lightning__booleanType"
+                    is_used_by_planner: True
+                    is_displayable: False
+
+topic case_management:
+    label: "Case Management"
+
+    description: "Handles customer inquiries and actions related to support cases, including providing case information, updating existing cases, and creating new cases."
+
+    reasoning:
+        instructions: ->
+            | Always format dates in a human readable format.
+              Do not show Case Id to the customer.
+              If the customer is not known, ask for their email address and get their Contact record first.
+              When adding a comment, first retrieve the case details, ask for the exact comment, then add it.
+              When sharing case details, show: Case number, Subject, Description, and Status as an itemized list.
+              When a customer asks to create a case, summarize the conversation. Subject should be under 7 words. Description should be no more than 3 sentences.
+              Acknowledge and validate user concerns with empathy and professionalism.
+
+        actions:
+            create_case: @actions.create_case
+                with verifiedCustomerID = ...
+                with messagingSessionID = ...
+                with caseSubject = ...
+                with caseDescription = ...
+
+            get_cases_for_contact: @actions.get_cases_for_contact
+                with verifiedContactID = ...
+
+            get_case_by_number: @actions.get_case_by_number
+                with caseNumber = ...
+                with customerEmail = ...
+
+            add_case_comment: @actions.add_case_comment
+                with caseRecord = ...
+                with caseComment = ...
+
+    actions:
+        create_case:
+            description: "Creates a support case for the customer"
+            label: "Create Case"
+            require_user_confirmation: True
+            include_in_progress_indicator: True
+            target: "flow://Skywave_CreateCase"
+
+            inputs:
+                "verifiedCustomerID": string
+                    description: "The contact ID for the case"
+                    label: "Verified Customer ID"
+                    is_required: True
+                    is_user_input: False
+                "messagingSessionID": string
+                    description: "The messaging session ID"
+                    label: "Messaging Session ID"
+                    is_required: False
+                    is_user_input: False
+                "caseSubject": string
+                    description: "The subject of the case"
+                    label: "Case Subject"
+                    is_required: False
+                    is_user_input: True
+                "caseDescription": string
+                    description: "The description of the case"
+                    label: "Case Description"
+                    is_required: False
+                    is_user_input: True
+
+            outputs:
+                "caseRecord": object
+                    description: "The created case record"
+                    label: "Case record"
+                    is_displayable: True
+                    filter_from_agent: False
+                    complex_data_type_name: "lightning__recordInfoType"
+
+        get_cases_for_contact:
+            description: "Returns a list of cases for a given contact ID"
+            label: "Get Cases for Contact"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            target: "flow://Skywave_GetCasesForContact"
+
+            inputs:
+                "verifiedContactID": string
+                    description: "The contact record ID"
+                    label: "Verified Contact record ID"
+                    is_required: True
+                    is_user_input: False
+
+            outputs:
+                "caseList": list[object]
+                    description: "Cases for the contact"
+                    label: "Case List"
+                    is_displayable: True
+                    filter_from_agent: False
+                    complex_data_type_name: "lightning__recordInfoType"
+
+        get_case_by_number:
+            description: "Returns a case by email and case number"
+            label: "Get Case by Number"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Checking Status"
+            target: "flow://Skywave_GetCaseByNumber"
+
+            inputs:
+                "caseNumber": string
+                    description: "case number"
+                    label: "caseNumber"
+                    is_required: False
+                    complex_data_type_name: "lightning__textType"
+                "customerEmail": string
+                    description: "contact email"
+                    label: "customerEmail"
+                    is_required: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "caseRecord": object
+                    description: "the case record"
+                    label: "caseRecord"
+                    complex_data_type_name: "lightning__recordInfoType"
+                    filter_from_agent: False
+                    is_displayable: True
+
+        add_case_comment:
+            description: "Adds a comment to an existing case"
+            label: "Add Case Comment"
+            require_user_confirmation: True
+            include_in_progress_indicator: True
+            target: "flow://Skywave_AddCaseComment"
+
+            inputs:
+                "caseRecord": object
+                    description: "The case record to add the comment to"
+                    label: "Case record"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__recordInfoType"
+                "caseComment": string
+                    description: "The comment text"
+                    label: "Case comment"
+                    is_required: True
+                    is_user_input: True
+
+            outputs:
+                "outcomeMessage": string
+                    description: "Result message"
+                    label: "Outcome message"
+                    is_displayable: True
+                    filter_from_agent: False

@@ -1,0 +1,29 @@
+{
+    "orgName": "Agentforce Scratch Org",
+    "edition": "developer",
+    "hasSampleData": true,
+    "features": [
+        "EnableSetPasswordInApi",
+        "Chatbot",
+        "Einstein1AIPlatform"
+    ],
+    "settings": {
+        "lightningExperienceSettings": {
+            "enableS1DesktopEnabled": "true",
+            "enableUsersAreLightningOnly": "true",
+            "enableLexEndUsersNoSwitching": "true"
+        },
+        "mobileSettings": {
+            "enableS1EncryptedStoragePref2": "false"
+        },
+        "einsteinGptSettings": {
+            "enableEinsteinGptPlatform": "true"
+        },
+        "botSettings": {
+            "enableBots": true
+        },
+        "agentPlatformSettings": {
+            "enableAgentPlatform": true
+        }
+    }
+}
