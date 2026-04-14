@@ -3,8 +3,11 @@
     "edition": "developer",
     "hasSampleData": true,
     "features": [
+        "CustomerDataPlatform",
+        "CustomerDataPlatformLite",
         "EnableSetPasswordInApi",
         "Chatbot",
+        "Knowledge",
         "Einstein1AIPlatform"
     ],
     "settings": {
@@ -24,6 +27,13 @@
         },
         "agentPlatformSettings": {
             "enableAgentPlatform": true
+        },
+        "customerDataPlatformSettings": {
+            "enableCustomerDataPlatform": true
+        },
+        "knowledgeSettings": {
+            "enableKnowledge": true,
+            "enableLightningKnowledge": true
         }
     }
 }

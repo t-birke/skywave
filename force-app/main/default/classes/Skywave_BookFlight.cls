@@ -1,12 +1,12 @@
-public class Skywave_FlightBookings {
+public class Skywave_BookFlight {
 
     public class Request {
-        @InvocableVariable(label='Contact Id' description='The contact ID to retrieve bookings for' required=false)
-        public String contactId;
+        @InvocableVariable(label='Flight Info' description='The flight information for booking' required=true)
+        public String flightInfo;
     }
 
-    @InvocableMethod(label='Get Flights for Current User' description='Gets all active flight bookings for the user')
-    public static List<Result> getBookings(List<Request> requests) {
+    @InvocableMethod(label='Book Flight' description='Books a flight for the current user')
+    public static List<Result> bookFlight(List<Request> requests) {
         List<Result> results = new List<Result>();
         Result r = new Result();
         r.success = true;
@@ -47,9 +47,7 @@ public class Skywave_FlightBookings {
 
         f1.segments.add(s1);
         b.flights.add(f1);
-
-        r.bookings = new List<Booking>();
-        r.bookings.add(b);
+        r.booking = b;
         results.add(r);
         return results;
     }
@@ -59,8 +57,8 @@ public class Skywave_FlightBookings {
         public Boolean success;
         @InvocableVariable(label='error message' description='details in case of an error')
         public String errorMessage;
-        @InvocableVariable(label='bookings' description='a list of bookings for the customer')
-        public List<Booking> bookings;
+        @InvocableVariable(label='bookingCode' description='The flight booking code in case of booking success')
+        public Booking booking;
     }
 
     public class Booking {

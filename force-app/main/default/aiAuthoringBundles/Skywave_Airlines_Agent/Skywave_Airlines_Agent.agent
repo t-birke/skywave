@@ -255,7 +255,7 @@ topic flight_management:
             require_user_confirmation: False
             include_in_progress_indicator: True
             progress_indicator_message: "Processing booking"
-            target: "apex://Skywave_FlightBook"
+            target: "apex://Skywave_BookFlight"
 
             inputs:
                 "flightInfo": string
@@ -271,7 +271,7 @@ topic flight_management:
                     label: "bookingCode"
                     is_displayable: True
                     is_used_by_planner: True
-                    complex_data_type_name: "@apexClassType/c__Skywave_FlightBook$Booking"
+                    complex_data_type_name: "@apexClassType/c__Skywave_BookFlight$Booking"
                 "errorMessage": string
                     description: "details in case of an error"
                     label: "error message"
@@ -289,7 +289,7 @@ topic flight_management:
             require_user_confirmation: False
             include_in_progress_indicator: True
             progress_indicator_message: "Checking your flights"
-            target: "apex://Skywave_FlightBookings"
+            target: "apex://Skywave_GetFlightBookings"
 
             inputs:
                 "contactId": string
@@ -305,7 +305,7 @@ topic flight_management:
                     label: "bookings"
                     is_displayable: False
                     is_used_by_planner: True
-                    complex_data_type_name: "@apexClassType/c__Skywave_FlightBookings$Booking"
+                    complex_data_type_name: "@apexClassType/c__Skywave_GetFlightBookings$Booking"
                 "errorMessage": string
                     description: "details in case of an error"
                     label: "error message"
@@ -322,7 +322,7 @@ topic flight_management:
             label: "Change Seat"
             require_user_confirmation: False
             include_in_progress_indicator: False
-            target: "apex://Skywave_FlightBook"
+            target: "apex://Skywave_BookFlight"
 
             inputs:
                 "flightInfo": string
@@ -336,7 +336,7 @@ topic flight_management:
                 "booking": object
                     description: "The flight booking details"
                     label: "bookingCode"
-                    complex_data_type_name: "@apexClassType/c__Skywave_FlightBook$Booking"
+                    complex_data_type_name: "@apexClassType/c__Skywave_BookFlight$Booking"
                     is_used_by_planner: True
                     is_displayable: False
                 "errorMessage": string
@@ -439,7 +439,7 @@ topic seat_selection:
         change_seat:
             description: "Add or change seat selection for a flight"
             label: "Change Seat"
-            target: "apex://Skywave_FlightBook"
+            target: "apex://Skywave_BookFlight"
 
             inputs:
                 flightInfo: string
@@ -452,7 +452,7 @@ topic seat_selection:
                 booking: object
                     description: "The flight booking details"
                     label: "bookingCode"
-                    complex_data_type_name: "@apexClassType/c__Skywave_FlightBook$Booking"
+                    complex_data_type_name: "@apexClassType/c__Skywave_BookFlight$Booking"
                     is_used_by_planner: True
                     is_displayable: False
                 errorMessage: string

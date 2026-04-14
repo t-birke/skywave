@@ -17,20 +17,22 @@ An Agentforce agent demo that helps customers search flights, book trips, manage
 
    This creates a scratch org, sets up an Einstein Agent user, deploys the project, and opens Salesforce Setup in your browser.
 
-2. In Salesforce, click the **App Launcher** (grid icon, top-left) and search for **Agentforce Studio**.
+2. **Set up Data Cloud** — Data Cloud takes ~20 minutes to activate after the org is created. Monitor progress in **Setup > Data Cloud Setup Home**. Once active, go to **Setup > Agentforce Data Library** and create a new Data Library.
 
-3. Click **Skywave Airlines Agent**.
+3. In Salesforce, click the **App Launcher** (grid icon, top-left) and search for **Agentforce Studio**.
 
-4. Click **Preview**.
+4. Click **Skywave Airlines Agent**.
 
-5. You’ll be prompted to assign a user record. Click **Select User**.
+5. Click **Preview**.
 
-6. Click the search text box — there will be one user available. Select it.
+6. You’ll be prompted to assign a user record. Click **Select User**.
 
-7. Click **Save**.
+7. Click the search text box — there will be one user available. Select it.
 
-8. Click **Preview** again. The agent chat window will open.
+8. Click **Save**.
 
-9. Try it out with a question like:
+9. Click **Preview** again. The agent chat window will open.
+
+10. Try it out with a question like:
 
    > Find me a flight from SEA to JFK on Sunday
