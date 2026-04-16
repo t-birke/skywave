@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
     <apiVersion>66.0</apiVersion>
+    <areMetricsLoggedToDataCloud>false</areMetricsLoggedToDataCloud>
     <description>Returns a case by customer email and case number</description>
     <environments>Default</environments>
     <interviewLabel>Skywave Get Case by Number {!$Flow.CurrentDateTime}</interviewLabel>

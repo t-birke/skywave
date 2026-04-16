@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
     <apiVersion>66.0</apiVersion>
+    <areMetricsLoggedToDataCloud>false</areMetricsLoggedToDataCloud>
+    <assignments>
+        <name>Set_Outcome_Message</name>
+        <label>Set Outcome Message</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <assignmentItems>
+            <assignToReference>outcomeMessage</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Your comment has been added to the case successfully.</stringValue>
+            </value>
+        </assignmentItems>
+    </assignments>
     <description>Adds a comment to an existing case</description>
     <environments>Default</environments>
     <interviewLabel>Skywave Add Case Comment {!$Flow.CurrentDateTime}</interviewLabel>
@@ -29,37 +43,24 @@
         <label>Create Case Comment</label>
         <locationX>0</locationX>
         <locationY>0</locationY>
-        <inputAssignments>
-            <field>ParentId</field>
-            <value>
-                <elementReference>caseRecord.Id</elementReference>
-            </value>
-        </inputAssignments>
+        <connector>
+            <targetReference>Set_Outcome_Message</targetReference>
+        </connector>
         <inputAssignments>
             <field>CommentBody</field>
             <value>
                 <elementReference>caseComment</elementReference>
             </value>
         </inputAssignments>
+        <inputAssignments>
+            <field>ParentId</field>
+            <value>
+                <elementReference>caseRecord.Id</elementReference>
+            </value>
+        </inputAssignments>
         <object>CaseComment</object>
         <storeOutputAutomatically>true</storeOutputAutomatically>
-        <connector>
-            <targetReference>Set_Outcome_Message</targetReference>
-        </connector>
     </recordCreates>
-    <assignments>
-        <name>Set_Outcome_Message</name>
-        <label>Set Outcome Message</label>
-        <locationX>0</locationX>
-        <locationY>0</locationY>
-        <assignmentItems>
-            <assignToReference>outcomeMessage</assignToReference>
-            <operator>Assign</operator>
-            <value>
-                <stringValue>Your comment has been added to the case successfully.</stringValue>
-            </value>
-        </assignmentItems>
-    </assignments>
     <start>
         <locationX>0</locationX>
         <locationY>0</locationY>
@@ -69,6 +70,14 @@
     </start>
     <status>Active</status>
     <variables>
+        <description>The comment text to add</description>
+        <name>caseComment</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
         <description>The case record to add the comment to</description>
         <name>caseRecord</name>
         <dataType>SObject</dataType>
@@ -76,14 +85,6 @@
         <isInput>true</isInput>
         <isOutput>false</isOutput>
         <objectType>Case</objectType>
-    </variables>
-    <variables>
-        <description>The comment text to add</description>
-        <name>caseComment</name>
-        <dataType>String</dataType>
-        <isCollection>false</isCollection>
-        <isInput>true</isInput>
-        <isOutput>false</isOutput>
     </variables>
     <variables>
         <description>Result message</description>

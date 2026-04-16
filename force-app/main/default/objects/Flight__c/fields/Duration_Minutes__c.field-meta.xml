@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Duration_Minutes__c</fullName>
+    <label>Duration (Minutes)</label>
+    <description>Total flight duration in minutes from departure to arrival</description>
+    <inlineHelpText>Enter the total flight time in minutes (e.g., 320 for a 5 hour 20 minute flight)</inlineHelpText>
+    <type>Number</type>
+    <precision>5</precision>
+    <scale>0</scale>
+    <required>true</required>
+</CustomField>

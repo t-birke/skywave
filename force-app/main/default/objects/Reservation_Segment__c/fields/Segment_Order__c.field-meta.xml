@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Segment_Order__c</fullName>
+    <label>Segment Order</label>
+    <description>The sequence order of this segment in a multi-leg journey</description>
+    <inlineHelpText>Enter 1 for first leg, 2 for second leg, etc.</inlineHelpText>
+    <type>Number</type>
+    <precision>2</precision>
+    <scale>0</scale>
+    <required>true</required>
+</CustomField>

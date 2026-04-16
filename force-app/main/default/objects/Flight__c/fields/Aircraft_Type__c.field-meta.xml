@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Aircraft_Type__c</fullName>
+    <label>Aircraft Type</label>
+    <description>Model and type of aircraft used for this flight</description>
+    <inlineHelpText>Enter the aircraft model (e.g., Boeing 737-800, Airbus A320)</inlineHelpText>
+    <type>Text</type>
+    <length>50</length>
+    <required>false</required>
+</CustomField>

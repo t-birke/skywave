@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
     <apiVersion>66.0</apiVersion>
+    <areMetricsLoggedToDataCloud>false</areMetricsLoggedToDataCloud>
     <description>Creates a support case for the customer</description>
     <environments>Default</environments>
     <interviewLabel>Skywave Create Case {!$Flow.CurrentDateTime}</interviewLabel>
@@ -29,22 +30,19 @@
         <label>Create Case Record</label>
         <locationX>0</locationX>
         <locationY>0</locationY>
+        <connector>
+            <targetReference>Get_Created_Case</targetReference>
+        </connector>
         <inputAssignments>
-            <field>Subject</field>
+            <field>ContactId</field>
             <value>
-                <elementReference>caseSubject</elementReference>
+                <elementReference>verifiedCustomerID</elementReference>
             </value>
         </inputAssignments>
         <inputAssignments>
             <field>Description</field>
             <value>
                 <elementReference>caseDescription</elementReference>
-            </value>
-        </inputAssignments>
-        <inputAssignments>
-            <field>ContactId</field>
-            <value>
-                <elementReference>verifiedCustomerID</elementReference>
             </value>
         </inputAssignments>
         <inputAssignments>
@@ -59,11 +57,14 @@
                 <stringValue>New</stringValue>
             </value>
         </inputAssignments>
+        <inputAssignments>
+            <field>Subject</field>
+            <value>
+                <elementReference>caseSubject</elementReference>
+            </value>
+        </inputAssignments>
         <object>Case</object>
         <storeOutputAutomatically>true</storeOutputAutomatically>
-        <connector>
-            <targetReference>Get_Created_Case</targetReference>
-        </connector>
     </recordCreates>
     <recordLookups>
         <name>Get_Created_Case</name>
@@ -97,30 +98,6 @@
     </start>
     <status>Active</status>
     <variables>
-        <description>The contact ID for the case</description>
-        <name>verifiedCustomerID</name>
-        <dataType>String</dataType>
-        <isCollection>false</isCollection>
-        <isInput>true</isInput>
-        <isOutput>false</isOutput>
-    </variables>
-    <variables>
-        <description>The messaging session ID</description>
-        <name>messagingSessionID</name>
-        <dataType>String</dataType>
-        <isCollection>false</isCollection>
-        <isInput>true</isInput>
-        <isOutput>false</isOutput>
-    </variables>
-    <variables>
-        <description>The subject of the case</description>
-        <name>caseSubject</name>
-        <dataType>String</dataType>
-        <isCollection>false</isCollection>
-        <isInput>true</isInput>
-        <isOutput>false</isOutput>
-    </variables>
-    <variables>
         <description>The description of the case</description>
         <name>caseDescription</name>
         <dataType>String</dataType>
@@ -136,5 +113,29 @@
         <isInput>false</isInput>
         <isOutput>true</isOutput>
         <objectType>Case</objectType>
+    </variables>
+    <variables>
+        <description>The subject of the case</description>
+        <name>caseSubject</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <description>The messaging session ID</description>
+        <name>messagingSessionID</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <description>The contact ID for the case</description>
+        <name>verifiedCustomerID</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
     </variables>
 </Flow>

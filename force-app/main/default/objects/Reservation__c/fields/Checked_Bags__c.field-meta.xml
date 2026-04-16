@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Checked_Bags__c</fullName>
+    <label>Checked Bags</label>
+    <description>Number of checked bags included in this reservation</description>
+    <inlineHelpText>Enter the total number of checked bags for this reservation</inlineHelpText>
+    <type>Number</type>
+    <precision>2</precision>
+    <scale>0</scale>
+    <required>false</required>
+    <defaultValue>0</defaultValue>
+</CustomField>

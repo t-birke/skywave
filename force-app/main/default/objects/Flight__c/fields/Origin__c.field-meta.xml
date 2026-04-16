@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Origin__c</fullName>
+    <label>Origin</label>
+    <description>Departure airport IATA code for this flight route</description>
+    <inlineHelpText>Enter the 3-letter IATA airport code for the departure airport (e.g., SEA for Seattle-Tacoma International)</inlineHelpText>
+    <type>Text</type>
+    <length>3</length>
+    <required>true</required>
+</CustomField>

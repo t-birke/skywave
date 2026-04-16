@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Loyalty_Points__c</fullName>
+    <label>Loyalty Points</label>
+    <description>Total accumulated loyalty points earned through flight purchases and other qualifying activities</description>
+    <inlineHelpText>Current loyalty points balance. Points can be redeemed for upgrades, free flights, and other rewards.</inlineHelpText>
+    <type>Number</type>
+    <precision>10</precision>
+    <scale>0</scale>
+    <required>false</required>
+    <defaultValue>0</defaultValue>
+</CustomField>

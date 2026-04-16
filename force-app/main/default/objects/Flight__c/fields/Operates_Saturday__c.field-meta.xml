@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Operates_Saturday__c</fullName>
+    <label>Operates Saturday</label>
+    <description>Indicates whether this flight operates on Saturdays</description>
+    <inlineHelpText>Check if this flight operates on Saturdays</inlineHelpText>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+</CustomField>

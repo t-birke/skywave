@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Membership_Start_Date__c</fullName>
+    <label>Membership Start Date</label>
+    <description>The date when the customer joined the loyalty program</description>
+    <inlineHelpText>The date this customer enrolled in the Skywave Airlines loyalty program. Used to calculate membership tenure and anniversary benefits.</inlineHelpText>
+    <type>Date</type>
+    <required>false</required>
+</CustomField>

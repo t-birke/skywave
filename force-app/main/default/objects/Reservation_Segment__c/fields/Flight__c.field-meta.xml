@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Flight__c</fullName>
+    <label>Flight</label>
+    <description>The flight from the master schedule that this segment is based on</description>
+    <inlineHelpText>Select the flight from the master schedule</inlineHelpText>
+    <type>Lookup</type>
+    <referenceTo>Flight__c</referenceTo>
+    <relationshipLabel>Reservation Segments</relationshipLabel>
+    <relationshipName>Reservation_Segments</relationshipName>
+    <required>true</required>
+    <deleteConstraint>Restrict</deleteConstraint>
+</CustomField>

@@ -12,3 +12,35 @@ package.xml
 **/__tests__/**
 
 node_modules/
+
+# Data Cloud / CDP metadata
+**/activationPlatforms/**
+**/dataSourceObjects/**
+**/dataSourceTenants/**
+**/dataStreamDefinitions/**
+**/fieldSrcTrgtRelationships/**
+**/internalDataConnectors/**
+**/mktDataSources/**
+**/mktDataTranObjects/**
+**/objectSourceTargetMaps/**
+
+# Org-level metadata we don't want to track
+**/appMenus/**
+**/authproviders/**
+**/flexipages/**
+**/objects/**__dll/**
+**/permissionsetgroups/**
+**/profiles/**
+
+# Non-project permissionsets
+**/permissionsets/NextGen_*
+**/permissionsets/sfdcInternalInt__*
+
+# Runtime artifacts created by "sf agent publish" — PERMANENTLY ignored, never manually deployed
+**/genAiPlannerBundles/**
+**/bots/**
+
+# Agent-dependent metadata — ignored during Phase 1 deploy, temporarily
+# un-ignored by orgInit.sh Phase 3 (after agent is published + activated)
+**/messagingChannels/**
+**/EmbeddedServiceConfig/**

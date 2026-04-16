@@ -1,14 +1,18 @@
 {
-    "orgName": "Agentforce Scratch Org",
+    "orgName": "Skywave Scratch",
     "edition": "developer",
-    "hasSampleData": true,
+    "hasSampleData": false,
     "features": [
         "CustomerDataPlatform",
         "CustomerDataPlatformLite",
         "EnableSetPasswordInApi",
         "Chatbot",
         "Knowledge",
-        "Einstein1AIPlatform"
+        "Einstein1AIPlatform",
+        "Communities",
+        "ServiceCloud",
+        "LiveMessage",
+        "LiveAgent"
     ],
     "settings": {
         "lightningExperienceSettings": {
@@ -28,12 +32,22 @@
         "agentPlatformSettings": {
             "enableAgentPlatform": true
         },
+        "communitiesSettings": {
+            "enableNetworksEnabled": true
+        },
         "customerDataPlatformSettings": {
             "enableCustomerDataPlatform": true
         },
         "knowledgeSettings": {
             "enableKnowledge": true,
             "enableLightningKnowledge": true
+        },
+        "omniChannelSettings": {
+            "enableOmniChannel": true,
+            "enableOmniSkillsRouting": true
+        },
+        "liveMessageSettings": {
+            "enableLiveMessage": true
         }
     }
 }

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Travel_Date__c</fullName>
+    <label>Travel Date</label>
+    <description>The specific date this flight segment operates</description>
+    <inlineHelpText>Enter the date this flight operates (e.g., March 19, 2026)</inlineHelpText>
+    <type>Date</type>
+    <required>true</required>
+</CustomField>

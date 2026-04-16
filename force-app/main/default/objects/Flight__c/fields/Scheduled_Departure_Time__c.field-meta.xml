@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Scheduled_Departure_Time__c</fullName>
+    <label>Scheduled Departure Time</label>
+    <description>Standard departure time for this flight in the daily schedule</description>
+    <inlineHelpText>Enter the scheduled departure time (e.g., 06:30 AM). This is the recurring time this flight departs each day it operates.</inlineHelpText>
+    <type>Time</type>
+    <required>true</required>
+</CustomField>

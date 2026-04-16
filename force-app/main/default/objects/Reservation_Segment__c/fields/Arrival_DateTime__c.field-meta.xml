@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Arrival_DateTime__c</fullName>
+    <label>Arrival Date/Time</label>
+    <description>The actual scheduled arrival date and time for this segment</description>
+    <inlineHelpText>Enter the complete arrival date and time</inlineHelpText>
+    <type>DateTime</type>
+    <required>true</required>
+</CustomField>

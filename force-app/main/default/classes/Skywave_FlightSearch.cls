@@ -9,6 +9,9 @@ public with sharing class Skywave_FlightSearch {
 
         @InvocableVariable(label='Departure Date (YYYY-MM-DD)' required=true)
         public String departureDate;
+        
+        @InvocableVariable(label='Fare Class (Basic/Choice/Choice Preferred/Choice Extra)')
+        public String fareClass;
     }
 
     public class FlightResponse {
@@ -40,9 +43,18 @@ public with sharing class Skywave_FlightSearch {
 
         @InvocableVariable(label='Price')
         public String price;
+        
+        @InvocableVariable(label='Flight Record ID')
+        public String flightId;
+        
+        @InvocableVariable(label='Departure Time')
+        public String departureTime;
+        
+        @InvocableVariable(label='Arrival Time')
+        public String arrivalTime;
     }
 
-    @InvocableMethod(label='Search Flights' description='Searches available flight itineraries')
+    @InvocableMethod(label='Search Flights' description='Searches available flight itineraries from master schedule')
     public static List<FlightResponse> searchFlights(List<FlightRequest> requests) {
         List<FlightResponse> allResponses = new List<FlightResponse>();
         for (FlightRequest req : requests) {
@@ -54,84 +66,105 @@ public with sharing class Skywave_FlightSearch {
     private static FlightResponse executeSearch(FlightRequest req) {
         FlightResponse res = new FlightResponse();
         res.options = new List<FlightOption>();
-
-        String apiKey = '0fbb1035b31c1777c0183587f1130e1e479685ebf2dcca9e32314f012da53090';
-        String endpoint = 'https://serpapi.com/search.json?engine=google_flights' +
-                          '&departure_id=' + req.origin +
-                          '&arrival_id=' + req.destination +
-                          '&outbound_date=' + req.departureDate +
-                          '&currency=USD' +
-                          '&gl=us' +
-                          '&hl=en' +
-                          '&type=2' +
-                          '&api_key=' + apiKey;
-
-        Http http = new Http();
-        HttpRequest request = new HttpRequest();
-        request.setEndpoint(endpoint);
-        request.setMethod('GET');
-
+        
+        // Parse the departure date to determine day of week
+        Date travelDate = Date.valueOf(req.departureDate);
+        String dayOfWeek = getDayOfWeekField(travelDate);
+        
+        // Build dynamic SOQL query based on day of week
+        String query = 'SELECT Id, Name, Flight_Number__c, Origin__c, Destination__c, ' +
+                      'Scheduled_Departure_Time__c, Scheduled_Arrival_Time__c, ' +
+                      'Duration_Minutes__c, Aircraft_Type__c, ' +
+                      'Base_Price_Basic__c, Base_Price_Choice__c, ' +
+                      'Base_Price_Choice_Preferred__c, Base_Price_Choice_Extra__c ' +
+                      'FROM Flight__c ' +
+                      'WHERE Active__c = true ' +
+                      'AND Origin__c = :origin ' +
+                      'AND Destination__c = :destination ' +
+                      'AND ' + dayOfWeek + ' = true ' +
+                      'ORDER BY Scheduled_Departure_Time__c ' +
+                      'LIMIT 10';
+        
+        String origin = req.origin;
+        String destination = req.destination;
+        
         try {
-            HttpResponse response = http.send(request);
-            if (response.getStatusCode() == 200) {
-                Map<String, Object> results = (Map<String, Object>) JSON.deserializeUntyped(response.getBody());
-                List<Object> bestFlights = (List<Object>) results.get('best_flights');
-
-                if (bestFlights == null) {
-                    bestFlights = (List<Object>) results.get('other_flights');
+            List<Flight__c> flights = Database.query(query);
+            
+            for (Flight__c flight : flights) {
+                FlightOption opt = new FlightOption();
+                opt.flightId = flight.Id;
+                opt.startingAirport = flight.Origin__c;
+                opt.arrivingAirport = flight.Destination__c;
+                opt.duration = flight.Duration_Minutes__c != null ? Integer.valueOf(flight.Duration_Minutes__c) : 0;
+                opt.numberOfFlights = 1;
+                opt.stopovers = 'Non-stop';
+                opt.aircraft = flight.Aircraft_Type__c;
+                opt.flightNumber = flight.Flight_Number__c;
+                
+                // Calculate departure and arrival times for the specific travel date
+                DateTime departureDateTime = calculateDateTime(travelDate, flight.Scheduled_Departure_Time__c);
+                DateTime arrivalDateTime = calculateDateTime(travelDate, flight.Scheduled_Arrival_Time__c);
+                
+                // Handle flights that arrive next day
+                if (flight.Scheduled_Arrival_Time__c < flight.Scheduled_Departure_Time__c) {
+                    arrivalDateTime = arrivalDateTime.addDays(1);
                 }
-
-                if (bestFlights != null) {
-                    for (Integer i = 0; i < Math.min(3, bestFlights.size()); i++) {
-                        Map<String, Object> flightData = (Map<String, Object>) bestFlights[i];
-                        res.options.add(parseFlight(flightData));
-                    }
-                }
+                
+                opt.departureTime = departureDateTime.format('h:mm a');
+                opt.arrivalTime = arrivalDateTime.format('h:mm a');
+                
+                // Set price based on fare class
+                opt.price = getPriceForFareClass(flight, req.fareClass);
+                
+                res.options.add(opt);
             }
         } catch (Exception e) {
-            System.debug('Error calling Flight API: ' + e.getMessage());
+            System.debug('Error querying Flight__c: ' + e.getMessage());
         }
-
+        
         return res;
     }
-
-    private static FlightOption parseFlight(Map<String, Object> data) {
-        FlightOption opt = new FlightOption();
-        List<Object> flights = (List<Object>) data.get('flights');
-
-        opt.price = String.valueOf(data.get('price'));
-        opt.duration = (Integer) data.get('total_duration');
-        opt.numberOfFlights = flights.size();
-
-        List<String> flightNums = new List<String>();
-        List<String> aircrafts = new List<String>();
-        List<String> stops = new List<String>();
-
-        for (Integer j = 0; j < flights.size(); j++) {
-            Map<String, Object> leg = (Map<String, Object>) flights[j];
-
-            if (j == 0) {
-                Map<String, Object> dep = (Map<String, Object>) leg.get('departure_airport');
-                opt.startingAirport = (String) dep.get('id');
-            }
-            if (j == flights.size() - 1) {
-                Map<String, Object> arr = (Map<String, Object>) leg.get('arrival_airport');
-                opt.arrivingAirport = (String) arr.get('id');
-            }
-
-            flightNums.add((String) leg.get('flight_number'));
-            aircrafts.add((String) leg.get('airplane'));
-
-            if (j < flights.size() - 1) {
-                Map<String, Object> arrLeg = (Map<String, Object>) leg.get('arrival_airport');
-                stops.add((String) arrLeg.get('id'));
-            }
+    
+    /**
+     * Returns the API field name for the day of week checkbox field
+     */
+    private static String getDayOfWeekField(Date travelDate) {
+        DateTime dt = DateTime.newInstance(travelDate, Time.newInstance(0, 0, 0, 0));
+        String dayName = dt.format('EEEE'); // Returns full day name like "Monday"
+        
+        return 'Operates_' + dayName + '__c';
+    }
+    
+    /**
+     * Combines a date with a time-only value to create a DateTime
+     */
+    private static DateTime calculateDateTime(Date travelDate, Time scheduleTime) {
+        if (scheduleTime == null) {
+            return DateTime.newInstance(travelDate, Time.newInstance(0, 0, 0, 0));
         }
-
-        opt.flightNumber = String.join(flightNums, ' / ');
-        opt.aircraft = String.join(aircrafts, ' / ');
-        opt.stopovers = stops.isEmpty() ? 'Non-stop' : String.join(stops, ', ');
-
-        return opt;
+        return DateTime.newInstance(travelDate, scheduleTime);
+    }
+    
+    /**
+     * Returns the formatted price string based on fare class
+     */
+    private static String getPriceForFareClass(Flight__c flight, String fareClass) {
+        Decimal price = 0;
+        
+        if (fareClass == 'Basic' && flight.Base_Price_Basic__c != null) {
+            price = flight.Base_Price_Basic__c;
+        } else if (fareClass == 'Choice' && flight.Base_Price_Choice__c != null) {
+            price = flight.Base_Price_Choice__c;
+        } else if (fareClass == 'Choice Preferred' && flight.Base_Price_Choice_Preferred__c != null) {
+            price = flight.Base_Price_Choice_Preferred__c;
+        } else if (fareClass == 'Choice Extra' && flight.Base_Price_Choice_Extra__c != null) {
+            price = flight.Base_Price_Choice_Extra__c;
+        } else if (flight.Base_Price_Choice__c != null) {
+            // Default to Choice pricing
+            price = flight.Base_Price_Choice__c;
+        }
+        
+        return '$' + price.setScale(2).toPlainString();
     }
 }
