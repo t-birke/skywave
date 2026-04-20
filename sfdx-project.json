@@ -1,13 +1,20 @@
 {
-  "packageDirectories": [
-    {
-      "path": "force-app",
-      "default": true
-    }
-  ],
-  "name": "skywave-scratch",
-  "namespace": "",
-  "sfdcLoginUrl": "https://login.salesforce.com",
-  "sourceApiVersion": "66.0",
-  "defaultLwcLanguage": "javascript"
+    "packageDirectories": [
+        {
+            "path": "force-app",
+            "default": true
+        }
+    ],
+    "replacements": [
+        {
+            "filename": "force-app/main/default/aiAuthoringBundles/Skywave_Airlines_Agent/Skywave_Airlines_Agent.agent",
+            "stringToReplace": "skywaveserviceagent@example.com",
+            "replaceWithEnv": "SF_AGENT_USER"
+        }
+    ],
+    "name": "skywave-scratch",
+    "namespace": "",
+    "sfdcLoginUrl": "https://login.salesforce.com",
+    "sourceApiVersion": "66.0",
+    "defaultLwcLanguage": "javascript"
 }

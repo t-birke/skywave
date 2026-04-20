@@ -2,6 +2,7 @@
 .sf/
 .sfdx/
 .localdevserver/
+.deploy-tmp/
 
 # LWC
 **/lwc/**/*.css.map

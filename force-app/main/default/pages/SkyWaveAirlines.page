@@ -1,4 +1,4 @@
-<apex:page showHeader="false" standardStylesheets="false" docType="html-5.0" title="SkyWave Airlines">
+<apex:page controller="SkyWaveAirlinesController" showHeader="false" standardStylesheets="false" docType="html-5.0" title="SkyWave Airlines">
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -1425,11 +1425,11 @@ body.mobile-view #phoneHomeBar { display: flex; }
         try {
             embeddedservice_bootstrap.settings.language = 'en_US';
             embeddedservice_bootstrap.init(
-                '00DRK00000ScJKs2AN',
+                '{!orgId}',
                 'Skywave_MIAW',
-                'https://ruby-customer-7374-dev-ed.scratch.my.site.com/ESWSkywaveMIAW',
+                '{!siteUrl}',
                 {
-                    scrt2URL: 'https://ruby-customer-7374-dev-ed.scratch.my.salesforce-scrt.com'
+                    scrt2URL: '{!scrt2Url}'
                 }
             );
         } catch (err) {
@@ -1437,7 +1437,7 @@ body.mobile-view #phoneHomeBar { display: flex; }
         }
     };
 </script>
-<script type="text/javascript" src="https://ruby-customer-7374-dev-ed.scratch.my.site.com/ESWSkywaveMIAW/assets/js/bootstrap.min.js" onload="initEmbeddedMessaging()"></script>
+<script type="text/javascript" src="{!bootstrapUrl}" onload="initEmbeddedMessaging()"></script>
 </body>
 </html>
 </apex:page>

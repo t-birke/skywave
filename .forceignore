@@ -39,8 +39,9 @@ node_modules/
 # Runtime artifacts created by "sf agent publish" — PERMANENTLY ignored, never manually deployed
 **/genAiPlannerBundles/**
 **/bots/**
-
-# Agent-dependent metadata — ignored during Phase 1 deploy, temporarily
-# un-ignored by orgInit.sh Phase 3 (after agent is published + activated)
-**/messagingChannels/**
+**/queues/**
+**/queueRoutingConfigs/**
+**/digitalExperiences/**
+**/digitalExperienceConfigs/**
 **/EmbeddedServiceConfig/**
+**/messagingChannels/**

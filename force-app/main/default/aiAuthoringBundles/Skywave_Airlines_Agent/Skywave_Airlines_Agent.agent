@@ -10,7 +10,7 @@ config:
     agent_label: "Skywave Airlines Agent"
     description: "A support agent for Skywave Airlines that assists customers with their flight bookings and related inquiries."
     agent_type: "AgentforceServiceAgent"
-    default_agent_user: "einsteinagent@00DRK00000ScJKs2AN.ext"
+    default_agent_user: "einsteinagent@00DEk00000gF1y5MAC.ext"
 
 variables:
     EndUserId: linked string
@@ -68,7 +68,7 @@ start_agent topic_selector:
     label: "Agent Router"
 
     description: "Welcome the user and determine the appropriate subagent based on user input"
-
+    
     reasoning:
         instructions: ->
             if @variables.ContactId is not None and @variables.resolved_contact_id == "":
