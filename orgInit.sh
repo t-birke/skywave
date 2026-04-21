@@ -13,20 +13,15 @@ sf data update record -s User -i "$ADMIN_USER_ID" -v "UserPermissionsKnowledgeUs
 
 PROFILE_ID=$(sf data query --json -q "SELECT Id FROM Profile WHERE Name = 'Einstein Agent User'" | grep -m1 '"Id"' | sed 's/.*"Id": *"//;s/".*//')
 sf data create record -s User -v "Username='${AGENT_USER}' Email='skywaveagent@example.com' Alias='skyagent' LastName='Skywave Agent' TimeZoneSidKey='America/Los_Angeles' LocaleSidKey='en_US' EmailEncodingKey='UTF-8' ProfileId='${PROFILE_ID}' LanguageLocaleKey='en_US'"
+
+sf project deploy start --ignore-conflicts
+
 sf org assign permset --name AgentforceServiceAgentUser --on-behalf-of "$AGENT_USER"
 sf org assign permset --name Skywave_Agent_User --on-behalf-of "$AGENT_USER"
 sf org assign permset --name sfdc_aiplanner_service_permset --on-behalf-of "$AGENT_USER"
 sf org assign permset --name sfdc_chatbot_service_permset --on-behalf-of "$AGENT_USER"
 
-sf project deploy start --ignore-conflicts
 sf org assign permset --name Demo
 sf apex run --file scripts/apex/createSampleData.apex
-
-#scripts/deploy-agent.sh
-#sf agent publish authoring-bundle --api-name Skywave_Airlines_Agent
-#sf agent activate --api-name Skywave_Airlines_Agent
-
-#scripts/create-miaw-stack.sh
-#sf apex run --file scripts/apex/demoSetup.apex
 
 sf org open

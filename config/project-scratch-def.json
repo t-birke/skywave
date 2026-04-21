@@ -33,8 +33,7 @@
             "enableAgentPlatform": true
         },
         "communitiesSettings": {
-            "enableNetworksEnabled": true,
-            "enableExperienceBundleMetadata": true
+            "enableNetworksEnabled": true
         },
         "customerDataPlatformSettings": {
             "enableCustomerDataPlatform": true
