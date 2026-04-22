@@ -17,8 +17,6 @@
 set -euo pipefail
 trap 'echo "FAILED at line $LINENO (exit $?): $BASH_COMMAND" >&2' ERR
 
-export SF_SOURCE_MEMBER_POLLING_TIMEOUT=120
-
 # Recreate scratch org.
 sf org delete scratch --no-prompt --target-org skywave-scratch 2>/dev/null || true
 sf org create scratch --definition-file config/project-scratch-def.json --alias skywave-scratch --duration-days 7 --set-default
@@ -106,10 +104,13 @@ sf community publish --name "skywave website" --json > /dev/null || true
 # record is no longer locked.
 net_id=$(sf data query --json -q "SELECT Id FROM Network WHERE Name = 'skywave website'" | jq -r '.result.records[0].Id')
 for i in $(seq 1 10); do
-    if sf data update record -s Network -i "$net_id" -v "Status=Live" 2>/dev/null | grep -q Success; then
-        echo "Network activated"
-        break
-    fi
+    result=$(sf data update record -s Network -i "$net_id" -v "Status=Live" 2>/dev/null || true)
+    case "$result" in
+        *Success*)
+            echo "Network activated"
+            break
+            ;;
+    esac
     sleep 5
 done
 

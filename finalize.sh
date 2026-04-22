@@ -91,10 +91,40 @@ cat > "$REDEPLOY_DIR/package.xml" <<PKG_EOF
 </Package>
 PKG_EOF
 
-sf project deploy start --metadata-dir "$REDEPLOY_DIR" --ignore-conflicts --json > /dev/null
+# The deploy can race against an earlier async admin op (e.g. the community
+# publish at the end of orgInit.sh) and fail with ORG_ADMIN_LOCKED. Retry.
+for attempt in 1 2 3 4 5 6; do
+    deploy_out=$(sf project deploy start --metadata-dir "$REDEPLOY_DIR" --ignore-conflicts --json 2>&1 || true)
+    deploy_status=$(echo "$deploy_out" | jq -r '.result.status // "unknown"')
+    if [ "$deploy_status" = "Succeeded" ]; then
+        echo "  ✓ LWC deployed"
+        break
+    fi
+    err=$(echo "$deploy_out" | jq -r '.result.errorMessage // .message // ""')
+    case "$err" in
+        *ORG_ADMIN_LOCKED*)
+            echo "  ⏳ org locked by another admin op, retrying in 15s (attempt $attempt)"
+            sleep 15
+            ;;
+        *)
+            echo "ERROR deploying LWC: $err"
+            exit 1
+            ;;
+    esac
+done
 
-# Republish so the LWR site serves the refreshed LWC bundle.
-sf community publish --name "skywave website" --json > /dev/null || true
+# Republish so the LWR site serves the refreshed LWC bundle. Same retry logic.
+for attempt in 1 2 3 4 5 6; do
+    pub_out=$(sf community publish --name "skywave website" --json 2>&1 || true)
+    if echo "$pub_out" | jq -e '.status == 0' > /dev/null 2>&1; then
+        break
+    fi
+    if echo "$pub_out" | grep -q "ORG_ADMIN_LOCKED"; then
+        sleep 15
+    else
+        break
+    fi
+done
 
 cat <<BANNER
 
