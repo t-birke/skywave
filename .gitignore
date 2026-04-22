@@ -31,3 +31,6 @@ skills-lock.json
 # Runtime artifacts created by "sf agent publish" — never committed
 **/bots/**
 genAiPlannerBundles/
+
+# Local scratch/test output
+/tmp/

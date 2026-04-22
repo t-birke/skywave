@@ -9,7 +9,7 @@
         {
             "filename": "force-app/main/default/aiAuthoringBundles/Skywave_Airlines_Agent/Skywave_Airlines_Agent.agent",
             "stringToReplace": "skywaveserviceagent@example.com",
-            "replaceWithEnv": "SF_AGENT_USER"
+            "replaceWithEnv": "AGENT_USER"
         }
     ],
     "name": "skywave-scratch",

@@ -12,7 +12,11 @@
         "Communities",
         "ServiceCloud",
         "LiveMessage",
-        "LiveAgent"
+        "LiveAgent",
+        "Sites",
+        "FlowSites",
+        "PublishExpBuilderBasedSna",
+        "EmbeddedServiceMessaging"
     ],
     "settings": {
         "lightningExperienceSettings": {
@@ -48,6 +52,9 @@
         },
         "liveMessageSettings": {
             "enableLiveMessage": true
+        },
+        "experienceBundleSettings": {
+            "enableExperienceBundleMetadata": true
         }
     }
 }

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Phase 2: Site-dependent metadata (queues, guest profile). The guest profile
+    references the LWR site and its deployed Apex class, which are created in
+    phase 1. Queues are needed so the agent user can be added as member before
+    activating the agent.
+-->
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>main_queue</members>
+        <name>Queue</name>
+    </types>
+    <types>
+        <members>skywave_routing</members>
+        <name>QueueRoutingConfig</name>
+    </types>
+    <types>
+        <members>skywave website Profile</members>
+        <name>Profile</name>
+    </types>
+    <version>66.0</version>
+</Package>
