@@ -1,0 +1,407 @@
+<template>
+  <div class={rootClass}>
+    <div class="site-content">
+
+      <div class="phone-status-bar">
+        <span class="phone-clock">{clockText}</span>
+        <div class="phone-di"></div>
+        <div class="phone-status-icons">
+          <svg width="17" height="12" viewBox="0 0 17 12" fill="white" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0" y="7" width="3" height="5" rx="1"></rect>
+            <rect x="5" y="5" width="3" height="7" rx="1"></rect>
+            <rect x="10" y="3" width="3" height="9" rx="1"></rect>
+            <rect x="14" y="1" width="3" height="11" rx="1"></rect>
+          </svg>
+          <svg width="25" height="12" viewBox="0 0 25 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="white"></rect>
+            <rect x="22" y="3.5" width="2.5" height="5" rx="1.25" fill="white"></rect>
+            <rect x="2" y="2" width="16" height="8" rx="2" fill="white"></rect>
+          </svg>
+        </div>
+      </div>
+
+      <div class="scroll-content">
+
+        <nav class="nav">
+          <div class="nav-logo">
+            <div class="logo-mark">
+              <svg viewBox="0 0 24 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" fill="white"></path>
+                <path d="M3 27 Q7.5 23 12 27 Q16.5 23 21 27" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"></path>
+              </svg>
+            </div>
+            <span class="logo-text">Sky<span>Wave</span></span>
+          </div>
+
+          <div class="nav-links">
+            <a class="active">Flights</a>
+            <a>Hotels</a>
+            <a>Cars</a>
+            <a>Vacations</a>
+            <a>Deals</a>
+            <a>SkyRewards</a>
+          </div>
+
+          <div class="nav-right">
+            <div class="pts-chip desktop-item">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+              Elite&nbsp;&nbsp;·&nbsp;&nbsp;42,180 pts
+            </div>
+            <span class="nav-user desktop-item">Hi, Alex</span>
+            <button class="nav-btn desktop-item">My Account</button>
+            <button class="hamburger-btn" onclick={handleHamburger} aria-label="Open menu">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
+            <button class="view-toggle-btn" onclick={handleViewToggle} title="Switch view" aria-label="Switch view">
+              <svg class="vt-icon-mobile" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="5" y="2" width="14" height="20" rx="2"></rect>
+                <circle cx="12" cy="18" r="1" fill="currentColor" stroke="none"></circle>
+              </svg>
+              <svg class="vt-icon-desktop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+                <polyline points="8 21 12 17 16 21"></polyline>
+              </svg>
+            </button>
+          </div>
+        </nav>
+
+        <div class={mobileDrawerClass}>
+          <div class="mob-drawer-inner">
+            <div class="mob-nav-links">
+              <a class="active">Flights</a>
+              <a>Hotels</a>
+              <a>Cars</a>
+              <a>Vacations</a>
+              <a>Deals</a>
+              <a>SkyRewards</a>
+            </div>
+            <div class="mob-drawer-footer">
+              <div class="mob-pts-chip">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+                Elite&nbsp;·&nbsp;42,180 pts
+              </div>
+              <div class="mob-user-links">
+                <a>Hi, Alex</a>
+                <a>My Account</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <section class="hero">
+          <div class="hero-dots"></div>
+          <div class="hero-glow"></div>
+
+          <svg class="hero-plane" viewBox="0 0 160 310" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="70" y="30" width="20" height="230" rx="10" fill="white"></rect>
+            <path d="M70,52 Q80,8 90,52Z" fill="white"></path>
+            <path d="M80,118 L6,180 L6,198 L80,158 L154,198 L154,180 Z" fill="white"></path>
+            <ellipse cx="34" cy="183" rx="10" ry="18" fill="white" opacity="0.75"></ellipse>
+            <ellipse cx="126" cy="183" rx="10" ry="18" fill="white" opacity="0.75"></ellipse>
+            <path d="M80,236 L42,272 L42,283 L80,258 L118,283 L118,272 Z" fill="white" opacity="0.85"></path>
+            <circle cx="80" cy="128" r="5" fill="#0D1B2A" opacity="0.22"></circle>
+            <circle cx="80" cy="146" r="5" fill="#0D1B2A" opacity="0.22"></circle>
+            <circle cx="80" cy="164" r="5" fill="#0D1B2A" opacity="0.22"></circle>
+            <circle cx="80" cy="182" r="5" fill="#0D1B2A" opacity="0.22"></circle>
+            <circle cx="80" cy="200" r="5" fill="#0D1B2A" opacity="0.22"></circle>
+            <circle cx="80" cy="218" r="5" fill="#0D1B2A" opacity="0.22"></circle>
+          </svg>
+
+          <div class="hero-content">
+            <div class="hero-left">
+              <div class="hero-eyebrow">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"></path></svg>
+                SkyWave Airlines
+              </div>
+              <h1 class="hero-title">
+                Discover your<br/>
+                <span class="accent">Dream Flight</span>
+              </h1>
+              <p class="hero-sub">
+                Find an easy way to book airplane tickets with just a few clicks. Earn 3x points on every flight.
+              </p>
+              <div class="hero-stats">
+                <div>
+                  <div class="stat-num">150+</div>
+                  <div class="stat-label">Destinations</div>
+                </div>
+                <div>
+                  <div class="stat-num">2M+</div>
+                  <div class="stat-label">Travelers</div>
+                </div>
+                <div>
+                  <div class="stat-num">$0</div>
+                  <div class="stat-label">Booking fees</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="hero-right">
+              <div class="search-card">
+                <div class="s-tabs">
+                  <div class="s-tab active">
+                    <span class="tab-pip"></span>One&#8209;Way
+                  </div>
+                  <div class="s-tab">
+                    <span class="tab-pip"></span>Round Trip
+                  </div>
+                </div>
+
+                <div class="s-fields">
+                  <div class="s-field">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M17.8 19.2L16 11l3.5-3.5C21 6 21 4 19.5 2.5S18 2 16.5 3.5L13 7 4.8 5.2l-1.1 1L9 10l-2 2H4l-1 1 3 2 2 3 1-1v-3l2-2 3.2 5.3z"></path>
+                    </svg>
+                    <input type="text" placeholder="Where from?" value="Seattle, WA (SEA)"/>
+                  </div>
+                  <div class="s-field">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M17.8 19.2L16 11l3.5-3.5C21 6 21 4 19.5 2.5S18 2 16.5 3.5L13 7 4.8 5.2l-1.1 1L9 10l-2 2H4l-1 1 3 2 2 3 1-1v-3l2-2 3.2 5.3z" transform="rotate(180 12 12)"></path>
+                    </svg>
+                    <input type="text" placeholder="Where to?"/>
+                  </div>
+                  <div class="s-row">
+                    <div class="s-field">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>
+                      </svg>
+                      <input type="date" value="2026-03-15"/>
+                    </div>
+                    <div class="s-field">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>
+                      </svg>
+                      <select>
+                        <option>Economy</option>
+                        <option>Business</option>
+                        <option>First Class</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="s-row">
+                    <div class="s-field">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>
+                      </svg>
+                      <input type="date" value="2026-03-22"/>
+                    </div>
+                    <div class="s-field">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                      </svg>
+                      <select>
+                        <option>1 Passenger</option>
+                        <option>2 Passengers</option>
+                        <option>3 Passengers</option>
+                        <option>4+ Passengers</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <button class="btn-search">Search Flights</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="main">
+
+          <div class="ticket-strip">
+            <div class="ticket-card">
+              <div>
+                <div class="ticket-eyebrow">Active Ticket&nbsp;&nbsp;·&nbsp;&nbsp;3 upcoming trips</div>
+                <div class="ticket-route">
+                  <span class="t-code">SEA</span>
+                  <div class="t-line-wrap">
+                    <div class="t-line"></div>
+                    <span class="t-dur">5h 27m</span>
+                  </div>
+                  <span class="t-code">JFK</span>
+                </div>
+                <div class="ticket-meta">
+                  Round trip&nbsp;·&nbsp;Mar 2 – 7&nbsp;·&nbsp;Flight SW 2241&nbsp;·&nbsp;Seat <strong>4A, Window</strong>&nbsp;·&nbsp;Conf. <strong>WK4482</strong>
+                </div>
+                <div class="ticket-links">
+                  <a>Upgrade fare</a>
+                  <a>View flight</a>
+                  <a>Change flight</a>
+                  <a>Cancel flight</a>
+                </div>
+              </div>
+              <button class="btn-manage">Manage trip</button>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <h2 class="section-title">Featured deals</h2>
+              <a class="section-more">See more &#8594;</a>
+            </div>
+            <div class="deals-grid">
+              <div class="deal-card">
+                <div class="deal-img c1">&#x1F5FD;</div>
+                <div class="deal-body">
+                  <div class="deal-tag">Limited Time</div>
+                  <h4>New York from $189</h4>
+                  <p>Nonstop flights from Seattle. Book by March 1 to lock in this rate.</p>
+                </div>
+              </div>
+              <div class="deal-card">
+                <div class="deal-img c2">&#x1F334;</div>
+                <div class="deal-body">
+                  <div class="deal-tag">Spring Break</div>
+                  <h4>Canc&#250;n from $299</h4>
+                  <p>Sun, sand, and savings. Earn double points on select international routes.</p>
+                </div>
+              </div>
+              <div class="deal-card">
+                <div class="deal-img c3">&#x1F3B0;</div>
+                <div class="deal-body">
+                  <div class="deal-tag">Weekend Deal</div>
+                  <h4>Las Vegas from $89</h4>
+                  <p>Quick getaway deals every Thursday. Sign up for SkyAlert to be notified.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pts-banner">
+            <div class="pts-inner">
+              <div>
+                <h3>You&#x2019;re 7,820 points from free</h3>
+                <p>Book your next trip with the SkyWave Rewards Card and earn enough points for a round-trip flight anywhere we fly.</p>
+              </div>
+              <button class="btn-pts">Explore rewards</button>
+            </div>
+          </div>
+
+        </div>
+
+        <footer class="sw-footer">
+          <div class="footer-inner">
+            <div class="footer-brand">
+              <div class="nav-logo">
+                <div class="logo-mark">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" fill="white"></path>
+                  </svg>
+                </div>
+                <span class="logo-text">Sky<span>Wave</span></span>
+              </div>
+              <p>Flying you further, faster, and smarter. Committed to exceptional service on every journey.</p>
+            </div>
+            <div>
+              <h5>Travel</h5>
+              <a>Book a flight</a>
+              <a>Flight status</a>
+              <a>Check-in</a>
+              <a>Baggage info</a>
+            </div>
+            <div>
+              <h5>Rewards</h5>
+              <a>SkyRewards</a>
+              <a>Credit card</a>
+              <a>Redeem points</a>
+              <a>Elite status</a>
+            </div>
+            <div>
+              <h5>Help</h5>
+              <a>FAQ</a>
+              <a>Contact us</a>
+              <a>Cancellations</a>
+              <a>Accessibility</a>
+            </div>
+          </div>
+          <div class="footer-bottom">
+            <span>&#169; 2026 SkyWave Airlines. All rights reserved.</span>
+            <span>Privacy&nbsp;·&nbsp;Terms&nbsp;·&nbsp;Cookie Policy</span>
+          </div>
+        </footer>
+
+      </div>
+
+      <button type="button" class="mob-call-fab" onclick={handleCallOpen} aria-label="Ask Me Anything">
+        Ask Me Anything
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 011 1V20a1 1 0 01-1 1C10.61 21 3 13.39 3 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.45.57 3.58a1 1 0 01-.25 1.02l-2.2 2.19z"></path>
+        </svg>
+      </button>
+
+      <div class={callUIClass} role="dialog" aria-modal="true" aria-label="Phone call">
+        <div class="call-top">
+          <div class="call-avatar">
+            <svg viewBox="0 0 24 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" fill="white"></path>
+              <path d="M3 27 Q7.5 23 12 27 Q16.5 23 21 27" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"></path>
+            </svg>
+          </div>
+          <div class="call-name">SkyWave Service Agent</div>
+          <div class="call-status">{callStatus}</div>
+        </div>
+
+        <div class="call-controls">
+          <button type="button" class="c-btn" data-ctrl="mute" onclick={handleCallCtrl}>
+            <div class="c-btn-disk">
+              <svg viewBox="0 0 24 24"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6"></path><path d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+            </div>
+            <span>mute</span>
+          </button>
+          <button type="button" class="c-btn" data-ctrl="keypad" onclick={handleCallCtrl}>
+            <div class="c-btn-disk">
+              <svg viewBox="0 0 24 24">
+                <circle cx="6"  cy="6"  r="1.5" fill="white" stroke="none"></circle>
+                <circle cx="12" cy="6"  r="1.5" fill="white" stroke="none"></circle>
+                <circle cx="18" cy="6"  r="1.5" fill="white" stroke="none"></circle>
+                <circle cx="6"  cy="12" r="1.5" fill="white" stroke="none"></circle>
+                <circle cx="12" cy="12" r="1.5" fill="white" stroke="none"></circle>
+                <circle cx="18" cy="12" r="1.5" fill="white" stroke="none"></circle>
+                <circle cx="6"  cy="18" r="1.5" fill="white" stroke="none"></circle>
+                <circle cx="12" cy="18" r="1.5" fill="white" stroke="none"></circle>
+                <circle cx="18" cy="18" r="1.5" fill="white" stroke="none"></circle>
+              </svg>
+            </div>
+            <span>keypad</span>
+          </button>
+          <button type="button" class="c-btn" data-ctrl="audio" onclick={handleCallRealPhone}>
+            <div class="c-btn-disk">
+              <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="white" stroke="none"></polygon><path d="M19.07 4.93a10 10 0 010 14.14"></path><path d="M15.54 8.46a5 5 0 010 7.07"></path></svg>
+            </div>
+            <span>speaker</span>
+          </button>
+          <button type="button" class="c-btn" data-ctrl="addcall" onclick={handleCallCtrl}>
+            <div class="c-btn-disk">
+              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </div>
+            <span>add call</span>
+          </button>
+          <button type="button" class="c-btn disabled">
+            <div class="c-btn-disk">
+              <svg viewBox="0 0 24 24"><rect x="2" y="7" width="15" height="11" rx="2"></rect><polyline points="17 12 22 8 22 16 17 12"></polyline></svg>
+            </div>
+            <span>FaceTime</span>
+          </button>
+          <button type="button" class="c-btn" data-ctrl="contacts" onclick={handleCallCtrl}>
+            <div class="c-btn-disk">
+              <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            </div>
+            <span>contacts</span>
+          </button>
+        </div>
+
+        <div class="call-end-row">
+          <button type="button" class="call-end-btn" onclick={handleCallEnd} aria-label="End call">
+            <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 011 1V20a1 1 0 01-1 1C10.61 21 3 13.39 3 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.45.57 3.58a1 1 0 01-.25 1.02l-2.2 2.19z" transform="rotate(135 12 12)"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="phone-home-bar"></div>
+
+    </div>
+  </div>
+</template>

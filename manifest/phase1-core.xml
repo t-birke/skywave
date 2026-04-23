@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Phase 1: core metadata. All Apex, LWC, objects, flows, CSP entries, etc.
+
+    Prereq: orgInit.sh runs `sf community create` twice before this deploys —
+    once for "skywave website" (the user-facing LWR site) and once for
+    "Skywave MIAW Deployment" (the companion Messaging-for-Web site). Those
+    commands provision the required CustomSite + Network + SiteDotCom and the
+    standard Apex pages (CommunitiesLanding etc.), none of which can be
+    deployed as metadata in a fresh scratch org.
+-->
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>Skywave_Airlines_Agent</members>
+        <name>AiAuthoringBundle</name>
+    </types>
+    <types>
+        <members>DemoSetup</members>
+        <members>GenerateDemoData</members>
+        <members>Skywave_BookFlight</members>
+        <members>Skywave_ChangeSeat</members>
+        <members>Skywave_FlightSearch</members>
+        <members>Skywave_GetFlightBookings</members>
+        <members>Skywave_GetUpcomingFlights</members>
+        <members>Skywave_ResolveContact</members>
+        <name>ApexClass</name>
+    </types>
+    <types>
+        <members>Skywave_MIAW_Scrt2</members>
+        <members>Skywave_MIAW_Scrt2_PcRnd</members>
+        <members>Skywave_MIAW_Site</members>
+        <members>Skywave_MIAW_Site_PcRnd</members>
+        <name>CspTrustedSite</name>
+    </types>
+    <types>
+        <members>Contact.Loyalty_Points__c</members>
+        <members>Contact.Member_Number__c</members>
+        <members>Contact.Membership_Start_Date__c</members>
+        <members>Contact.Membership_Tier__c</members>
+        <members>Flight__c.Active__c</members>
+        <members>Flight__c.Aircraft_Type__c</members>
+        <members>Flight__c.Base_Price_Basic__c</members>
+        <members>Flight__c.Base_Price_Choice_Extra__c</members>
+        <members>Flight__c.Base_Price_Choice_Preferred__c</members>
+        <members>Flight__c.Base_Price_Choice__c</members>
+        <members>Flight__c.Destination__c</members>
+        <members>Flight__c.Duration_Minutes__c</members>
+        <members>Flight__c.Flight_Number__c</members>
+        <members>Flight__c.Operates_Friday__c</members>
+        <members>Flight__c.Operates_Monday__c</members>
+        <members>Flight__c.Operates_Saturday__c</members>
+        <members>Flight__c.Operates_Sunday__c</members>
+        <members>Flight__c.Operates_Thursday__c</members>
+        <members>Flight__c.Operates_Tuesday__c</members>
+        <members>Flight__c.Operates_Wednesday__c</members>
+        <members>Flight__c.Origin__c</members>
+        <members>Flight__c.Scheduled_Arrival_Time__c</members>
+        <members>Flight__c.Scheduled_Departure_Time__c</members>
+        <members>Reservation_Segment__c.Arrival_DateTime__c</members>
+        <members>Reservation_Segment__c.Departure_DateTime__c</members>
+        <members>Reservation_Segment__c.Flight__c</members>
+        <members>Reservation_Segment__c.Reservation__c</members>
+        <members>Reservation_Segment__c.Seat_Number__c</members>
+        <members>Reservation_Segment__c.Segment_Order__c</members>
+        <members>Reservation_Segment__c.Segment_Status__c</members>
+        <members>Reservation_Segment__c.Travel_Date__c</members>
+        <members>Reservation__c.Booking_Date__c</members>
+        <members>Reservation__c.Checked_Bags__c</members>
+        <members>Reservation__c.Confirmation_Code__c</members>
+        <members>Reservation__c.Contact__c</members>
+        <members>Reservation__c.Fare_Class__c</members>
+        <members>Reservation__c.Number_of_Passengers__c</members>
+        <members>Reservation__c.Status__c</members>
+        <members>Reservation__c.Total_Amount__c</members>
+        <name>CustomField</name>
+    </types>
+    <types>
+        <members>Flight__c</members>
+        <members>Reservation_Segment__c</members>
+        <members>Reservation__c</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>site/skywave_website1</members>
+        <name>DigitalExperienceBundle</name>
+    </types>
+    <types>
+        <members>site/skywave_website1.*</members>
+        <name>DigitalExperience</name>
+    </types>
+    <types>
+        <members>skywave_website1</members>
+        <name>DigitalExperienceConfig</name>
+    </types>
+    <types>
+        <members>Skywave_AddCaseComment</members>
+        <members>Skywave_ChangeFlight</members>
+        <members>Skywave_CreateCase</members>
+        <members>Skywave_GetCaseByNumber</members>
+        <members>Skywave_GetCasesForContact</members>
+        <name>Flow</name>
+    </types>
+    <types>
+        <members>Skywave_RescheduleFlights</members>
+        <name>GenAiPromptTemplate</name>
+    </types>
+    <types>
+        <members>Contact-Contact Layout</members>
+        <members>Flight__c-Flight Layout</members>
+        <members>Reservation_Segment__c-Reservation Segment Layout</members>
+        <members>Reservation__c-Reservation Layout</members>
+        <name>Layout</name>
+    </types>
+    <types>
+        <members>skywaveAirlinesHome</members>
+        <name>LightningComponentBundle</name>
+    </types>
+    <types>
+        <members>Demo</members>
+        <members>Skywave_Agent_User</members>
+        <name>PermissionSet</name>
+    </types>
+    <version>66.0</version>
+</Package>

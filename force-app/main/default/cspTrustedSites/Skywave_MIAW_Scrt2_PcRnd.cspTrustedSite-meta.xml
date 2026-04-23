@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CspTrustedSite xmlns="http://soap.sforce.com/2006/04/metadata">
+    <context>All</context>
+    <description>SCRT2 service for embedded messaging (pc-rnd scratch org variant)</description>
+    <endpointUrl>https://*.my.pc-rnd.salesforce-scrt.com</endpointUrl>
+    <isActive>true</isActive>
+</CspTrustedSite>
