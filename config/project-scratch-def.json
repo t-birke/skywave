@@ -1,10 +1,9 @@
 {
     "orgName": "Skywave Scratch",
     "edition": "developer",
+    "language": "en_US",
     "hasSampleData": false,
     "features": [
-        "CustomerDataPlatform",
-        "CustomerDataPlatformLite",
         "EnableSetPasswordInApi",
         "Chatbot",
         "Knowledge",
@@ -14,9 +13,7 @@
         "LiveMessage",
         "LiveAgent",
         "Sites",
-        "FlowSites",
-        "PublishExpBuilderBasedSna",
-        "EmbeddedServiceMessaging"
+        "FlowSites"
     ],
     "settings": {
         "lightningExperienceSettings": {
@@ -38,9 +35,6 @@
         },
         "communitiesSettings": {
             "enableNetworksEnabled": true
-        },
-        "customerDataPlatformSettings": {
-            "enableCustomerDataPlatform": true
         },
         "knowledgeSettings": {
             "enableKnowledge": true,

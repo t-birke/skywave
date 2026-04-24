@@ -137,8 +137,6 @@ export default class SkywaveAirlinesHome extends LightningElement {
     bootstrapEmbeddedMessaging() {
         if (this._messagingBootstrapped) return;
         const { orgId, esConfigName, siteUrl, scrt2Url } = EMBEDDED_MESSAGING_CONFIG;
-        // If finalize.sh hasn't run yet, the tokens are still placeholders —
-        // skip bootstrap rather than firing bogus network calls.
         if (orgId.startsWith('__') || esConfigName.startsWith('__') || siteUrl.startsWith('__') || scrt2Url.startsWith('__')) {
             return;
         }

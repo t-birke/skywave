@@ -1,0 +1,10 @@
+{
+    "name": "skywave-scratch",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "description": "Skywave Airlines Agentforce + MIAW demo",
+    "devDependencies": {
+        "playwright": "^1.48.0"
+    }
+}
