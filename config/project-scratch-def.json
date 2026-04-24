@@ -13,9 +13,7 @@
         "LiveMessage",
         "LiveAgent",
         "Sites",
-        "FlowSites",
-        "PublishExpBuilderBasedSna",
-        "EmbeddedServiceMessaging"
+        "FlowSites"
     ],
     "settings": {
         "lightningExperienceSettings": {
