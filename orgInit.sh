@@ -280,6 +280,19 @@ else
     echo "  ⚠ Network metadata not retrieved — enable guest access manually in Experience Builder > Settings > General"
 fi
 
+# Warm up the site's CDN by issuing an authenticated server-side render.
+# Without this, anonymous visitors see the login screen until the first
+# authenticated request passes through — which is why users who ran
+# `sf org open` once before testing always saw the site working, but a
+# fresh incognito/anonymous visit would fail. Triggers the same CDN-state
+# refresh that frontdoor.jsp would. Non-fatal on failure.
+curl -sL -o /dev/null -b "/tmp/skywave-warm-${ORG_ID}.jar" -c "/tmp/skywave-warm-${ORG_ID}.jar" \
+    "${ORG_INFO_URL:-$(echo "$ORG_INFO" | jq -r '.result.instanceUrl')}/secur/frontdoor.jsp?sid=$(echo "$ORG_INFO" | jq -r '.result.accessToken')&retURL=%2Fskywavevforcesite%2F" \
+    2>/dev/null \
+    && echo "  ✓ CDN warmed for guest access" \
+    || echo "  ⚠ CDN warm-up failed — first guest visit may see login screen until it propagates"
+rm -f "/tmp/skywave-warm-${ORG_ID}.jar"
+
 cat <<BANNER
 
 ────────────────────────────────────────────────────────────────────
