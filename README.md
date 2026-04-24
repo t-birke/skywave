@@ -24,7 +24,8 @@ chmod +x orgInit.sh scripts/createEmbeddedServiceConfig.sh
 
 ## Getting Started
 
-Run one script. It pauses for a single Setup click, then finishes itself:
+Run one script. With Playwright installed it runs end-to-end with zero
+clicks; without it, the script pauses once for a Setup "Publish" click:
 
 ```sh
 ./orgInit.sh
