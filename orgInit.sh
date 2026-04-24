@@ -256,6 +256,30 @@ done
 echo "─── 12/12 Republishing LWR site so it picks up the baked LWC ───"
 sf community publish --name "skywave website" --json > /dev/null 2>&1 || true
 
+echo "─── 12b/12 Enabling guest (public) access on the LWR site ───"
+# `sf community publish` resets enableGuestFileAccess=false, so this has to
+# run AFTER the final publish. Without it, anonymous visitors see the login
+# page instead of the homepage.
+NET_RETR=$(mktemp -d)
+trap 'rm -rf "$REDEPLOY_DIR" "$BOT_PATCH_DIR" "$NET_RETR" 2>/dev/null || true' EXIT
+cat > "$NET_RETR/pkg.xml" <<PKG_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types><members>skywave website</members><name>Network</name></types>
+    <version>66.0</version>
+</Package>
+PKG_EOF
+sf project retrieve start --manifest "$NET_RETR/pkg.xml" --target-metadata-dir "$NET_RETR/out" --unzip --json > /dev/null
+NET_FILE="$NET_RETR/out/unpackaged/unpackaged/networks/skywave website.network"
+if [ -f "$NET_FILE" ]; then
+    sed -i '' 's|<enableGuestFileAccess>false</enableGuestFileAccess>|<enableGuestFileAccess>true</enableGuestFileAccess>|' "$NET_FILE"
+    sf project deploy start --metadata-dir "$NET_RETR/out/unpackaged/unpackaged" --ignore-conflicts --json > /dev/null \
+        && echo "  ✓ guest access enabled" \
+        || echo "  ⚠ guest-access flip failed — enable manually in Experience Builder > Settings > General"
+else
+    echo "  ⚠ Network metadata not retrieved — enable guest access manually in Experience Builder > Settings > General"
+fi
+
 cat <<BANNER
 
 ────────────────────────────────────────────────────────────────────
