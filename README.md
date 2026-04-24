@@ -11,11 +11,16 @@ a public LWR Experience Cloud site with an embedded Agentforce Messaging
 - Authenticated into a DevHub org (`sf org login web --set-default-dev-hub`)
 - [`jq`](https://jqlang.github.io/jq/) on your PATH (`brew install jq` on macOS)
 - `python3` on your PATH (ships with macOS)
-- Make the setup script executable:
+- Node.js 18+ (for Playwright — skip if you prefer to click Publish manually)
 
-  ```sh
-  chmod +x orgInit.sh scripts/createEmbeddedServiceConfig.sh
-  ```
+Install Playwright + Chromium so `orgInit.sh` can click Publish headlessly
+(otherwise the script will prompt you to click it):
+
+```sh
+npm install
+npx playwright install chromium
+chmod +x orgInit.sh scripts/createEmbeddedServiceConfig.sh
+```
 
 ## Getting Started
 
@@ -45,19 +50,16 @@ What it does automatically:
 - Publishes the customer LWR site, flips the Network to `Live`, loads
   sample data
 
-### The one manual step
+### The Publish step
 
-Today there is no public API for the "Publish" button on an Embedded
-Service Deployment (confirmed internally — see
-[PLATFORM_FEEDBACK.md #10](PLATFORM_FEEDBACK.md)). When the script pauses,
-a Setup tab opens at Embedded Service Deployments:
+Salesforce doesn't expose a public API for the "Publish" button on an
+Embedded Service Deployment (confirmed internally — see
+[PLATFORM_FEEDBACK.md #10](PLATFORM_FEEDBACK.md)). The script works
+around this by driving a headless Chromium via Playwright to click
+the button for you. See `scripts/publishEmbeddedServiceDeployment.mjs`.
 
-1. Click **Skywave MIAW Deployment**
-2. Click **Publish**
-3. Return to the terminal and press Enter
-
-The script resumes, bakes runtime values into the `skywaveAirlinesHome`
-LWC, redeploys it, and republishes the LWR site.
+If Playwright isn't installed, the script falls back to prompting you
+to click Publish in Setup, then press Enter to continue.
 
 ### Open the site
 

@@ -245,10 +245,15 @@ The CSOT (Core Source of Truth) initiative is supposed to make channel
 lifecycle operations more API-friendly but is not there yet for
 Embedded deployments.
 
-**Workaround.** The only remaining manual step in our script is a single
-Setup click: **Setup → Embedded Service Deployments → [your deployment] →
-Publish.** Our `orgInit.sh` pauses with a clear prompt, opens the Setup
-tab, and resumes after the user presses Enter.
+**Workaround.** Our `orgInit.sh` drives a headless Chromium via
+Playwright (`scripts/publishEmbeddedServiceDeployment.mjs`) that
+authenticates via frontdoor, navigates to the deployment page, and
+clicks the Publish button. Zero user interaction. Falls back to a
+manual-click prompt if Playwright isn't installed.
+
+Fragile: Salesforce can change Aura internals / button labels
+quarterly, which would break the selectors. This is why we're still
+asking for a real API.
 
 **Ask.** Expose a public endpoint for Publish, e.g.:
 

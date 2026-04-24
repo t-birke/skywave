@@ -179,28 +179,34 @@ SETUP_HOST="${SETUP_HOST/.my.pc-rnd.salesforce.com/.my.pc-rnd.salesforce-setup.c
 SETUP_HOST="${SETUP_HOST/.sandbox.my.salesforce.com/.sandbox.my.salesforce-setup.com}"
 DEPLOY_URL="https://${SETUP_HOST}/lightning/setup/EmbeddedServiceDeployments/${ESC_ID}/view"
 
-cat <<BANNER
+echo "─── 10b/12 Publishing ESD (headless browser click) ───"
+# Salesforce doesn't expose a public API for the Publish button on an Embedded
+# Service Deployment (confirmed internally — see PLATFORM_FEEDBACK.md #10), so
+# we drive a real Chromium via Playwright. One click, zero user interaction.
+#
+# If Playwright isn't installed (npm install was skipped) we fall back to
+# prompting the user to click manually.
+if [ -x node_modules/.bin/playwright ] || node -e "require('playwright')" 2>/dev/null; then
+    node scripts/publishEmbeddedServiceDeployment.mjs \
+        --target-org "$ORG_ALIAS" \
+        --deployment-name Skywave_MIAW_Deployment
+else
+    cat <<BANNER
 
 ════════════════════════════════════════════════════════════════════
-  ONE manual step before finishing (Salesforce offers no API for it
-  — this is the only UI action the script can't reproduce):
+  Playwright isn't installed. Click Publish manually:
 
-    Open the deployment and click "Publish":
+    ${DEPLOY_URL}
 
-      ${DEPLOY_URL}
-
-  Press Enter here after clicking Publish. The script will then bake
-  runtime values into the LWC and republish the LWR site.
-
-  (Customer site URL after finish: ${SITE_URL})
+  Then press Enter to continue. (To skip this prompt in future runs,
+  run: npm install && npx playwright install chromium)
 ════════════════════════════════════════════════════════════════════
 
 BANNER
-
-# Open the deep link directly (falls back to the list if the deep link fails)
-sf org open --path "/lightning/setup/EmbeddedServiceDeployments/${ESC_ID}/view" > /dev/null 2>&1 || \
-    sf org open --path "/lightning/setup/EmbeddedServiceDeployments/home" > /dev/null || true
-read -r -p "Press Enter after clicking Publish..." _
+    sf org open --path "/lightning/setup/EmbeddedServiceDeployments/${ESC_ID}/view" > /dev/null 2>&1 || \
+        sf org open --path "/lightning/setup/EmbeddedServiceDeployments/home" > /dev/null || true
+    read -r -p "Press Enter after clicking Publish..." _
+fi
 
 echo "─── 11/12 Fetching published config + baking LWC ───"
 # The scrt2 config endpoint is authoritative for the bootstrap siteUrl (the
