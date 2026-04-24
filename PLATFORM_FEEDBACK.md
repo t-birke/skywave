@@ -201,31 +201,63 @@ classAccesses entries for classes that don't exist.
 
 ---
 
-## 10. No headless endpoint to create an Embedded Service Deployment
+## 10. No headless endpoint to "Publish" an Embedded Service Deployment
 
-**Problem.** An `EmbeddedServiceConfig` metadata file can only be
-successfully deployed if it references an existing `<site>` (and that
-site has to be the auto-generated `ESW_*` site). That ESW site is
-**only** provisioned when you click through the "Messaging for In-App
-and Web" wizard in Setup. Attempts via Tooling API `POST` on
-`EmbeddedServiceConfig` return `"You must provide a valid Metadata
-field for EmbeddedServiceConfig"` and later
-`"An unexpected error occurred"`.
+**Update (revisited 2026-04-23).** The "ESW site must be the auto-generated
+`ESW_*` site" claim was wrong. Per `trailheadapps/coral-cloud`, the ESW
+bootstrap site can be vendored as a regular
+`DigitalExperienceBundle + CustomSite + Network` triple (see our
+`force-app/main/default/digitalExperiences/site/ESA_Deployment1/`). The
+`EmbeddedServiceConfig.<site>` field accepts any deployable site, not
+just the wizard-generated ones.
 
-`CustomSite` metadata can't create an ESW site either — the site type
-isn't exposed as deployable metadata.
+Likewise, `POST /tooling/sobjects/EmbeddedServiceConfig` works cleanly
+when the `Metadata` body is shaped correctly (include
+`deploymentFeature=EmbeddedMessaging`, `deploymentType=Web`,
+`clientVersion=WebV2`, `site=<your-site-name>`,
+`shouldShowAgentforceTagline` in the channel sub-object, etc. —
+see `scripts/createEmbeddedServiceConfig.sh`). Our earlier errors were
+from missing required sub-fields.
 
-**Workaround.** This is the one piece of the setup that stays manual.
-Scripts can't avoid it; you have to click through the Setup wizard.
+**The real residual blocker — the "Publish" action.** Creating the
+`EmbeddedServiceConfig` via Tooling API yields a record with
+`Metadata.urls = null`. The scrt2 config-fetch endpoint then responds:
 
-**Ask.** This is the single biggest friction point for fully headless
-Agentforce demo setup. Expose any of:
+> HTTP 412 `"Embedded Messaging Config is not Published"`
 
-- A CLI command: `sf embedded-service deployment create --channel X --name Y`
-- A Connect API endpoint:
-  `POST /services/data/vXX/connect/embedded-service/deployments`
-- Or make `EmbeddedServiceConfig` metadata deployable without a
-  pre-existing `<site>`, and have the deploy auto-provision the ESW site.
+Clicking **Publish** in Setup populates `Metadata.urls` and inserts (or
+mutates) a record in an internal sobject with key-prefix `3mc` (the
+existence of the record leaks through a `DUPLICATE_VALUE` error when you
+try to PATCH the ESC Metadata: `duplicates value on record with id
+3mc...`). That `3mc` sobject isn't in the global describe — it's hidden
+from the public API surface by design.
+
+Internal Slack confirmation (#technical-digital-engagement, #crm-de-messaging-support-help, Mar 2026):
+> "There's certain fields on the messaging channel record that are
+> hidden/not API accessible — customers wouldn't be able to copy them
+> manually with metadata API, so the best way is to use the New Channel
+> setup flow to insert them."
+> "MessagingChannel isn't supported by changesets or metadata API. I
+> don't believe you can query all the necessary fields to make the
+> channel functional."
+
+The CSOT (Core Source of Truth) initiative is supposed to make channel
+lifecycle operations more API-friendly but is not there yet for
+Embedded deployments.
+
+**Workaround.** The only remaining manual step in our script is a single
+Setup click: **Setup → Embedded Service Deployments → [your deployment] →
+Publish.** Our `orgInit.sh` pauses with a clear prompt, opens the Setup
+tab, and resumes after the user presses Enter.
+
+**Ask.** Expose a public endpoint for Publish, e.g.:
+
+- Tooling action on the `EmbeddedServiceConfig` record:
+  `POST /tooling/sobjects/EmbeddedServiceConfig/{Id}/publish`
+- Or a Connect API endpoint:
+  `POST /services/data/vXX/connect/embedded-service/deployments/{Id}/publish`
+- Or expose the `3mc` sobject and its required fields in the public
+  describe so scripts can insert the published-state record themselves.
 
 ---
 
@@ -272,18 +304,21 @@ body on 400 instead of failing silently.
 
 ---
 
-## 13. `EmbeddedServiceConfig` must be switched to "Enhanced v2" manually
+## 13. `EmbeddedServiceConfig` "Switch to Enhanced v2" — **resolved**
 
-**Problem.** Newly created Embedded Service Deployments default to the
-v1 client. v1 does not integrate with Agentforce agents. To use the
-agent, you have to open the deployment in Setup and click "Switch to
-Enhanced v2" — but this flag is not exposed in `EmbeddedServiceConfig`
-metadata or Tooling API.
+**Update (revisited 2026-04-23).** `clientVersion` is accessible via the
+Tooling API — it's a picklist field `{WebV1, WebV2}` on
+`EmbeddedServiceConfig`. Creating the record via
+`POST /tooling/sobjects/EmbeddedServiceConfig` with
+`Metadata.clientVersion = "WebV2"` produces a Enhanced/v2 record on
+first create, no "Switch to v2" click needed.
 
-**Workaround.** Manual step in the Setup wizard.
+The field is not exposed as a create-time column on the sobject
+(`createable=false`), so you have to go through the Tooling `Metadata`
+blob — but that works reliably.
 
-**Ask.** Expose `clientVersion` (or whatever internal flag represents
-v2) as a deployable metadata field.
+**Ask.** Document this. Most docs still say "Switch to Enhanced v2 in
+Setup."
 
 ---
 
@@ -393,8 +428,8 @@ to return empty. See #4.
 
 | # | Issue | Impact |
 |---|---|---|
-| 10 | No headless ESC deployment creation | 🔴 Blocks end-to-end automation entirely |
-| 13 | Manual "Switch to Enhanced v2" step | 🔴 Blocks end-to-end automation entirely |
+| 10 | No headless "Publish" on ESC | 🔴 The sole remaining manual step |
+| 13 | Manual "Switch to Enhanced v2" step | ✅ Resolved (Tooling API `clientVersion=WebV2`) |
 | 11 | 15 vs 18 char org ID silent failure | 🟠 Easy to lose hours debugging |
 | 12 | `esConfigName` vs channel name confusion | 🟠 Easy to lose hours debugging |
 | 1  | `sf agent publish` leaves BotUserId null | 🟠 Requires non-obvious 3-step workaround |

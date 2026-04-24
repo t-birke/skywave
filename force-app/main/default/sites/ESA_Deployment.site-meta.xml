@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomSite xmlns="http://soap.sforce.com/2006/04/metadata">
+    <active>true</active>
+    <allowGuestPaymentsApi>false</allowGuestPaymentsApi>
+    <allowHomePage>false</allowHomePage>
+    <allowStandardAnswersPages>false</allowStandardAnswersPages>
+    <allowStandardIdeasPages>false</allowStandardIdeasPages>
+    <allowStandardLookups>false</allowStandardLookups>
+    <allowStandardPortalPages>true</allowStandardPortalPages>
+    <allowStandardSearch>false</allowStandardSearch>
+    <authorizationRequiredPage>CommunitiesLogin</authorizationRequiredPage>
+    <bandwidthExceededPage>BandwidthExceeded</bandwidthExceededPage>
+    <browserXssProtection>true</browserXssProtection>
+    <cachePublicVisualforcePagesInProxyServers
+    >true</cachePublicVisualforcePagesInProxyServers>
+    <clickjackProtectionLevel>SameOriginOnly</clickjackProtectionLevel>
+    <contentSniffingProtection>true</contentSniffingProtection>
+    <enableAuraRequests>true</enableAuraRequests>
+    <fileNotFoundPage>FileNotFound</fileNotFoundPage>
+    <genericErrorPage>Exception</genericErrorPage>
+    <inMaintenancePage>InMaintenance</inMaintenancePage>
+    <indexPage>CommunitiesLanding</indexPage>
+    <masterLabel>ESA_Deployment</masterLabel>
+    <redirectToCustomDomain>false</redirectToCustomDomain>
+    <referrerPolicyOriginWhenCrossOrigin
+    >true</referrerPolicyOriginWhenCrossOrigin>
+    <selfRegPage>CommunitiesSelfReg</selfRegPage>
+    <serverIsDown>SNA_HUpnp_sf_default_cdn_ESA_Deployment1</serverIsDown>
+    <siteIframeWhiteListUrls>
+        <url>my.site.com</url>
+    </siteIframeWhiteListUrls>
+    <siteIframeWhiteListUrls>
+        <url>*.my.site.com</url>
+    </siteIframeWhiteListUrls>
+    <siteIframeWhiteListUrls>
+        <url>my.pc-rnd.site.com</url>
+    </siteIframeWhiteListUrls>
+    <siteIframeWhiteListUrls>
+        <url>*.my.pc-rnd.site.com</url>
+    </siteIframeWhiteListUrls>
+    <siteIframeWhiteListUrls>
+        <url>*.vf.force.com</url>
+    </siteIframeWhiteListUrls>
+    <!-- Per-scratch-org host entries populated by sfdx-project.json replaceWithEnv at deploy
+         time. Required on pc-rnd: the widget's iframe's parent postMessage handshake only
+         works when the exact scratch host AND its subdomain wildcard are listed. Without
+         the wildcard, the wizard-created ESW site renders the button and a vendored
+         ChatterNetwork site does not (the auto-computed CSP frame-ancestors diverges). -->
+    <siteIframeWhiteListUrls>
+        <url>%%SCRATCH_ORG_SITE_HOST%%</url>
+    </siteIframeWhiteListUrls>
+    <siteIframeWhiteListUrls>
+        <url>*.%%SCRATCH_ORG_SITE_HOST%%</url>
+    </siteIframeWhiteListUrls>
+    <siteIframeWhiteListUrls>
+        <url>%%SCRATCH_ORG_VF_HOST%%</url>
+    </siteIframeWhiteListUrls>
+    <siteType>ChatterNetwork</siteType>
+    <urlPathPrefix>ESADeploymentvforce</urlPathPrefix>
+</CustomSite>

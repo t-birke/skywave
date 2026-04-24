@@ -10,6 +10,31 @@
             "filename": "force-app/main/default/aiAuthoringBundles/Skywave_Airlines_Agent/Skywave_Airlines_Agent.agent",
             "stringToReplace": "skywaveserviceagent@example.com",
             "replaceWithEnv": "AGENT_USER"
+        },
+        {
+            "filename": "force-app/main/default/flows/Skywave_Route_to_Agent.flow-meta.xml",
+            "stringToReplace": "%%SF_SKYWAVE_FLOW_AGENT_ID%%",
+            "replaceWithEnv": "SF_SKYWAVE_FLOW_AGENT_ID"
+        },
+        {
+            "filename": "force-app/main/default/flows/Skywave_Route_to_Agent.flow-meta.xml",
+            "stringToReplace": "%%SF_SKYWAVE_FLOW_CHANNEL_ID%%",
+            "replaceWithEnv": "SF_SKYWAVE_FLOW_CHANNEL_ID"
+        },
+        {
+            "filename": "force-app/main/default/flows/Skywave_Route_to_Agent.flow-meta.xml",
+            "stringToReplace": "%%SF_SKYWAVE_FLOW_QUEUE_ID%%",
+            "replaceWithEnv": "SF_SKYWAVE_FLOW_QUEUE_ID"
+        },
+        {
+            "filename": "force-app/main/default/sites/ESA_Deployment.site-meta.xml",
+            "stringToReplace": "%%SCRATCH_ORG_SITE_HOST%%",
+            "replaceWithEnv": "SCRATCH_ORG_SITE_HOST"
+        },
+        {
+            "filename": "force-app/main/default/sites/ESA_Deployment.site-meta.xml",
+            "stringToReplace": "%%SCRATCH_ORG_VF_HOST%%",
+            "replaceWithEnv": "SCRATCH_ORG_VF_HOST"
         }
     ],
     "name": "skywave-scratch",
