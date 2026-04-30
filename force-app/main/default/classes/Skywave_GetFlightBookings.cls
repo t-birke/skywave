@@ -8,134 +8,129 @@ public class Skywave_GetFlightBookings {
     @InvocableMethod(label='Get Flights for Current User' description='Gets all active flight bookings for the user')
     public static List<Result> getBookings(List<Request> requests) {
         List<Result> results = new List<Result>();
-        
+
         for (Request req : requests) {
             Result r = new Result();
-            
-            try {
-                if (String.isBlank(req.contactId)) {
-                    r.success = false;
-                    r.errorMessage = 'Contact ID is required';
-                    r.bookings = new List<Booking>();
-                    results.add(r);
-                    continue;
-                }
-                
-                // Query active reservations for this contact
-                List<Reservation__c> reservations = [
-                    SELECT Id, Name, Confirmation_Code__c, Total_Amount__c, 
-                           Fare_Class__c, Status__c, Checked_Bags__c,
-                           (SELECT Id, Flight__c, Flight__r.Flight_Number__c, 
-                                   Flight__r.Origin__c, Flight__r.Destination__c,
-                                   Flight__r.Aircraft_Type__c, Flight__r.Duration_Minutes__c,
-                                   Travel_Date__c, Departure_DateTime__c, Arrival_DateTime__c,
-                                   Seat_Number__c, Segment_Order__c, Segment_Status__c
-                            FROM Reservation_Segments__r
-                            WHERE Segment_Status__c != 'Cancelled'
-                            ORDER BY Segment_Order__c)
-                    FROM Reservation__c
-                    WHERE Contact__c = :req.contactId
-                      AND Status__c = 'Confirmed'
-                      AND Id IN (SELECT Reservation__c 
-                                FROM Reservation_Segment__c 
-                                WHERE Departure_DateTime__c >= :DateTime.now())
-                ];
-                
-                r.bookings = new List<Booking>();
-                
-                for (Reservation__c reservation : reservations) {
-                    Booking b = new Booking();
-                    b.bookingReference = reservation.Confirmation_Code__c;
-                    b.total = '$' + reservation.Total_Amount__c.setScale(0).format();
-                    
-                    // Set rebooking/cancellation conditions based on fare class
-                    if (reservation.Fare_Class__c == 'Basic') {
-                        b.rebookingConditions = 'change fee $75, plus fare difference';
-                        b.cancellationConditions = 'non-refundable';
-                    } else if (reservation.Fare_Class__c == 'Choice') {
-                        b.rebookingConditions = 'allowed, plus fare difference';
-                        b.cancellationConditions = 'fully refundable';
-                    } else {
-                        b.rebookingConditions = 'free changes, plus fare difference';
-                        b.cancellationConditions = 'fully refundable';
-                    }
-                    
-                    Integer bagCount = reservation.Checked_Bags__c != null ? 
-                                      reservation.Checked_Bags__c.intValue() : 0;
-                    b.checkedBaggageAllowance = bagCount + ' (50lbs each)';
-                    
-                    b.flights = new List<Flight>();
-                    
-                    // Group segments by travel date (for multi-city trips)
-                    Flight currentFlight = null;
-                    Date currentDate = null;
-                    
-                    for (Reservation_Segment__c segment : reservation.Reservation_Segments__r) {
-                        if (currentDate == null || currentDate != segment.Travel_Date__c) {
-                            if (currentFlight != null) {
-                                b.flights.add(currentFlight);
-                            }
-                            
-                            currentFlight = new Flight();
-                            currentFlight.segments = new List<Segment>();
-                            currentFlight.numberOfFlights = 0;
-                            currentDate = segment.Travel_Date__c;
-                        }
-                        
-                        Segment s = new Segment();
-                        s.segmentType = 'flight';
-                        s.flightNumber = segment.Flight__r.Flight_Number__c;
-                        s.departureDateTime = segment.Departure_DateTime__c.format('EEEE, MMMM d, yyyy h:mm a zzz');
-                        s.arrivalDateTime = segment.Arrival_DateTime__c.format('EEEE, MMMM d, yyyy h:mm a zzz');
-                        s.departureAirportCode = segment.Flight__r.Origin__c;
-                        s.arrivalAirportCode = segment.Flight__r.Destination__c;
-                        s.departureCity = getAirportCity(segment.Flight__r.Origin__c);
-                        s.arrivalCity = getAirportCity(segment.Flight__r.Destination__c);
-                        s.departureAirport = getAirportName(segment.Flight__r.Origin__c);
-                        s.arrivalAirport = getAirportName(segment.Flight__r.Destination__c);
-                        s.bookingClass = reservation.Fare_Class__c;
-                        s.operatingAircraft = segment.Flight__r.Aircraft_Type__c;
-                        s.operatingAirline = 'Skywave Airlines';
-                        
-                        Long durationMinutes = segment.Flight__r.Duration_Minutes__c != null ? 
-                                              segment.Flight__r.Duration_Minutes__c.longValue() : 0;
-                        s.duration = formatDuration(durationMinutes);
-                        
-                        currentFlight.segments.add(s);
-                        currentFlight.numberOfFlights++;
-                        
-                        // Set flight-level properties from first segment
-                        if (currentFlight.segments.size() == 1) {
-                            currentFlight.originDateTime = s.departureDateTime;
-                            currentFlight.originCity = s.departureCity;
-                            currentFlight.bookingClass = s.bookingClass;
-                        }
-                        
-                        // Always update to last segment
-                        currentFlight.destinationDateTime = s.arrivalDateTime;
-                        currentFlight.destinationCity = s.arrivalCity;
-                        currentFlight.duration = calculateTotalDuration(currentFlight.segments);
-                    }
-                    
-                    if (currentFlight != null) {
-                        b.flights.add(currentFlight);
-                    }
-                    
-                    r.bookings.add(b);
-                }
-                
-                r.success = true;
-                
-            } catch (Exception e) {
-                r.success = false;
-                r.errorMessage = 'Error retrieving bookings: ' + e.getMessage();
-                r.bookings = new List<Booking>();
-            }
-            
+            r.success = true;
+            r.bookings = buildDemoBookings();
             results.add(r);
         }
-        
+
         return results;
+    }
+
+    // Demo data: returns two active bookings whose dates always sit
+    // 3 days and 2 months out from today, so the demo stays current.
+    private static List<Booking> buildDemoBookings() {
+        Date today = Date.today();
+        Date oneWayDate = today.addDays(3);
+        Date returnOutboundDate = today.addMonths(2);
+        Date returnInboundDate = returnOutboundDate.addDays(7);
+
+        List<Booking> bookings = new List<Booking>();
+        bookings.add(buildOneWayBooking(oneWayDate));
+        bookings.add(buildReturnBooking(returnOutboundDate, returnInboundDate));
+        return bookings;
+    }
+
+    private static Booking buildOneWayBooking(Date travelDate) {
+        Booking b = new Booking();
+        b.bookingReference = 'SW-LV2401';
+        b.total = '$389';
+        b.rebookingConditions = 'semi-flexible, plus fare difference';
+        b.cancellationConditions = 'semi-flexible: $200 cancellation fee';
+        b.checkedBaggageAllowance = '1 (50lbs each)';
+        b.flights = new List<Flight>();
+
+        DateTime depart = Datetime.newInstance(travelDate, Time.newInstance(9, 30, 0, 0));
+        DateTime arrive = depart.addMinutes(345); // 5h 45m flight
+
+        Segment seg = buildFlightSegment(
+            'SW412', 'JFK', 'LAS', depart, arrive,
+            'Choice', 'Boeing 737-800', '5h 45m'
+        );
+
+        Flight f = new Flight();
+        f.segments = new List<Segment>{ seg };
+        f.numberOfFlights = 1;
+        f.duration = seg.duration;
+        f.originDateTime = seg.departureDateTime;
+        f.destinationDateTime = seg.arrivalDateTime;
+        f.originCity = seg.departureCity;
+        f.destinationCity = seg.arrivalCity;
+        f.bookingClass = seg.bookingClass;
+        b.flights.add(f);
+
+        return b;
+    }
+
+    private static Booking buildReturnBooking(Date outboundDate, Date inboundDate) {
+        Booking b = new Booking();
+        b.bookingReference = 'SW-SF8825';
+        b.total = '$642';
+        b.rebookingConditions = 'free changes, plus fare difference';
+        b.cancellationConditions = 'fully refundable';
+        b.checkedBaggageAllowance = '1 (50lbs each)';
+        b.flights = new List<Flight>();
+
+        // Outbound: JFK -> SFO
+        DateTime outDepart = Datetime.newInstance(outboundDate, Time.newInstance(8, 0, 0, 0));
+        DateTime outArrive = outDepart.addMinutes(390); // 6h 30m
+        Segment outSeg = buildFlightSegment(
+            'SW88', 'JFK', 'SFO', outDepart, outArrive,
+            'Choice', 'Airbus A321neo', '6h 30m'
+        );
+        Flight outFlight = new Flight();
+        outFlight.segments = new List<Segment>{ outSeg };
+        outFlight.numberOfFlights = 1;
+        outFlight.duration = outSeg.duration;
+        outFlight.originDateTime = outSeg.departureDateTime;
+        outFlight.destinationDateTime = outSeg.arrivalDateTime;
+        outFlight.originCity = outSeg.departureCity;
+        outFlight.destinationCity = outSeg.arrivalCity;
+        outFlight.bookingClass = outSeg.bookingClass;
+        b.flights.add(outFlight);
+
+        // Inbound: SFO -> JFK
+        DateTime inDepart = Datetime.newInstance(inboundDate, Time.newInstance(18, 0, 0, 0));
+        DateTime inArrive = inDepart.addMinutes(330); // 5h 30m
+        Segment inSeg = buildFlightSegment(
+            'SW123', 'SFO', 'JFK', inDepart, inArrive,
+            'Choice', 'Airbus A321neo', '5h 30m'
+        );
+        Flight inFlight = new Flight();
+        inFlight.segments = new List<Segment>{ inSeg };
+        inFlight.numberOfFlights = 1;
+        inFlight.duration = inSeg.duration;
+        inFlight.originDateTime = inSeg.departureDateTime;
+        inFlight.destinationDateTime = inSeg.arrivalDateTime;
+        inFlight.originCity = inSeg.departureCity;
+        inFlight.destinationCity = inSeg.arrivalCity;
+        inFlight.bookingClass = inSeg.bookingClass;
+        b.flights.add(inFlight);
+
+        return b;
+    }
+
+    private static Segment buildFlightSegment(String flightNumber, String originCode, String destCode,
+                                              DateTime depart, DateTime arrive,
+                                              String fareClass, String aircraft, String duration) {
+        Segment s = new Segment();
+        s.segmentType = 'flight';
+        s.flightNumber = flightNumber;
+        s.departureDateTime = depart.format('EEEE, MMMM d, yyyy h:mm a zzz');
+        s.arrivalDateTime = arrive.format('EEEE, MMMM d, yyyy h:mm a zzz');
+        s.departureAirportCode = originCode;
+        s.arrivalAirportCode = destCode;
+        s.departureCity = getAirportCity(originCode);
+        s.arrivalCity = getAirportCity(destCode);
+        s.departureAirport = getAirportName(originCode);
+        s.arrivalAirport = getAirportName(destCode);
+        s.bookingClass = fareClass;
+        s.operatingAircraft = aircraft;
+        s.operatingAirline = 'Skywave Airlines';
+        s.duration = duration;
+        return s;
     }
     
     private static String formatDuration(Long minutes) {
@@ -167,6 +162,7 @@ public class Skywave_GetFlightBookings {
             'SEA' => 'Seattle, WA',
             'JFK' => 'New York, NY',
             'LAX' => 'Los Angeles, CA',
+            'LAS' => 'Las Vegas, NV',
             'ORD' => 'Chicago, IL',
             'HNL' => 'Honolulu, HI',
             'SFO' => 'San Francisco, CA',
@@ -174,12 +170,13 @@ public class Skywave_GetFlightBookings {
         };
         return cityMap.containsKey(airportCode) ? cityMap.get(airportCode) : airportCode;
     }
-    
+
     private static String getAirportName(String airportCode) {
         Map<String, String> nameMap = new Map<String, String>{
             'SEA' => 'Seattle-Tacoma International',
             'JFK' => 'John F. Kennedy International',
             'LAX' => 'Los Angeles International',
+            'LAS' => 'Harry Reid International',
             'ORD' => 'O\'Hare International',
             'HNL' => 'Daniel K. Inouye International',
             'SFO' => 'San Francisco International',

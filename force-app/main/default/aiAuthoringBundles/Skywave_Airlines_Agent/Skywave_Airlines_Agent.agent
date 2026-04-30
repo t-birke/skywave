@@ -1,8 +1,8 @@
 system:
-  instructions: "You are a support agent for Skywave Airlines. Assist customers with their flight bookings and related inquiries."
+  instructions: "You are a support agent for Skywave Airlines. The customer you are speaking with is Lauren — already authenticated for this demo. Greet her by name and assist with her flight bookings and related inquiries. Do not ask for identification or email; treat the customer as verified."
 
   messages:
-    welcome: "Welcome to Skywave Airlines! How can I help you today?"
+    welcome: "Hi Lauren, thank you for calling. I am an AI Agent, how can I be of service today?"
     error: "Something went wrong, please try again."
 
 config:
@@ -53,8 +53,8 @@ variables:
         label: "Booking"
     Booking_Outcome: mutable boolean
         label: "Booking Outcome"
-    resolved_contact_id: mutable string = ""
-        description: "Resolved contact ID for the current user"
+    resolved_contact_id: mutable string = "003000000000000"
+        description: "Resolved contact ID for the current user (demo: pre-authenticated as Lauren)"
 
 language:
     default_locale: "en_US"
@@ -197,32 +197,25 @@ topic flight_management:
 
     reasoning:
         instructions: ->
-            if @variables.retrieve_active_booking_done is False and @variables.resolved_contact_id != "":
+            if @variables.retrieve_active_booking_done is False:
                 run @actions.get_bookings
                     with contactId = @variables.resolved_contact_id
                     set @variables.active_bookings = @outputs.bookings
                     set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
                     set @variables.retrieve_active_booking_done = @outputs.success
 
-            | Assist the user with their flight bookings.
+            | Assist Lauren with her flight bookings. The customer is already authenticated — never ask for email or identification.
 
-            if @variables.resolved_contact_id == "":
-                | The user has not been identified yet. Ask for their email address to look up their account.
-                  Use the {!@actions.identify_customer} action once you have the email.
-                  Do NOT attempt to look up flights or bookings until the user is identified.
-
-            if @variables.resolved_contact_id != "" and @variables.active_bookings is None:
-                | The user currently has no flights booked. Let them know and offer to search for flights.
+            if @variables.active_bookings is None:
+                | Lauren currently has no flights booked. Let her know and offer to search for flights.
 
             if @variables.active_bookings is not None:
-                | Here are the user's current bookings: {!@variables.active_bookings}
-                  When presenting bookings to the user, write the details directly in your text response.
-                  For each booking, include the bookingReference, flight segments with flightNumber,
-                  departureCity, arrivalCity, departureDateTime, arrivalDateTime, bookingClass, and total.
-                  Use the exact values returned — do NOT paraphrase or round.
-                  Do NOT use the show_command tool. Always compose your response as direct text.
+                | Here are Lauren's current bookings: {!@variables.active_bookings}
+                  When the user asks about her bookings, give a SHORT one-line summary per booking — trip type (one-way vs return), origin and destination cities, and how far out it is (e.g., "in 3 days", "in about 2 months"). Then ask which booking she means. Do NOT dump every field unless asked.
+                  When presenting full details, use the exact values returned — do NOT paraphrase or round. Do NOT use the show_command tool. Always compose your response as direct text.
 
-            | If the user wants to change a seat, use the {!@actions.change_seat} action.
+            | If the user wants to CANCEL a booking, identify which booking from active_bookings, then state the booking's cancellationConditions in plain language and ask her to confirm. Once she confirms, call {!@actions.cancel_booking} with the booking's bookingReference. After the action returns, relay the confirmationMessage to the user using its exact values (refund amount, payment method) — do NOT paraphrase the numbers.
+              If the user wants to change a seat, use the {!@actions.change_seat} action.
               If the user wants to book a new flight or reschedule, use {!@actions.Reschedule_Flights} to find available options and check eligibility.
               If the user wants to search for flights, use {!@actions.search_flights} with origin, destination, and departure date.
               If the user has confirmed specific flight details from search results (flightId, travelDate, fareClass), use {!@actions.book_flight} with all required parameters.
@@ -265,6 +258,10 @@ topic flight_management:
                 with reservationSegmentId = ...
                 with newSeatNumber = ...
                 with seatPreference = ...
+
+            cancel_booking: @actions.cancel_booking
+                with bookingReference = ...
+                with contactId = @variables.resolved_contact_id
 
             change_flight: @actions.change_flight
                 with Flight = ...
@@ -517,6 +514,65 @@ topic flight_management:
                     complex_data_type_name: "@apexClassType/c__Skywave_ChangeSeat$SegmentInfo"
                     is_used_by_planner: True
                     is_displayable: True
+
+        cancel_booking:
+            description: "Cancels a flight booking and processes the refund"
+            label: "Cancel Booking"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Processing cancellation"
+            target: "apex://Skywave_CancelFlight"
+
+            inputs:
+                "bookingReference": string
+                    description: "The booking reference of the booking to cancel"
+                    label: "Booking Reference"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "contactId": string
+                    description: "The contact ID associated with the booking"
+                    label: "Contact ID"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "success": boolean
+                    description: "true if the cancellation was processed"
+                    label: "success"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "errorMessage": string
+                    description: "details in case of an error"
+                    label: "error message"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "bookingReference": string
+                    description: "the cancelled booking reference"
+                    label: "booking reference"
+                    is_displayable: True
+                    is_used_by_planner: True
+                "cancellationFee": string
+                    description: "the fee applied for cancelling the booking"
+                    label: "cancellation fee"
+                    is_displayable: True
+                    is_used_by_planner: True
+                "refundAmount": string
+                    description: "the amount refunded to the customer"
+                    label: "refund amount"
+                    is_displayable: True
+                    is_used_by_planner: True
+                "refundMethod": string
+                    description: "where the refund will be issued"
+                    label: "refund method"
+                    is_displayable: True
+                    is_used_by_planner: True
+                "confirmationMessage": string
+                    description: "human-readable confirmation of the cancellation"
+                    label: "confirmation message"
+                    is_displayable: True
+                    is_used_by_planner: True
 
         change_flight:
             description: "Change a flight by providing the original flight info and the desired change"
