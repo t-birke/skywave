@@ -272,7 +272,8 @@ PKG_EOF
 sf project retrieve start --manifest "$NET_RETR/pkg.xml" --target-metadata-dir "$NET_RETR/out" --unzip --json > /dev/null
 NET_FILE="$NET_RETR/out/unpackaged/unpackaged/networks/skywave website.network"
 if [ -f "$NET_FILE" ]; then
-    sed -i '' 's|<enableGuestFileAccess>false</enableGuestFileAccess>|<enableGuestFileAccess>true</enableGuestFileAccess>|' "$NET_FILE"
+    # Portable in-place edit (GNU `sed -i` and BSD `sed -i ''` are mutually incompatible).
+    sed 's|<enableGuestFileAccess>false</enableGuestFileAccess>|<enableGuestFileAccess>true</enableGuestFileAccess>|' "$NET_FILE" > "$NET_FILE.tmp" && mv "$NET_FILE.tmp" "$NET_FILE"
     sf project deploy start --metadata-dir "$NET_RETR/out/unpackaged/unpackaged" --ignore-conflicts --json > /dev/null \
         && echo "  ✓ guest access enabled" \
         || echo "  ⚠ guest-access flip failed — enable manually in Experience Builder > Settings > General"
