@@ -31,6 +31,10 @@
         <apexClass>Skywave_CancelFlight</apexClass>
         <enabled>true</enabled>
     </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_ChangeName</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
     <fieldPermissions>
         <editable>false</editable>
         <field>Contact.Membership_Tier__c</field>

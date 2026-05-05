@@ -58,20 +58,4 @@
         <enabled>true</enabled>
         <name>AIViewInsightObjects</name>
     </userPermissions>
-    <userPermissions>
-        <enabled>true</enabled>
-        <name>ManageSelfServiceUsers</name>
-    </userPermissions>
-    <userPermissions>
-        <enabled>true</enabled>
-        <name>UseEinsteinCopilot</name>
-    </userPermissions>
-    <userPermissions>
-        <enabled>true</enabled>
-        <name>UseEinsteinCopilotInLightningExperience</name>
-    </userPermissions>
-    <userPermissions>
-        <enabled>true</enabled>
-        <name>ViewEinsteinCopilot</name>
-    </userPermissions>
 </PermissionSet>
