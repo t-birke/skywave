@@ -1,9 +1,8 @@
 system:
-  instructions: "You are a support agent for Skywave Airlines. The customer you are speaking with is Lauren — already authenticated for this demo. Greet her by name and assist with her flight bookings and related inquiries. Do not ask for identification or email; treat the customer as verified."
-
-  messages:
-    welcome: "Hi Lauren, thank you for calling. I am an AI Agent, how can I be of service today?"
-    error: "Something went wrong, please try again."
+    instructions: "You are a support agent for Skywave Airlines. The caller has been identified from their phone number and is already authenticated — do not ask for identification or email. If @variables.customer_first_name is non-empty, address the caller by that first name. If it is empty, use a polite neutral address (do not guess a name). Assist with flight bookings and related inquiries."
+    messages:
+        welcome: "Hi, thank you for calling Skywave Airlines. I'm an AI Agent — how can I help today?"
+        error: "Something went wrong, please try again."
 
 config:
     developer_name: "Skywave_Airlines_Agent_Test_Voice"
@@ -28,36 +27,55 @@ variables:
     VoiceCallId: linked string
         source: @VoiceCall.Id
         description: "VoiceCall Id"
+    CallerPhone: linked string
+        source: @VoiceCall.FromPhoneNumber
+        description: "Caller's phone number from telephony (E.164 or national)"
     VerifiedCustomerId: mutable string
         description: "Verified customer contact ID"
     Latest_Flight_Search_Results: mutable object
         label: "Latest Flight Search Results"
+        description: ""
     flight_booking_detail: mutable object
         label: "Flight Booking Detail"
+        description: ""
     flight_booking_error_detail: mutable string
         label: "Flight Booking Error Detail"
+        description: ""
     flight_booking_error_flag: mutable boolean
         label: "Flight Booking Error Flag"
+        description: ""
     check_imminent_flights_success: mutable boolean = False
         label: "Check Imminent Flights Success"
+        description: ""
     check_imminent_flight_error_message: mutable string
         label: "Check Imminent Flight Error Message"
+        description: ""
     flights_within_72hrs: mutable number = 0
         label: "Flights Within 72hrs"
+        description: ""
     active_bookings: mutable object
         label: "Active Bookings"
+        description: ""
     retrieve_active_booking_error_message: mutable string
         label: "Retrieve Active Booking Error Message"
+        description: ""
     retrieve_active_booking_done: mutable boolean = False
         label: "Retrieve Active Booking Done"
+        description: ""
     Tier_Status: mutable string
         label: "Tier Status"
+        description: ""
     booking: mutable string
         label: "Booking"
+        description: ""
     Booking_Outcome: mutable boolean
         label: "Booking Outcome"
-    resolved_contact_id: mutable string = "003000000000000"
-        description: "Resolved contact ID for the current user (demo: pre-authenticated as Lauren)"
+        description: ""
+    resolved_contact_id: mutable string = ""
+        description: "Resolved contact ID for the current caller"
+    customer_first_name: mutable string = "Lauren"
+        label: "Customer First Name"
+        description: "First name of the resolved caller, populated by resolve_contact"
 
 language:
     default_locale: "en_US"
@@ -76,6 +94,12 @@ start_agent topic_selector:
                 run @actions.resolve_contact
                     with contactId = @variables.ContactId
                     set @variables.resolved_contact_id = @outputs.contactId
+                    set @variables.customer_first_name = @outputs.firstName
+            if @variables.CallerPhone is not None and @variables.resolved_contact_id == "":
+                run @actions.resolve_contact
+                    with phoneNumber = @variables.CallerPhone
+                    set @variables.resolved_contact_id = @outputs.contactId
+                    set @variables.customer_first_name = @outputs.firstName
             if @variables.resolved_contact_id != "" and @variables.check_imminent_flights_success == False:
                 run @actions.get_upcoming_flights
                     with contactId = @variables.resolved_contact_id
@@ -107,14 +131,19 @@ start_agent topic_selector:
             go_to_case_management: @utils.transition to @topic.case_management
                 description: "Create, view, or update support cases"
 
+
+
+
+
+
     actions:
         resolve_contact:
-            description: "Resolves a Contact ID from a known ID or email lookup"
+            description: "Resolves a Contact ID from a known ID, email, or phone number"
             label: "Resolve Contact"
             require_user_confirmation: False
             include_in_progress_indicator: False
             target: "apex://Skywave_ResolveContact"
-                                                                        
+                                        
             inputs:
                 "contactId": string
                     description: "A known Contact ID to validate"
@@ -128,15 +157,31 @@ start_agent topic_selector:
                     is_required: False
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
-                                                                        
+                "phoneNumber": string
+                    description: "Phone number to look up a Contact (E.164 or national format accepted)"
+                    label: "Phone Number"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                                        
             outputs:
                 "contactId": string
                     description: "The resolved Contact ID"
                     label: "Contact ID"
                     is_displayable: False
                     is_used_by_planner: True
+                "firstName": string
+                    description: "The contact first name"
+                    label: "First Name"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "lastName": string
+                    description: "The contact last name"
+                    label: "Last Name"
+                    is_displayable: False
+                    is_used_by_planner: True
                 "contactName": string
-                    description: "The contact name"
+                    description: "The contact full name"
                     label: "Contact Name"
                     is_displayable: False
                     is_used_by_planner: True
@@ -157,7 +202,7 @@ start_agent topic_selector:
             require_user_confirmation: False
             include_in_progress_indicator: False
             target: "apex://Skywave_GetUpcomingFlights"
-                                                                        
+                                                                                                                
             inputs:
                 "contactId": string
                     description: "The contact id for the customer"
@@ -165,7 +210,7 @@ start_agent topic_selector:
                     is_required: True
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
-                                                                        
+                                                                                                                
             outputs:
                 "errorMessage": string
                     description: "details in case of an error"
@@ -198,17 +243,17 @@ topic flight_management:
                     set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
                     set @variables.retrieve_active_booking_done = @outputs.success
 
-            | Assist Lauren with her flight bookings. The customer is already authenticated — never ask for email or identification.
+            | Assist the caller with their flight bookings. The customer is already authenticated — never ask for email or identification. If {!@variables.customer_first_name} is non-empty, address the caller by that first name; otherwise use a polite neutral address.
 
             if @variables.active_bookings is None:
-                | Lauren currently has no flights booked. Let her know and offer to search for flights.
+                | The caller currently has no flights booked. Let them know and offer to search for flights.
 
             if @variables.active_bookings is not None:
-                | Here are Lauren's current bookings: {!@variables.active_bookings}
-                  When the user asks about her bookings, give a SHORT one-line summary per booking — trip type (one-way vs return), origin and destination cities, and how far out it is (e.g., "in 3 days", "in about 2 months"). Then ask which booking she means. Do NOT dump every field unless asked.
+                | Here are the caller's current bookings: {!@variables.active_bookings}
+                  When the user asks about their bookings, give a SHORT one-line summary per booking — trip type (one-way vs return), origin and destination cities, and how far out it is (e.g., "in 3 days", "in about 2 months"). Then ask which booking they mean. Do NOT dump every field unless asked.
                   When presenting full details, use the exact values returned — do NOT paraphrase or round. Do NOT use the show_command tool. Always compose your response as direct text.
 
-            | If the user wants to CANCEL a booking, identify which booking from active_bookings, then state the booking's cancellationConditions in plain language and ask her to confirm. Once she confirms, call {!@actions.cancel_booking} with the booking's bookingReference. After the action returns, relay the confirmationMessage to the user using its exact values (refund amount, payment method) — do NOT paraphrase the numbers.
+            | If the user wants to CANCEL a booking, identify which booking from active_bookings, then state the booking's cancellationConditions in plain language and ask the caller to confirm. Once they confirm, call {!@actions.cancel_booking} with the booking's bookingReference. After the action returns, relay the confirmationMessage to the user using its exact values (refund amount, payment method) — do NOT paraphrase the numbers.
               If the user wants to change a seat, use the {!@actions.change_seat} action.
               If the user wants to book a new flight or reschedule, use {!@actions.Reschedule_Flights} to find available options and check eligibility.
               If the user wants to search for flights, use {!@actions.search_flights} with origin, destination, and departure date.
@@ -266,6 +311,11 @@ topic flight_management:
 
 
 
+
+
+
+
+
     actions:
         Reschedule_Flights:
             description: "Reschedule flights based on user tier and reservation booking type"
@@ -273,14 +323,14 @@ topic flight_management:
             require_user_confirmation: False
             include_in_progress_indicator: False
             target: "generatePromptResponse://Skywave_RescheduleFlights"
-                                        
+                                                                                
             inputs:
                 "Input:New_Flight_Requested": string
                     description: "requested flight"
                     label: "New Flight Requested"
                     is_required: True
                     complex_data_type_name: "lightning__textType"
-                                        
+                                                                                
             outputs:
                 "promptResponse": string
                     description: "The prompt response generated by the action based on the specified prompt and input."
@@ -296,7 +346,7 @@ topic flight_management:
             include_in_progress_indicator: True
             progress_indicator_message: "Looking for available flights"
             target: "apex://Skywave_FlightSearch"
-                                        
+                                                                                
             inputs:
                 "departureDate": string
                     description: "The desired departure date formatted in YYYY-MM-DD"
@@ -316,7 +366,7 @@ topic flight_management:
                     is_required: True
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
-                                        
+                                                                                
             outputs:
                 "options": list[object]
                     description: "A list of available flight options and details"
@@ -332,7 +382,7 @@ topic flight_management:
             include_in_progress_indicator: True
             progress_indicator_message: "Processing booking"
             target: "apex://Skywave_BookFlight"
-                                        
+                                                                                
             inputs:
                 "contactId": string
                     description: "The contact ID for the booking"
@@ -370,7 +420,7 @@ topic flight_management:
                     is_required: False
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
-                                        
+                                                                                
             outputs:
                 "booking": object
                     description: "The flight booking details"
@@ -390,7 +440,7 @@ topic flight_management:
                     is_used_by_planner: True
 
         resolve_contact:
-            description: "Resolves a Contact ID from a known ID or email lookup"
+            description: "Resolves a Contact ID from a known ID, email, or phone number"
             label: "Resolve Contact"
             require_user_confirmation: False
             include_in_progress_indicator: False
@@ -409,6 +459,12 @@ topic flight_management:
                     is_required: False
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
+                "phoneNumber": string
+                    description: "Phone number to look up a Contact (E.164 or national format accepted)"
+                    label: "Phone Number"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
                                         
             outputs:
                 "contactId": string
@@ -416,8 +472,18 @@ topic flight_management:
                     label: "Contact ID"
                     is_displayable: False
                     is_used_by_planner: True
+                "firstName": string
+                    description: "The contact first name"
+                    label: "First Name"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "lastName": string
+                    description: "The contact last name"
+                    label: "Last Name"
+                    is_displayable: False
+                    is_used_by_planner: True
                 "contactName": string
-                    description: "The contact name"
+                    description: "The contact full name"
                     label: "Contact Name"
                     is_displayable: False
                     is_used_by_planner: True
@@ -439,7 +505,7 @@ topic flight_management:
             include_in_progress_indicator: True
             progress_indicator_message: "Checking your flights"
             target: "apex://Skywave_GetFlightBookings"
-                                        
+                                                                                
             inputs:
                 "contactId": string
                     description: "the contact Id of the user"
@@ -447,7 +513,7 @@ topic flight_management:
                     is_required: True
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
-                                        
+                                                                                
             outputs:
                 "bookings": list[object]
                     description: "a list of bookings for the customer"
@@ -473,7 +539,7 @@ topic flight_management:
             include_in_progress_indicator: True
             progress_indicator_message: "Changing seat assignment"
             target: "apex://Skywave_ChangeSeat"
-                                        
+                                                                                
             inputs:
                 "reservationSegmentId": string
                     description: "The Reservation Segment ID to change seat for"
@@ -493,7 +559,7 @@ topic flight_management:
                     is_required: False
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
-                                        
+                                                                                
             outputs:
                 "errorMessage": string
                     description: "details in case of an error"
@@ -521,7 +587,7 @@ topic flight_management:
             include_in_progress_indicator: True
             progress_indicator_message: "Processing cancellation"
             target: "apex://Skywave_CancelFlight"
-                                        
+                                                                                
             inputs:
                 "bookingReference": string
                     description: "The booking reference of the booking to cancel"
@@ -535,7 +601,7 @@ topic flight_management:
                     is_required: False
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
-                                        
+                                                                                
             outputs:
                 "success": boolean
                     description: "true if the cancellation was processed"
@@ -580,7 +646,7 @@ topic flight_management:
             include_in_progress_indicator: True
             progress_indicator_message: "Requesting flight change"
             target: "flow://Skywave_ChangeFlight"
-                                        
+                                                                                
             inputs:
                 "Flight": string
                     description: "The original flight that needs to be changed"
@@ -592,7 +658,7 @@ topic flight_management:
                     label: "requested_change"
                     is_required: True
                     is_user_input: False
-                                        
+                                                                                
             outputs:
                 "available_options": string
                     description: "Options available based on the requested change"
@@ -649,12 +715,17 @@ topic seat_selection:
 
 
 
+
+
+
+
+
     actions:
         change_seat:
             description: "Change seat selection for a flight reservation segment"
             label: "Change Seat"
             target: "apex://Skywave_ChangeSeat"
-                                        
+                                                                                
             inputs:
                 reservationSegmentId: string
                     description: "The Reservation Segment ID to change seat for"
@@ -671,7 +742,7 @@ topic seat_selection:
                     label: "Seat Preference"
                     is_required: False
                     complex_data_type_name: "lightning__textType"
-                                        
+                                                                                
             outputs:
                 errorMessage: string
                     description: "details in case of an error"
@@ -730,6 +801,11 @@ topic case_management:
 
 
 
+
+
+
+
+
     actions:
         create_case:
             description: "Creates a support case for the customer"
@@ -737,7 +813,7 @@ topic case_management:
             require_user_confirmation: True
             include_in_progress_indicator: True
             target: "flow://Skywave_CreateCase"
-                                        
+                                                                                
             inputs:
                 "verifiedCustomerID": string
                     description: "The contact ID for the case"
@@ -759,7 +835,7 @@ topic case_management:
                     label: "Case Description"
                     is_required: False
                     is_user_input: True
-                                        
+                                                                                
             outputs:
                 "caseRecord": object
                     description: "The created case record"
@@ -774,14 +850,14 @@ topic case_management:
             require_user_confirmation: False
             include_in_progress_indicator: True
             target: "flow://Skywave_GetCasesForContact"
-                                        
+                                                                                
             inputs:
                 "verifiedContactID": string
                     description: "The contact record ID"
                     label: "Verified Contact record ID"
                     is_required: True
                     is_user_input: False
-                                        
+                                                                                
             outputs:
                 "caseList": list[object]
                     description: "Cases for the contact"
@@ -797,7 +873,7 @@ topic case_management:
             include_in_progress_indicator: True
             progress_indicator_message: "Checking Status"
             target: "flow://Skywave_GetCaseByNumber"
-                                        
+                                                                                
             inputs:
                 "caseNumber": string
                     description: "case number"
@@ -809,7 +885,7 @@ topic case_management:
                     label: "customerEmail"
                     is_required: False
                     complex_data_type_name: "lightning__textType"
-                                        
+                                                                                
             outputs:
                 "caseRecord": object
                     description: "the case record"
@@ -824,7 +900,7 @@ topic case_management:
             require_user_confirmation: True
             include_in_progress_indicator: True
             target: "flow://Skywave_AddCaseComment"
-                                        
+                                                                                
             inputs:
                 "caseRecord": object
                     description: "The case record to add the comment to"
@@ -837,7 +913,7 @@ topic case_management:
                     label: "Case comment"
                     is_required: True
                     is_user_input: True
-                                        
+                                                                                
             outputs:
                 "outcomeMessage": string
                     description: "Result message"
