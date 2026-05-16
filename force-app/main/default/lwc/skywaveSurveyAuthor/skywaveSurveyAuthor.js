@@ -205,6 +205,7 @@ export default class SkywaveSurveyAuthor extends LightningElement {
         try {
             await reorderQuestions({ orderedIds: next.map(q => q.id) });
             await this.refresh(this.selected?.id);
+            this.toast('Order saved', 'success');
         } catch (e) {
             this.toastError('Reorder failed', e);
         }
