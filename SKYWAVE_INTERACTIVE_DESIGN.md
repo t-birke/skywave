@@ -576,6 +576,15 @@ Get sign-off on the architecture and the stage-by-stage flow.
   to `survey` in the org UI, all phones flip
 - **Demoable:** a phone scans the QR, gets pushed to a placeholder screen.
 
+### Phase 1.5 — monitor stage advancer (picked up at start of Phase 2)
+- Add a stage-button strip to `skywaveDemoMonitor` LWC: one button per
+  `Demo_Session__c.State__c` value, current value highlighted, click
+  fires Apex to update `State__c` on the active row. The trigger then
+  publishes `Demo_State_Change__e` and both monitor and phones see
+  the change via their existing subscriptions.
+- New Apex method `Skywave_DemoMonitorController.advanceState(String newState)`.
+- Removes the need for the presenter to leave the monitor mid-demo.
+
 ### Phase 2 — survey content + dual-path delivery + Data Cloud grounding
 - New CRM objects: `Survey_Question__c` + master-detail `Survey_Answer_Option__c`
   (with `Image_Url__c`); seed with 4–6 questions
