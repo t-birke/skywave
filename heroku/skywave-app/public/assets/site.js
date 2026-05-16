@@ -62,7 +62,18 @@ function el(tag, attrs = {}, ...children) {
 
 function go(screen) {
     root.innerHTML = '';
+    setStage(screen);
     screens[screen]();
+}
+
+// Mirror the current screen onto document.body so the Interactions SDK
+// sitemap's isMatch callbacks (`document.body.dataset.stage === ...`)
+// can pick up the active page-type. URL doesn't change between SPA
+// screens, so dataset is the only stable signal.
+function setStage(stage) {
+    if (typeof document !== 'undefined' && document.body) {
+        document.body.dataset.stage = stage;
+    }
 }
 
 function renderConsent() {
@@ -148,6 +159,7 @@ function connectWs(wsUrl) {
             const msg = JSON.parse(m.data);
             if (msg.type === 'stage_changed') {
                 state.stage = msg.newState || state.stage;
+                setStage(state.stage);
                 renderStageIfWaiting();
             }
         } catch (e) { console.error(e); }
