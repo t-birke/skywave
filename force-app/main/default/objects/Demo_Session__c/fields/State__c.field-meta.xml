@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>State__c</fullName>
+    <label>State</label>
+    <description>Current stage of the demo. Changing this value publishes Demo_State_Change__e via trigger, which advances all connected phones via the Heroku WS relay and updates the monitor LWC.</description>
+    <inlineHelpText>Pick the current stage of the demo. Phones receive the change in &lt;1s.</inlineHelpText>
+    <type>Picklist</type>
+    <required>true</required>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>idle</fullName>
+                <default>true</default>
+                <label>Idle</label>
+            </value>
+            <value>
+                <fullName>scan</fullName>
+                <default>false</default>
+                <label>Scan</label>
+            </value>
+            <value>
+                <fullName>survey</fullName>
+                <default>false</default>
+                <label>Survey</label>
+            </value>
+            <value>
+                <fullName>agent_book</fullName>
+                <default>false</default>
+                <label>Agent: Book Flight</label>
+            </value>
+            <value>
+                <fullName>profile</fullName>
+                <default>false</default>
+                <label>Create Profile</label>
+            </value>
+            <value>
+                <fullName>c360</fullName>
+                <default>false</default>
+                <label>C360 Reveal</label>
+            </value>
+            <value>
+                <fullName>agent_seat_fail</fullName>
+                <default>false</default>
+                <label>Agent: Change Seat (Fail)</label>
+            </value>
+            <value>
+                <fullName>agent_seat_pass</fullName>
+                <default>false</default>
+                <label>Agent: Change Seat (Pass)</label>
+            </value>
+            <value>
+                <fullName>race</fullName>
+                <default>false</default>
+                <label>Trolley Race</label>
+            </value>
+            <value>
+                <fullName>slack</fullName>
+                <default>false</default>
+                <label>Slack Reveal</label>
+            </value>
+            <value>
+                <fullName>done</fullName>
+                <default>false</default>
+                <label>Done</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

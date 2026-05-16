@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Session_Id__c</fullName>
+    <label>Session Id</label>
+    <description>Per-phone UUID. Lets the monitor attribute the event to a specific audience member.</description>
+    <type>Text</type>
+    <length>64</length>
+    <required>true</required>
+</CustomField>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Active__c</fullName>
+    <label>Active</label>
+    <description>Marks this run as the currently-active demo. Profile-creation Apex and the QR generator look up the single Active=true record. By convention only one Demo_Session__c is Active at a time; not enforced via validation rule for v1 (single-tenant by design).</description>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+</CustomField>

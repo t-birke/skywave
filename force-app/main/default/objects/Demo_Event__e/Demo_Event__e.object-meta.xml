@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description>Data-plane Platform Event for Skywave Interactive. Published by Apex REST endpoints from the consumer site. Consumed by the monitor LWC ONLY (the WS relay does not subscribe — phones don't care what other phones did). Type discriminator: session_started, survey_answer, profile_created, race_tick. New types are added by extending the Type__c values, not by creating new channels.</description>
+    <eventType>HighVolume</eventType>
+    <label>Demo Event</label>
+    <pluralLabel>Demo Events</pluralLabel>
+    <publishBehavior>PublishImmediately</publishBehavior>
+</CustomObject>

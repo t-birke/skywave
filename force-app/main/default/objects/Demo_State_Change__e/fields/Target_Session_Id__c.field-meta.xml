@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Target_Session_Id__c</fullName>
+    <label>Target Session Id</label>
+    <description>Optional. If set, the WS relay only pushes to that one phone's session. If empty, the change broadcasts to all connected phones (the v1 default).</description>
+    <type>Text</type>
+    <length>64</length>
+    <required>false</required>
+</CustomField>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Type__c</fullName>
+    <label>Type</label>
+    <description>Event type discriminator: session_started, survey_answer, profile_created, race_tick. Plain text (not picklist) so Apex can publish new types without metadata changes.</description>
+    <type>Text</type>
+    <length>32</length>
+    <required>true</required>
+</CustomField>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Payload_Json__c</fullName>
+    <label>Payload Json</label>
+    <description>JSON-serialized type-specific payload. Schema by Type__c: session_started -> {user_agent}; survey_answer -> {question_key, answer_key}; profile_created -> {contact_id, display_name, avatar_url}; race_tick -> {intensity, t}.</description>
+    <type>LongTextArea</type>
+    <length>32768</length>
+    <visibleLines>4</visibleLines>
+</CustomField>

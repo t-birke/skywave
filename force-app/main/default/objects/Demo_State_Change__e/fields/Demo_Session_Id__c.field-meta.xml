@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Demo_Session_Id__c</fullName>
+    <label>Demo Session Id</label>
+    <description>The Demo_Session__c record Id whose State changed. Lets consumers filter to the active run.</description>
+    <type>Text</type>
+    <length>18</length>
+    <required>true</required>
+</CustomField>
