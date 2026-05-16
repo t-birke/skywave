@@ -36,4 +36,16 @@ genAiPlannerBundles/
 /tmp/
 nanobanana-output/
 brochure/
+
+# Secrets — never commit anything matching these
 .secrets/
+secrets/
+.env
+.env.*
+!.env.example
+.heroku/
+*.pem
+*.key
+*.p12
+*.jks
+*.pfx
