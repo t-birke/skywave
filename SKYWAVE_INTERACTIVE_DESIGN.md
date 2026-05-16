@@ -908,3 +908,11 @@ Add items as they come up. Don't pre-prioritize.
   up/down arrow buttons on each question and option. Drag-and-drop
   is slicker on desktop but brittler on touch and adds ~50 LOC; not
   worth it until the authoring tool gets daily use.
+- **Self-hosted image storage for `Survey_Answer_Option__c.Image_Url__c`.**
+  v1 uses arbitrary external URLs (Unsplash, etc.). Long-term we want
+  to host images on our own domain — likely under
+  `skywave-app.herokuapp.com/images/` — so the consumer site avoids
+  CSP/CORS surprises with third-party image hosts and we control
+  uptime. Could be a small upload endpoint on `skywave-app` plus a
+  file picker in `skywaveSurveyAuthor`. Until then, only use HTTPS
+  URLs from hosts that allow hotlinking.
