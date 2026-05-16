@@ -1,41 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
-    <description>Minimal permissions for the integration user the Heroku skywave-app authenticates as via JWT-bearer flow. Read-only on Demo_Session__c plus what is needed to subscribe to Demo_State_Change__e via Pub/Sub API. Do NOT add write or admin access.</description>
+    <description>Minimal permissions for the integration user the Heroku skywave-app authenticates as via JWT-bearer flow. Read-only on Demo_Session__c plus Pub/Sub subscribe on Demo_State_Change__e. Do NOT add write or admin access.</description>
     <hasActivationRequired>false</hasActivationRequired>
     <label>Skywave Heroku Relay Integration</label>
-    <objectPermissions>
-        <object>Demo_Session__c</object>
-        <allowCreate>false</allowCreate>
-        <allowDelete>false</allowDelete>
-        <allowEdit>false</allowEdit>
-        <allowRead>true</allowRead>
-        <modifyAllRecords>false</modifyAllRecords>
-        <viewAllRecords>true</viewAllRecords>
-    </objectPermissions>
-    <fieldPermissions>
-        <editable>false</editable>
-        <field>Demo_Session__c.Active__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <editable>false</editable>
-        <field>Demo_Session__c.Started__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <editable>false</editable>
-        <field>Demo_Session__c.Ended__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <editable>false</editable>
-        <field>Demo_Session__c.Notes__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <userPermissions>
+    <classAccesses>
+        <apexClass>Skywave_Profile</apexClass>
         <enabled>true</enabled>
-        <name>ApiEnabled</name>
-    </userPermissions>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_RaceTick</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
     <classAccesses>
         <apexClass>Skywave_RestUtil</apexClass>
         <enabled>true</enabled>
@@ -52,12 +27,46 @@
         <apexClass>Skywave_SurveySchema</apexClass>
         <enabled>true</enabled>
     </classAccesses>
-    <classAccesses>
-        <apexClass>Skywave_RaceTick</apexClass>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Demo_Session__c.Active__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Demo_Session__c.Ended__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Demo_Session__c.Notes__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Demo_Session__c.Started__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <objectPermissions>
+        <allowCreate>false</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>false</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>Demo_Session__c</object>
+        <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <allowCreate>false</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>false</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>Demo_State_Change__e</object>
+        <viewAllRecords>false</viewAllRecords>
+    </objectPermissions>
+    <userPermissions>
         <enabled>true</enabled>
-    </classAccesses>
-    <classAccesses>
-        <apexClass>Skywave_Profile</apexClass>
-        <enabled>true</enabled>
-    </classAccesses>
+        <name>ApiEnabled</name>
+    </userPermissions>
 </PermissionSet>
