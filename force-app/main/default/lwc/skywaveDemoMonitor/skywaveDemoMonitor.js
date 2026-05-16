@@ -9,6 +9,10 @@ import searchSessions from '@salesforce/apex/Skywave_DemoMonitorController.searc
 
 const CONSUMER_SITE_URL = 'https://skywave-app-bb0e8666933b.herokuapp.com/';
 const STATE_CHANNEL = '/event/Demo_State_Change__e';
+const EVENT_CHANNEL = '/event/Demo_Event__e';
+// How long a session is considered "active" without a fresh event from it.
+// 30 minutes covers a normal demo run; sessions older than this drop off.
+const SESSION_TTL_MS = 30 * 60 * 1000;
 
 const STAGES = [
     { value: 'idle', label: 'Idle' },
@@ -32,7 +36,9 @@ export default class SkywaveDemoMonitor extends LightningElement {
     @track customer = null;
     @track demoDate = null;
     @track currentState = 'idle';
-    @track activeCount = 0;
+    @track sessions = []; // [{ sessionId, shortId, lastSeen }]
+
+    get activeCount() { return this.sessions.length; }
 
     qrCodeVisible = true;
     qrCodeGenerated = false;
@@ -88,13 +94,15 @@ export default class SkywaveDemoMonitor extends LightningElement {
     }
 
     applySession(data) {
+        // Switching active session resets the bubble set — bubbles are
+        // scoped to the currently-active demo run.
+        this.sessions = [];
         if (data) {
             this.activeId = data.id;
             this.name = data.name;
             this.customer = data.customer;
             this.demoDate = data.demoDate;
             this.currentState = data.state || 'idle';
-            this.activeCount = data.contactCount || 0;
             this.pickerInputValue = data.customer || data.name || '';
         } else {
             this.activeId = null;
@@ -102,7 +110,6 @@ export default class SkywaveDemoMonitor extends LightningElement {
             this.customer = null;
             this.demoDate = null;
             this.currentState = 'idle';
-            this.activeCount = 0;
             this.pickerInputValue = '';
         }
     }
@@ -146,15 +153,39 @@ export default class SkywaveDemoMonitor extends LightningElement {
     }
 
     subscribeStateChanges() {
-        const callback = (msg) => {
+        const stateCb = (msg) => {
             const payload = msg?.data?.payload || {};
-            // Filter to the active demo session so monitor isn't disturbed
-            // by historical replays from other sessions.
             if (payload.Demo_Session_Id__c && payload.Demo_Session_Id__c !== this.activeId) return;
             this.currentState = payload.New_State__c || this.currentState;
         };
-        subscribe(STATE_CHANNEL, -1, callback).catch((e) => console.error('subscribe failed', e));
+        subscribe(STATE_CHANNEL, -1, stateCb).catch((e) => console.error('state sub failed', e));
+
+        // Replay -1 = LATEST; we don't backfill missed bubbles on first paint.
+        const eventCb = (msg) => {
+            const payload = msg?.data?.payload || {};
+            if (payload.Demo_Session_Id__c && payload.Demo_Session_Id__c !== this.activeId) return;
+            this.handleDemoEvent(payload);
+        };
+        subscribe(EVENT_CHANNEL, -1, eventCb).catch((e) => console.error('event sub failed', e));
+
         onError((err) => console.error('empApi error', err));
+    }
+
+    handleDemoEvent(payload) {
+        const sessionId = payload.Session_Id__c;
+        if (!sessionId) return;
+        const now = Date.now();
+        // Any event type from a session keeps it alive in the bubble set.
+        const existing = this.sessions.find(s => s.sessionId === sessionId);
+        if (existing) {
+            existing.lastSeen = now;
+            this.sessions = [...this.sessions];
+            return;
+        }
+        this.sessions = [
+            ...this.sessions.filter(s => now - s.lastSeen < SESSION_TTL_MS),
+            { sessionId, shortId: sessionId.slice(-8), lastSeen: now }
+        ];
     }
 
     renderQRCode() {

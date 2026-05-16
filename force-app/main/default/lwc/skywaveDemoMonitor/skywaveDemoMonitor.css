@@ -54,6 +54,16 @@
     text-transform: capitalize;
 }
 
+.bubble-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+.bubble {
+    font-family: var(--slds-g-font-family-monospace, ui-monospace, monospace);
+    letter-spacing: 0.05em;
+}
+
 .qrcode {
     position: fixed;
     bottom: 4vh;

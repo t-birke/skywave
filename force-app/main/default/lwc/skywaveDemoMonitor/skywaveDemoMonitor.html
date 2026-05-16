@@ -92,6 +92,15 @@
                 <div class="slds-text-title_caps slds-text-color_weak">Current stage</div>
                 <div class="slds-text-heading_large slds-m-top_xx-small stage-value">{currentStateLabel}</div>
             </div>
+
+            <div class="slds-m-top_x-large">
+                <div class="slds-text-title_caps slds-text-color_weak">Active sessions ({activeCount})</div>
+                <div class="slds-m-top_x-small bubble-row">
+                    <template for:each={sessions} for:item="s">
+                        <span key={s.sessionId} class="slds-badge bubble" title={s.sessionId}>{s.shortId}</span>
+                    </template>
+                </div>
+            </div>
         </div>
     </article>
 
