@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ConnectedApp xmlns="http://soap.sforce.com/2006/04/metadata">
+    <contactEmail>tbirke.ce2f9ba5d7@salesforce.com</contactEmail>
+    <label>Skywave DC Ingest</label>
+    <description>Connected App for Data Cloud Ingestion API tests using JWT Bearer Flow.</description>
+    <oauthConfig>
+        <callbackUrl>http://localhost</callbackUrl>
+        <certificate>MIIDVzCCAj+gAwIBAgIUeyxj/s1JxEKm9HKYq8iCuoBANwcwDQYJKoZIhvcNAQELBQAwOzELMAkGA1UEBhMCREUxEDAOBgNVBAoMB1NreXdhdmUxGjAYBgNVBAMMEXNreXdhdmUtZGMtaW5nZXN0MB4XDTI2MDUwNjE5NTIyNFoXDTI3MDUwNjE5NTIyNFowOzELMAkGA1UEBhMCREUxEDAOBgNVBAoMB1NreXdhdmUxGjAYBgNVBAMMEXNreXdhdmUtZGMtaW5nZXN0MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAro8ZF608cDPiJSWyMlwlsA0XGfxw9gNq5rSy3bL/8/TkUrgKhFWTfF8N7HLLQsifzwzfLYsrCOVvgpIFsD0YZdMnDgUvHeTwZB9Fc9ulzgbU8Vhck2I5BH4bVIRmT0LUcGrAHNe/uVLudlprLRVkjtIZPIMe1PJ2+SlS4fDdGFEXuB38nEhODVi7ro/FYig8FtmpQW651tTi9w830WN5o3L+9aakfjMPHGqxy+3R4rH/ufWrAaptL3cYaiuRUG/omkFGRhBadjrSwlwJAucYNJthXzWbHoPCTnv7NcCiZXgCQvvou7DFAtcPF7YRGRjjt3XzTcONJ9xmwLfUhSOdQwIDAQABo1MwUTAdBgNVHQ4EFgQUCp3qCxE65mA1AVOkqnuy22gADHMwHwYDVR0jBBgwFoAUCp3qCxE65mA1AVOkqnuy22gADHMwDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAZOkVkAnNLCGJ+dI0PAy3emscz7vQxdMDyDs0fXBb9aNGUWKhXrjDfIES5KOGuNRHXXrUTetjIRDVlzjsavtOrgFrvVaKFoPCmgzrvsRVZL1wm7fRwam4tc7d2Gf5pMhqr74Uh+sWHfzSEFGQe8tILipWVTYr0q8WHPAIxW7HLsTtdOZtpjVOaAxkm5alH47d2IhAw9fT3ahpYqtG0AXrFq7nJSnpJGYtKxrgqctO/rpBfa96DVndsE0QZ+0JLwc3DNFDENC2hpz7fhiBbrgJINBPfuxA2Q/VwkhIqT7uAPMsKKmDu9YtcZfN+33oEdUAQH/d43OCEpy4ZHus7vuKPA==</certificate>
+        <scopes>Api</scopes>
+        <scopes>RefreshToken</scopes>
+    </oauthConfig>
+</ConnectedApp>

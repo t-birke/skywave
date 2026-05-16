@@ -36,3 +36,4 @@ genAiPlannerBundles/
 /tmp/
 nanobanana-output/
 brochure/
+.secrets/

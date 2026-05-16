@@ -49,6 +49,10 @@ variables:
         label: "Retrieve Active Booking Done"
     Tier_Status: mutable string
         label: "Tier Status"
+    mileage_balance: mutable number
+        label: "Mileage Balance"
+    mileage_balance_message: mutable string
+        label: "Mileage Balance Message"
     booking: mutable string
         label: "Booking"
     Booking_Outcome: mutable boolean
@@ -88,6 +92,7 @@ start_agent agent_router:
               - Flight bookings, upcoming flights, flight status, booking a flight, changing or canceling flights -> use go_to_flight_management
               - Seat selection or seat changes for a flight within 72 hours -> use go_to_seat_selection
               - Correcting or updating the traveler's first or last name on a booking -> use go_to_name_change
+              - Questions about mileage balance, tier points, loyalty points, or frequent flyer miles -> use go_to_mileage_account
               - Support cases, complaints, case status, creating a case -> use go_to_case_management
               - Request to speak to a human agent or live agent -> use go_to_escalation
               - Ambiguous or unclear requests -> use go_to_ambiguous_question
@@ -116,6 +121,9 @@ start_agent agent_router:
 
             go_to_name_change: @utils.transition to @subagent.name_change
                 description: "Correct or update the traveler's first or last name on a booking"
+
+            go_to_mileage_account: @utils.transition to @subagent.mileage_account
+                description: "Check mileage balance, tier points, loyalty points, or frequent flyer miles"
 
     actions:
         resolve_contact:
@@ -842,6 +850,63 @@ subagent name_change:
                     description: "true if the action completed without error"
                     label: "success"
                     is_displayable: False
+                    is_used_by_planner: True
+
+subagent mileage_account:
+    label: "Mileage Account"
+
+    description: "Provides the customer's mileage / tier points / loyalty points balance."
+
+    reasoning:
+        instructions: ->
+            if @variables.mileage_balance is None:
+                run @actions.get_mileage_balance
+                    with contactId = @variables.resolved_contact_id
+                    set @variables.mileage_balance = @outputs.milesBalance
+                    set @variables.mileage_balance_message = @outputs.confirmationMessage
+
+            | Tell Lauren her current mileage balance using the exact number from mileage_balance. Do NOT paraphrase or round the number.
+              Use the confirmation message as the primary response: {!@variables.mileage_balance_message}
+              Then ask if there is anything else you can help with.
+
+    actions:
+        get_mileage_balance:
+            description: "Gets the customer's current mileage / tier points / loyalty points balance"
+            label: "Get Mileage Balance"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Checking your mileage balance"
+            target: "apex://Skywave_GetMileageBalance"
+
+            inputs:
+                "contactId": string
+                    description: "The contact ID for the customer"
+                    label: "Contact ID"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "success": boolean
+                    description: "true if the action completed without error"
+                    label: "success"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "errorMessage": string
+                    description: "details in case of an error"
+                    label: "error message"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "milesBalance": object
+                    description: "the customer's current mileage balance"
+                    label: "miles balance"
+                    complex_data_type_name: "lightning__integerType"
+                    is_displayable: True
+                    is_used_by_planner: True
+                "confirmationMessage": string
+                    description: "human-readable summary of the mileage balance"
+                    label: "confirmation message"
+                    is_displayable: True
                     is_used_by_planner: True
 
 subagent case_management:
