@@ -100,3 +100,66 @@ body {
     margin-top: 1rem;
 }
 .stage-pill.disconnected { background: var(--skywave-warn); color: var(--skywave-navy-deep); }
+
+.survey-screen {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 0.5rem 0;
+}
+.survey-progress {
+    color: var(--skywave-mute);
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+.survey-question {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+    line-height: 1.25;
+}
+.survey-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+.survey-option {
+    background: var(--skywave-blue-soft);
+    border: 2px solid transparent;
+    border-radius: var(--skywave-radius);
+    padding: 0.75rem;
+    color: var(--skywave-text);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    transition: border-color 0.15s, transform 0.1s, opacity 0.2s;
+}
+.survey-option:hover { border-color: var(--skywave-blue); }
+.survey-option:active { transform: scale(0.98); }
+.survey-option.selected { border-color: var(--skywave-blue); background: var(--skywave-blue); }
+.survey-option:disabled { cursor: default; }
+.survey-option:disabled:not(.selected) { opacity: 0.4; }
+.survey-option-img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 0.5rem;
+    background: rgba(0,0,0,0.2);
+}
+.survey-option-img.placeholder {
+    display: grid;
+    place-items: center;
+    color: var(--skywave-mute);
+    font-size: 0.75rem;
+}
+.survey-option-label {
+    font-weight: 500;
+    font-size: 0.95rem;
+    line-height: 1.2;
+}

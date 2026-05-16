@@ -27,6 +27,8 @@ global without sharing class Skywave_SurveyAnswer {
         String sessionId = String.valueOf(body.get('sessionId'));
         String questionKey = String.valueOf(body.get('questionKey'));
         String answerKey = String.valueOf(body.get('answerKey'));
+        String questionText = String.valueOf(body.get('questionText'));
+        String answerText = String.valueOf(body.get('answerText'));
 
         Skywave_RestUtil.publishEvent(
             'survey_answer',
@@ -34,7 +36,9 @@ global without sharing class Skywave_SurveyAnswer {
             demoSessionId,
             new Map<String, Object>{
                 'questionKey' => questionKey,
-                'answerKey' => answerKey
+                'answerKey' => answerKey,
+                'questionText' => questionText,
+                'answerText' => answerText
             }
         );
 

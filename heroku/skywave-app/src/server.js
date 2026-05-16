@@ -32,24 +32,30 @@ app.get('/api/config', (_, res) => {
     });
 });
 
-// Phones POST here; we forward to Apex with the integration user's token.
-// Lets the phone stay anonymous to Salesforce — the relay holds the JWT.
-app.post('/api/session/start', async (req, res) => {
+// Phones call the relay; the relay forwards to Apex with the integration
+// user's JWT-bearer token. Phones stay anonymous to Salesforce.
+async function forwardToApex(method, apexPath, body, res, label) {
     try {
         const { accessToken, instanceUrl } = await getSalesforceToken();
-        const sf = await axios.post(
-            `${instanceUrl}/services/apexrest/skywave/session/start`,
-            req.body || {},
-            { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
-        );
+        const url = `${instanceUrl}/services/apexrest${apexPath}`;
+        const cfg = { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } };
+        const sf = method === 'GET'
+            ? await axios.get(url, cfg)
+            : await axios.post(url, body || {}, cfg);
         res.json(sf.data);
     } catch (err) {
         const status = err.response?.status ?? 500;
         const data = err.response?.data ?? { error: err.message };
-        console.error('session/start failed', status, data);
+        console.error(`${label} failed`, status, data);
         res.status(status).json(data);
     }
-});
+}
+
+app.post('/api/session/start',  (req, res) => forwardToApex('POST', '/skywave/session/start',  req.body, res, 'session/start'));
+app.get('/api/survey/schema',   (_,   res) => forwardToApex('GET',  '/skywave/survey/schema',  null,     res, 'survey/schema'));
+app.post('/api/survey/answer',  (req, res) => forwardToApex('POST', '/skywave/survey/answer',  req.body, res, 'survey/answer'));
+app.post('/api/race/tick',      (req, res) => forwardToApex('POST', '/skywave/race/tick',      req.body, res, 'race/tick'));
+app.post('/api/profile',        (req, res) => forwardToApex('POST', '/skywave/profile',        req.body, res, 'profile'));
 
 const server = createServer(app);
 
@@ -57,7 +63,9 @@ const server = createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url, 'http://placeholder');
-    const match = url.pathname.match(/^\/ws\/([0-9a-fA-F-]{8,64})$/);
+    // SDK anonymousIds are short hex (e.g. 1db57f8b6d54a786); UUIDs are dashed
+    // hex; both fit. Allow alphanumerics + dashes + underscores, 8–64 chars.
+    const match = url.pathname.match(/^\/ws\/([A-Za-z0-9_-]{8,64})$/);
     if (!match) {
         socket.destroy();
         return;

@@ -1,12 +1,18 @@
-// Skywave Interactive consumer site — Phase 2 placeholder.
+// Skywave Interactive consumer site.
 //
 // Flow:
 //   1. Consent screen.
 //   2. On Accept, init Salesforce Interactions SDK (best-effort).
-//   3. Read SDK anonymous cookie ID, POST to /api/session/start.
-//   4. Open WS to skywave-app, render current stage, wait for stage_changed.
+//   3. Read SDK anonymous cookie ID, POST /api/session/start.
+//   4. Open WS, render the screen the org's current stage tells us to.
 //
-// Phase 2 keeps the survey UI a stub — that lands in step 6.
+// Stage → screen mapping:
+//   scan / waiting / idle / null         → "you're in" waiting card
+//   survey                                 → survey questions, one per screen
+//   thanks                                 → "thanks, hold tight" card
+//   anything else (agent, profile, race…)  → waiting card with the stage shown
+//
+// The presenter advances stage via the monitor LWC; phones follow via WS.
 
 const CONSENT_KEY = 'skywave.consent.v1';
 const root = document.getElementById('root');
@@ -33,17 +39,15 @@ function loadInteractionsSdk() {
     });
 }
 
-const screens = {
-    consent: renderConsent,
-    waiting: renderWaiting
-};
-
 let state = {
     sessionId: null,
     demoSessionId: null,
     stage: null,
     ws: null,
-    wsConnected: false
+    wsConnected: false,
+    survey: null,        // { questions: [...] } — fetched once on Accept
+    surveyIndex: 0,      // which question we're showing
+    answeredKeys: new Set() // questionKeys we've already answered (idempotency)
 };
 
 function el(tag, attrs = {}, ...children) {
@@ -60,23 +64,51 @@ function el(tag, attrs = {}, ...children) {
     return node;
 }
 
-function go(screen) {
-    root.innerHTML = '';
-    setStage(screen);
-    screens[screen]();
-}
-
 // Mirror the current screen onto document.body so the Interactions SDK
-// sitemap's isMatch callbacks (`document.body.dataset.stage === ...`)
-// can pick up the active page-type. URL doesn't change between SPA
-// screens, so dataset is the only stable signal.
-function setStage(stage) {
+// sitemap's isMatch callbacks can pick up the active page-type. URL
+// doesn't change between SPA screens, so dataset is the only stable signal.
+function setBodyStage(stage) {
     if (typeof document !== 'undefined' && document.body) {
         document.body.dataset.stage = stage;
     }
 }
 
+// Single render function — picks a screen based on state.stage. Called
+// after every stage change from the WS handler, after consent, and
+// after each survey answer (to advance to the next question).
+function render() {
+    root.innerHTML = '';
+    const stage = state.stage;
+
+    if (stage === 'survey') {
+        if (state.surveyIndex >= (state.survey?.questions?.length ?? 0)) {
+            // We've finished the local survey loop but the org is still in
+            // 'survey' state — treat as thanks/hold while waiting for advance.
+            setBodyStage('survey');
+            renderThanks();
+        } else {
+            setBodyStage('survey');
+            renderSurveyQuestion();
+        }
+        return;
+    }
+
+    if (stage === 'thanks') {
+        setBodyStage('thanks');
+        renderThanks();
+        return;
+    }
+
+    // Default: "you're in, hold tight" card showing whatever stage we're in.
+    setBodyStage(stage || 'waiting');
+    renderWaiting();
+}
+
+// ── Consent ────────────────────────────────────────────────────────────────
+
 function renderConsent() {
+    setBodyStage('consent');
+    root.innerHTML = '';
     root.append(
         el('div', { class: 'center' },
             el('div', { class: 'brand' }, 'Skywave'),
@@ -102,16 +134,8 @@ async function handleConsent() {
 
     await loadInteractionsSdk();
 
-    // Best-effort: tell the Interactions SDK the user opted in. If the SDK
-    // hasn't loaded (no Web Connector configured yet on si), this no-ops.
-    //
-    // Use literal strings, not SDK constants:
-    //   SalesforceInteractions.ConsentStatus.OptIn resolves to "Opt In"
-    //   (with a space) — that's the human-readable label, not the
-    //   schema-canonical value. The schema and Data Cloud expect "OptIn".
-    //
-    // Provider must exactly match the sitemap consent declaration so we
-    // end up with one consent record per session, not two.
+    // Use literal strings, not SDK constants. Provider must match the
+    // sitemap declaration so we get one consent record per session.
     try {
         if (window.SalesforceInteractions) {
             window.SalesforceInteractions.updateConsents({
@@ -124,8 +148,6 @@ async function handleConsent() {
         console.warn('SDK consent failed', e);
     }
 
-    // Prefer the SDK cookie ID as our session id when present; otherwise let
-    // Apex mint one.
     const sdkId = (() => {
         try { return window.SalesforceInteractions?.getAnonymousId?.() || null; }
         catch (_) { return null; }
@@ -143,51 +165,168 @@ async function handleConsent() {
         state.demoSessionId = data.demoSessionId;
         state.stage = data.currentState || 'idle';
         connectWs(data.wsUrl);
-        go('waiting');
+        await loadSurveySchema();   // best-effort prefetch — used when stage flips to survey
+        render();
     } catch (e) {
         console.error('session/start failed', e);
-        root.innerHTML = '';
-        root.append(
-            el('div', { class: 'card center' },
-                el('h1', {}, 'Something went wrong'),
-                el('p', {}, e.message),
-                el('button', { class: 'btn', onclick: () => go('consent') }, 'Try again')
-            )
-        );
+        renderError(e.message);
     }
 }
+
+function renderError(message) {
+    root.innerHTML = '';
+    root.append(
+        el('div', { class: 'card center' },
+            el('h1', {}, 'Something went wrong'),
+            el('p', {}, message),
+            el('button', { class: 'btn', onclick: renderConsent }, 'Try again')
+        )
+    );
+}
+
+// ── WS ─────────────────────────────────────────────────────────────────────
 
 function connectWs(wsUrl) {
     const ws = new WebSocket(wsUrl);
     state.ws = ws;
-    ws.addEventListener('open', () => { state.wsConnected = true; renderStageIfWaiting(); });
-    ws.addEventListener('close', () => { state.wsConnected = false; renderStageIfWaiting(); });
+    ws.addEventListener('open',  () => { state.wsConnected = true;  render(); });
+    ws.addEventListener('close', () => { state.wsConnected = false; render(); });
     ws.addEventListener('message', (m) => {
         try {
             const msg = JSON.parse(m.data);
             if (msg.type === 'stage_changed') {
+                const previous = state.stage;
                 state.stage = msg.newState || state.stage;
-                setStage(state.stage);
-                renderStageIfWaiting();
+                if (previous !== state.stage) {
+                    // Reset survey position when (re)entering the survey stage
+                    if (state.stage === 'survey') state.surveyIndex = 0;
+                    render();
+                }
             }
         } catch (e) { console.error(e); }
     });
 }
 
-function renderStageIfWaiting() {
-    // Phase 2 step 6 will branch on state.stage to render the actual survey
-    // UI etc. For now we always show the waiting card.
-    if (root.querySelector('[data-screen="waiting"]')) renderWaiting();
+// ── Survey ─────────────────────────────────────────────────────────────────
+
+async function loadSurveySchema() {
+    try {
+        const res = await fetch('/api/survey/schema');
+        if (!res.ok) throw new Error(`schema HTTP ${res.status}`);
+        state.survey = await res.json();
+    } catch (e) {
+        console.warn('loadSurveySchema failed', e);
+    }
 }
 
+function renderSurveyQuestion() {
+    const q = state.survey?.questions?.[state.surveyIndex];
+    if (!q) {
+        renderThanks();
+        return;
+    }
+    const total = state.survey.questions.length;
+    const num = state.surveyIndex + 1;
+    root.append(
+        el('div', { class: 'survey-screen' },
+            el('div', { class: 'survey-progress' },
+                el('span', {}, `Question ${num} of ${total}`)
+            ),
+            el('h1', { class: 'survey-question' }, q.text),
+            el('div', { class: 'survey-options' },
+                ...q.options.map((opt) =>
+                    el('button',
+                        {
+                            class: 'survey-option',
+                            'data-question-key': q.key,
+                            'data-answer-key': opt.key,
+                            'data-question-text': q.text,
+                            'data-answer-text': opt.text,
+                            onclick: handleAnswer
+                        },
+                        opt.imageUrl
+                            ? el('img', { class: 'survey-option-img', src: opt.imageUrl, alt: opt.text })
+                            : el('div', { class: 'survey-option-img placeholder' }),
+                        el('span', { class: 'survey-option-label' }, opt.text)
+                    )
+                )
+            )
+        )
+    );
+}
+
+async function handleAnswer(event) {
+    const t = event.currentTarget;
+    const questionKey = t.dataset.questionKey;
+    const answerKey   = t.dataset.answerKey;
+    const questionText = t.dataset.questionText;
+    const answerText   = t.dataset.answerText;
+
+    // Idempotency: if we re-render the same question (e.g. due to a stage
+    // re-broadcast) we don't want to fire two userProfiling events.
+    const dedupeKey = `${questionKey}:${state.surveyIndex}`;
+    if (state.answeredKeys.has(dedupeKey)) return;
+    state.answeredKeys.add(dedupeKey);
+
+    // Visual: lock the row in.
+    Array.from(root.querySelectorAll('.survey-option')).forEach((b) => {
+        b.disabled = true;
+        if (b === t) b.classList.add('selected');
+    });
+
+    // Path A — persistence + agent grounding via Interactions SDK.
+    try {
+        if (window.SalesforceInteractions) {
+            window.SalesforceInteractions.sendEvent({
+                interaction: {
+                    name: 'userProfiling',
+                    eventType: 'userProfiling',
+                    attributes: {
+                        question:    questionText,
+                        questionKey: questionKey,
+                        answer:      answerText,
+                        answerKey:   answerKey
+                    }
+                }
+            });
+        }
+    } catch (e) {
+        console.warn('userProfiling sendEvent failed', e);
+    }
+
+    // Path B — live monitor tile via Apex relay.
+    try {
+        await fetch('/api/survey/answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sessionId:    state.sessionId,
+                questionKey,
+                answerKey,
+                questionText,
+                answerText
+            })
+        });
+    } catch (e) {
+        console.warn('survey/answer relay failed', e);
+    }
+
+    // Advance to next question after a short visual confirmation.
+    setTimeout(() => {
+        state.surveyIndex += 1;
+        render();
+    }, 350);
+}
+
+// ── Waiting / thanks ───────────────────────────────────────────────────────
+
 function renderWaiting() {
-    root.innerHTML = '';
     const stagePill = el('span',
         { class: state.wsConnected ? 'stage-pill' : 'stage-pill disconnected' },
         state.wsConnected ? (state.stage || '…') : 'reconnecting…'
     );
     root.append(
-        el('div', { class: 'center', 'data-screen': 'waiting' },
+        el('div', { class: 'center' },
             el('div', { class: 'brand' }, 'Skywave'),
             el('div', { class: 'brand-sub' }, 'Interactive'),
             el('div', { class: 'card' },
@@ -203,7 +342,22 @@ function renderWaiting() {
     );
 }
 
+function renderThanks() {
+    root.append(
+        el('div', { class: 'center' },
+            el('div', { class: 'brand' }, 'Skywave'),
+            el('div', { class: 'brand-sub' }, 'Interactive'),
+            el('div', { class: 'card' },
+                el('h1', {}, 'Thanks!'),
+                el('p', {}, 'Your preferences are recorded. Hold tight — we’ll guide you to the next step.')
+            )
+        )
+    );
+}
+
+// ── Entry ──────────────────────────────────────────────────────────────────
+
 (async () => {
     await loadConfig();
-    go('consent');
+    renderConsent();
 })();
