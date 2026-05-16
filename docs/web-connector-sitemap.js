@@ -27,12 +27,13 @@
 // initSitemap() emit their own diagnostics on every page load.
 SalesforceInteractions.setLoggingLevel('trace');
 
+// Consent is intentionally NOT declared in init's consents array. The
+// consumer site shows a consent screen and calls updateConsents() with
+// status: 'OptIn' on Accept — that way the consent record reflects an
+// actual user action, not a sitemap default. Until then, events are
+// queued and dropped (the SDK refuses to ship without consent), which
+// is the right behavior.
 SalesforceInteractions.init({
-  consents: [{
-    provider: 'Skywave Interactive',
-    purpose:  'Tracking',
-    status:   'OptIn'    // exact string: 'OptIn' | 'OptOut' | 'NotSet'
-  }],
   // Single-host on Heroku. No subdomain spread, so a literal host is fine.
   cookieDomain: 'skywave-app-bb0e8666933b.herokuapp.com'
 });

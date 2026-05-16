@@ -27,16 +27,36 @@ async function loadConfig() {
     } catch (e) { console.warn('config fetch failed', e); }
 }
 
-function loadInteractionsSdk() {
-    return new Promise((resolve) => {
-        if (!config.interactionsSdkUrl || sdkReady) return resolve(sdkReady);
+async function loadInteractionsSdk() {
+    if (!config.interactionsSdkUrl || sdkReady) return sdkReady;
+    await new Promise((resolve) => {
         const s = document.createElement('script');
         s.src = config.interactionsSdkUrl;
         s.async = true;
-        s.onload = () => { sdkReady = !!window.SalesforceInteractions; resolve(sdkReady); };
-        s.onerror = () => { console.warn('SDK failed to load'); resolve(false); };
+        s.onload = () => resolve();
+        s.onerror = () => { console.warn('SDK script failed to load'); resolve(); };
         document.head.appendChild(s);
     });
+    if (!window.SalesforceInteractions) {
+        console.warn('SDK script loaded but SalesforceInteractions is undefined');
+        return false;
+    }
+    // The script also runs the sitemap which calls SalesforceInteractions.init().
+    // updateConsents() and sendEvent() silently no-op if called before init's
+    // promise resolves — wait for it explicitly before continuing.
+    try {
+        if (window.SalesforceInteractions.ready) {
+            await window.SalesforceInteractions.ready;
+        } else if (typeof window.SalesforceInteractions.init === 'function') {
+            // Older SDK versions: poll for getAnonymousId() returning a value
+            // as a proxy for "init has resolved."
+            for (let i = 0; i < 50 && !window.SalesforceInteractions.getAnonymousId?.(); i++) {
+                await new Promise((r) => setTimeout(r, 50));
+            }
+        }
+    } catch (e) { console.warn('SDK init wait failed', e); }
+    sdkReady = true;
+    return true;
 }
 
 let state = {

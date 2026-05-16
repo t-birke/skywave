@@ -14,8 +14,8 @@ The sitemap declares **consent** at SDK init and **types pages** so post-demo an
 
 ## What this sitemap does
 
-- `SalesforceInteractions.init({ consents: [...], cookieDomain: ... })`
-  - **Consent declaration**: opts the page in to the `Tracking` purpose with provider `Skywave Interactive`.
+- `SalesforceInteractions.init({ cookieDomain: ... })`
+  - **No consent declaration** — the consent screen in `site.js` calls `updateConsents({status: 'OptIn'})` when the user actually clicks Accept. Until then the SDK queues and drops events, which is correct.
   - **Cookie domain**: literal Heroku app host (`skywave-app-bb0e8666933b.herokuapp.com`). Single-host setup; cookies don't need to span subdomains.
 - `SalesforceInteractions.initSitemap({ global, pageTypes, pageTypeDefault })`
   - **`pageTypes`**: 8 named page types matching `document.body.dataset.stage`. The consumer site sets that attribute whenever its SPA state advances (see `setStage()` in `site.js`).
