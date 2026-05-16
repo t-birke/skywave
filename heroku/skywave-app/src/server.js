@@ -22,6 +22,16 @@ app.get('/healthz', (_, res) => {
     res.json({ ok: true, activeWs: activeCount() });
 });
 
+// Consumer-site config. The SDK is only loaded when SF_INTERACTIONS_SDK_URL
+// is set on Heroku — that gets populated once the Web Connector is created
+// in si Setup and we know the appId. Until then the consumer site runs
+// without the SDK and Apex mints the sessionId.
+app.get('/api/config', (_, res) => {
+    res.json({
+        interactionsSdkUrl: process.env.SF_INTERACTIONS_SDK_URL || null
+    });
+});
+
 // Phones POST here; we forward to Apex with the integration user's token.
 // Lets the phone stay anonymous to Salesforce — the relay holds the JWT.
 app.post('/api/session/start', async (req, res) => {

@@ -2,52 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
     <title>Skywave Interactive</title>
-    <style>
-        body { font-family: system-ui, sans-serif; background: #0b1d3a; color: #fff; margin: 0; min-height: 100vh; display: grid; place-items: center; }
-        main { padding: 2rem; text-align: center; max-width: 30rem; }
-        h1 { font-size: 1.5rem; margin: 0 0 1rem; letter-spacing: -0.02em; }
-        p { color: #a8bcd8; margin: 0.25rem 0; font-size: 0.9rem; }
-        code { background: #12305f; padding: 0.1rem 0.4rem; border-radius: 4px; }
-        #state { margin-top: 2rem; padding: 1rem; background: #12305f; border-radius: 8px; min-height: 2.5rem; }
-        #state .label { color: #a8bcd8; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; }
-        #state .value { font-size: 1.2rem; margin-top: 0.25rem; }
-    </style>
+    <link rel="stylesheet" href="/assets/site.css">
 </head>
 <body>
-    <main>
-        <h1>Skywave Interactive</h1>
-        <p>Phase 1 placeholder.</p>
-        <p>Session: <code id="sid">…</code></p>
-        <div id="state">
-            <div class="label">Stage</div>
-            <div class="value" id="stage">connecting…</div>
-        </div>
-    </main>
-    <script>
-        (async () => {
-            const sidEl = document.getElementById('sid');
-            const stageEl = document.getElementById('stage');
-            try {
-                const startResp = await fetch('/api/session/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userAgent: navigator.userAgent }) });
-                const { sessionId, wsUrl, currentState } = await startResp.json();
-                sidEl.textContent = sessionId;
-                stageEl.textContent = currentState || 'waiting for presenter';
-                const ws = new WebSocket(wsUrl);
-                ws.onmessage = (m) => {
-                    try {
-                        const msg = JSON.parse(m.data);
-                        if (msg.type === 'stage_changed') {
-                            stageEl.textContent = msg.newState;
-                        }
-                    } catch (e) { console.error(e); }
-                };
-                ws.onclose = () => { stageEl.textContent = 'disconnected'; };
-            } catch (e) {
-                stageEl.textContent = 'failed: ' + e.message;
-            }
-        })();
-    </script>
+    <main id="root"></main>
+    <script src="/assets/site.js" defer></script>
 </body>
 </html>

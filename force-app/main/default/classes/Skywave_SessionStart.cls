@@ -37,9 +37,16 @@ global without sharing class Skywave_SessionStart {
 
         Map<String, Object> body = Skywave_RestUtil.parseBody();
         String userAgent = String.valueOf(body.get('userAgent'));
-        // Mint a UUID-shaped session id. Apex doesn't have UUID natively;
-        // a Crypto-based pseudo-UUID is good enough for our scale.
-        String sessionId = newSessionId();
+        // Prefer the Salesforce Interactions SDK's anonymous cookie ID when
+        // the consumer site provides it — that ID is what Data Cloud uses to
+        // correlate events into the Engagement DLO, so using it as our
+        // sessionId means one identifier flows through everything.
+        // Fall back to a minted UUID if the SDK didn't load (no consent,
+        // ad-blocker, etc.) so the demo never hard-blocks.
+        String providedId = String.valueOf(body.get('sessionId'));
+        String sessionId = (providedId != null && providedId.length() >= 8 && providedId.length() <= 64)
+            ? providedId
+            : newSessionId();
 
         Skywave_RestUtil.publishEvent(
             'session_started',
