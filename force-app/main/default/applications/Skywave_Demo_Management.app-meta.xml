@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomApplication xmlns="http://soap.sforce.com/2006/04/metadata">
+    <brand>
+        <headerColor>#0B1D3A</headerColor>
+    </brand>
+    <description>Presenter-side control center for Skywave Interactive: monitor LWC, demo session record list, and audience contacts.</description>
+    <formFactors>Large</formFactors>
+    <isNavAutoTempTabsDisabled>false</isNavAutoTempTabsDisabled>
+    <isNavPersonalizationDisabled>false</isNavPersonalizationDisabled>
+    <isNavTabPersistenceDisabled>false</isNavTabPersistenceDisabled>
+    <label>Skywave Demo Management</label>
+    <navType>Standard</navType>
+    <tabs>Skywave_Demo_Monitor</tabs>
+    <tabs>Demo_Session__c</tabs>
+    <tabs>standard-Contact</tabs>
+    <uiType>Lightning</uiType>
+</CustomApplication>

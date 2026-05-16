@@ -54,4 +54,8 @@
         <apexClass>Skywave_DemoMonitorController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
+    <applicationVisibilities>
+        <application>Skywave_Demo_Management</application>
+        <visible>true</visible>
+    </applicationVisibilities>
 </PermissionSet>
