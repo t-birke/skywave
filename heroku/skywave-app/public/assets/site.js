@@ -104,12 +104,20 @@ async function handleConsent() {
 
     // Best-effort: tell the Interactions SDK the user opted in. If the SDK
     // hasn't loaded (no Web Connector configured yet on si), this no-ops.
+    //
+    // Use literal strings, not SDK constants:
+    //   SalesforceInteractions.ConsentStatus.OptIn resolves to "Opt In"
+    //   (with a space) — that's the human-readable label, not the
+    //   schema-canonical value. The schema and Data Cloud expect "OptIn".
+    //
+    // Provider must exactly match the sitemap consent declaration so we
+    // end up with one consent record per session, not two.
     try {
         if (window.SalesforceInteractions) {
             window.SalesforceInteractions.updateConsents({
-                purpose: window.SalesforceInteractions.ConsentPurpose.Tracking,
-                provider: 'Skywave Interactive Demo',
-                status: window.SalesforceInteractions.ConsentStatus.OptIn
+                purpose:  'Tracking',
+                provider: 'Skywave Interactive',
+                status:   'OptIn'
             });
         }
     } catch (e) {
