@@ -879,3 +879,10 @@ demo itself is stable end-to-end.
   (Phase 8).
 - **Multi-language agent** (current `en_US` only, see Q8).
 - **Per-device shake normalization** for the trolley race (see Q2).
+- **Enable GitHub Push Protection** (Settings → Code security → Secret
+  scanning) **before flipping the repo to public.** While the repo is
+  private and clean, `.gitignore` + the `SECRETS.md` discipline are
+  enough. See `SECRETS.md` for the full secrets policy.
+- **Optional local pre-commit hook** to scan staged files for common
+  key markers (`-----BEGIN`, `AKIA*`, etc.) — adds an offline guard
+  layer; not needed yet.
