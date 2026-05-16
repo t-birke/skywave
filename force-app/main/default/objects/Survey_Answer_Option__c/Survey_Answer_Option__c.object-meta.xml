@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Survey Answer Option</label>
+    <pluralLabel>Survey Answer Options</pluralLabel>
+    <description>Master-detail child of Survey_Question__c. One row per selectable option. Image_Url__c renders next to the option label on the consumer site.</description>
+    <nameField>
+        <label>Option Number</label>
+        <type>AutoNumber</type>
+        <displayFormat>OPT-{0000}</displayFormat>
+        <startingNumber>1</startingNumber>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ControlledByParent</sharingModel>
+    <visibility>Public</visibility>
+    <enableSearch>true</enableSearch>
+    <enableReports>false</enableReports>
+    <enableActivities>false</enableActivities>
+    <enableHistory>false</enableHistory>
+</CustomObject>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Option_Key__c</fullName>
+    <label>Option Key</label>
+    <description>Stable identifier sent as the answerKey, e.g. tyo. Lowercase recommended. Must be unique within a question.</description>
+    <type>Text</type>
+    <length>64</length>
+    <required>true</required>
+    <caseSensitive>false</caseSensitive>
+</CustomField>
