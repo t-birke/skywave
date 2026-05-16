@@ -19,12 +19,21 @@ global without sharing class Skywave_SessionStart {
         RestResponse res = RestContext.response;
         res.addHeader('Content-Type', 'application/json');
 
-        Id demoSessionId = Skywave_RestUtil.getActiveDemoSessionId();
-        if (demoSessionId == null) {
+        // Read the active session and current state in one query — phones
+        // need both to bootstrap their UI without waiting for the next PE.
+        List<Demo_Session__c> active = [
+            SELECT Id, State__c FROM Demo_Session__c
+            WHERE Active__c = true
+            ORDER BY Started__c DESC NULLS LAST
+            LIMIT 1
+        ];
+        if (active.isEmpty()) {
             res.statusCode = 503;
             res.responseBody = Blob.valueOf('{"error":"no_active_demo_session"}');
             return;
         }
+        Id demoSessionId = active[0].Id;
+        String currentState = active[0].State__c;
 
         Map<String, Object> body = Skywave_RestUtil.parseBody();
         String userAgent = String.valueOf(body.get('userAgent'));
@@ -42,6 +51,7 @@ global without sharing class Skywave_SessionStart {
         Map<String, Object> response = new Map<String, Object>{
             'sessionId' => sessionId,
             'demoSessionId' => demoSessionId,
+            'currentState' => currentState,
             'wsUrl' => WS_BASE_URL + '/' + sessionId
         };
         res.statusCode = 200;

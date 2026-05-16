@@ -31,9 +31,9 @@
             const stageEl = document.getElementById('stage');
             try {
                 const startResp = await fetch('/api/session/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userAgent: navigator.userAgent }) });
-                const { sessionId, wsUrl } = await startResp.json();
+                const { sessionId, wsUrl, currentState } = await startResp.json();
                 sidEl.textContent = sessionId;
-                stageEl.textContent = 'waiting for presenter';
+                stageEl.textContent = currentState || 'waiting for presenter';
                 const ws = new WebSocket(wsUrl);
                 ws.onmessage = (m) => {
                     try {
