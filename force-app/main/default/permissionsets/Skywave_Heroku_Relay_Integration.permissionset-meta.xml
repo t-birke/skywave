@@ -36,4 +36,28 @@
         <enabled>true</enabled>
         <name>ApiEnabled</name>
     </userPermissions>
+    <classAccesses>
+        <apexClass>Skywave_RestUtil</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_SessionStart</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_SurveyAnswer</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_SurveySchema</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_RaceTick</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_Profile</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
 </PermissionSet>
