@@ -354,6 +354,72 @@ the agent a populated data graph.
 
 ---
 
+## 4c. Salesforce Interactions SDK event plan
+
+The consumer site fires these stock event types via
+`SalesforceInteractions.sendEvent(...)`. Schema customizations happen
+in the `si` Web Connector → Schema editor; once published, schemas are
+**append-only** (never delete, rename, or retype). See
+[`sf-interactions-sdk` skill](../../../dev/claude-skills/sf-interactions-sdk/)
+for the SDK reference, and §5b for the parallel SOQL-into-DC path.
+
+### Events Skywave will fire
+
+| Event | When | Payload | Purpose |
+|-------|------|---------|---------|
+| `consentLog` | After Accept on the consent screen (auto-fired by `SalesforceInteractions.updateConsents()`) | `purpose='Tracking'`, `provider='Skywave Interactive Demo'`, `status='OptIn'` | GDPR audit trail; DC consent ledger |
+| `userProfiling` | Each survey answer tap | `attributesQuestion`, `attributesQuestionKey`, `attributesAnswer`, `attributesAnswerKey` | Persisted survey data; agent grounding via RTDG |
+| `catalog` | On any browse event — help pages, business-class amenity views, destination detail, etc. (see "Browse tracking" below) | `id`, `type`, `category` | Behavioral signal for agent personalisation ("you looked at X — want me to suggest Y?") |
+| `contactPointEmail` | Stage 4 profile creation (first of the three-event burst) | `email` | Feeds `ContactPointEmail` DMO — IR exact-match key A |
+| `partyIdentification` | Stage 4 profile creation (second of the three-event burst) | `IDName='SkywaveContactId'`, `IDType='CRM'`, `userId=<Contact.Id>` | Feeds `PartyIdentification` DMO — IR exact-match key B |
+| `identity` | Stage 4 profile creation (last of the three-event burst) | `isAnonymous='0'`, `firstName`, `lastName`, `email` | Flips SDK to known + writes Identity DMO |
+
+### Anonymous-to-known transition
+
+The three-event burst (`contactPointEmail` → `partyIdentification` →
+`identity`) is the IR-friendly pattern. Without it, IR has nothing to
+match against and the engagement events stay stranded on a never-resolved
+anonymous Individual. **A single `identity` event is not sufficient** —
+it populates the Identity DMO only, not the contact-point DMOs IR reads.
+See `recipes/anonymous-to-known.md` in the SDK skill.
+
+The `IDName='SkywaveContactId'` value must match how the **CRM
+connector** lands `Contact.Id` into the CRM-side `PartyIdentification`
+DMO — same string both sides, otherwise IR can't pair them.
+
+### Browse tracking — reuse `catalog`
+
+Generic "user viewed something" signal. Reusing the stock `catalog`
+event rather than a custom `browse` event because:
+- the SDK fields (`id`, `type`, `category`) map cleanly onto generic browse
+- DC's pre-built IR rules + segment templates already understand `catalog`
+- electra already uses this pattern and it works
+
+Naming convention for `catalog.id`:
+- `amenity:<slug>` — content/info pages
+- `flight:<flight-number>` — flight detail views
+- `destination:<iata>` — destination pages
+- `help:<topic-key>` — help articles
+
+Stable, parseable, easy to query (`WHERE id LIKE 'amenity:%'`).
+
+### Escape hatch (documented, not recommended)
+
+Electra packs demo-cohort metadata into the `identity` event's
+unused address fields (`addressLine1`–`addressLine4`). Schema is
+append-only, so this avoided redeploys when new metadata appeared
+mid-demo. The footgun: future readers see `addressLine1` and assume
+it's an address.
+
+For Skywave v1 we **do not** use this pattern — `Demo_Session__c`
+already lives in CRM and §5b's SOQL-into-DC handles the lookups.
+Captured here only so future-us recognizes it if we hit a similar
+"need to ship more anonymous-session metadata without a schema bump"
+constraint. Preferred path then is to **add a custom field to the
+relevant event** rather than misuse address fields.
+
+---
+
 ## 5. State management — killing the manual "check state" button
 
 In electra, the phone polled a state endpoint and the user had to tap
