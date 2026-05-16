@@ -11,6 +11,7 @@
     <label>Skywave Demo Management</label>
     <navType>Standard</navType>
     <tabs>Skywave_Demo_Monitor</tabs>
+    <tabs>Skywave_Survey_Author</tabs>
     <tabs>Demo_Session__c</tabs>
     <tabs>Survey_Question__c</tabs>
     <tabs>standard-Contact</tabs>

@@ -1,0 +1,109 @@
+<template>
+    <article class="slds-card">
+        <header class="slds-card__header slds-grid slds-grid_align-spread slds-grid_vertical-align-center slds-p-around_medium">
+            <div>
+                <span class="slds-text-heading_small">Survey questions</span>
+            </div>
+            <div>
+                <lightning-button label="New question" icon-name="utility:add" onclick={handleAddQuestion}></lightning-button>
+            </div>
+        </header>
+
+        <div class="slds-card__body slds-grid">
+            <!-- Left pane: question list -->
+            <aside class="slds-col slds-size_1-of-3 slds-border_right">
+                <ul class="question-list">
+                    <template for:each={questions} for:item="q">
+                        <li key={q.id} class={q.rowClass} onclick={handleSelectQuestion} data-id={q.id}>
+                            <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center slds-p-around_small">
+                                <div class="slds-truncate">
+                                    <div class="slds-text-body_regular slds-truncate" title={q.questionText}>{q.questionText}</div>
+                                    <div class="slds-text-body_small slds-text-color_weak">{q.name} · {q.questionKey}</div>
+                                </div>
+                                <div class="slds-grid slds-grid_vertical-align-center" onclick={stopProp}>
+                                    <lightning-button-icon icon-name="utility:up" size="x-small" alternative-text="Move up" data-id={q.id} onclick={handleMoveUp} disabled={q.isFirst}></lightning-button-icon>
+                                    <lightning-button-icon icon-name="utility:down" size="x-small" alternative-text="Move down" class="slds-m-left_xx-small" data-id={q.id} onclick={handleMoveDown} disabled={q.isLast}></lightning-button-icon>
+                                </div>
+                            </div>
+                        </li>
+                    </template>
+                    <template lwc:if={hasNoQuestions}>
+                        <li class="slds-p-around_medium slds-text-color_weak slds-text-align_center">No questions yet</li>
+                    </template>
+                </ul>
+            </aside>
+
+            <!-- Right pane: editor -->
+            <section class="slds-col slds-size_2-of-3 slds-p-around_medium">
+                <template lwc:if={selected}>
+                    <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center slds-m-bottom_medium">
+                        <span class="slds-text-heading_small">Edit question</span>
+                        <div>
+                            <template lwc:if={dirty}>
+                                <lightning-badge label="Unsaved changes" class="slds-m-right_small"></lightning-badge>
+                            </template>
+                            <lightning-button label="Delete" variant="destructive-text" onclick={handleDeleteQuestion} class="slds-m-right_x-small"></lightning-button>
+                            <lightning-button label="Save" variant="brand" onclick={handleSave} disabled={saving}></lightning-button>
+                        </div>
+                    </div>
+
+                    <lightning-input label="Question text" value={selected.questionText} data-field="questionText" onchange={handleQuestionFieldChange}></lightning-input>
+                    <lightning-input label="Question key" value={selected.questionKey} data-field="questionKey" onchange={handleQuestionFieldChange} field-level-help="Stable identifier sent to Apex and the SDK (e.g. fav_destination)."></lightning-input>
+                    <lightning-combobox label="Type" value={selected.questionType} data-field="questionType" options={typeOptions} onchange={handleQuestionFieldChange}></lightning-combobox>
+                    <lightning-input type="toggle" label="Active" checked={selected.active} data-field="active" onchange={handleQuestionFieldChange} message-toggle-active="On" message-toggle-inactive="Off"></lightning-input>
+
+                    <div class="slds-m-top_large slds-grid slds-grid_align-spread slds-grid_vertical-align-center">
+                        <span class="slds-text-heading_small">Options</span>
+                        <lightning-button label="Add option" icon-name="utility:add" onclick={handleAddOption}></lightning-button>
+                    </div>
+
+                    <div class="slds-m-top_small">
+                        <template for:each={selected.options} for:item="o" for:index="idx">
+                            <div key={o.localId} class="option-row slds-box slds-box_x-small slds-m-bottom_x-small">
+                                <div class="slds-grid slds-gutters_x-small slds-grid_vertical-align-start">
+                                    <div class="slds-col image-col">
+                                        <template lwc:if={o.imageUrl}>
+                                            <img src={o.imageUrl} class="thumb" alt={o.optionText}/>
+                                        </template>
+                                        <template lwc:else>
+                                            <div class="thumb thumb-placeholder slds-text-color_weak">no image</div>
+                                        </template>
+                                    </div>
+                                    <div class="slds-col slds-grow">
+                                        <div class="slds-grid slds-gutters_x-small">
+                                            <div class="slds-col slds-size_1-of-2">
+                                                <lightning-input label="Text" variant="label-hidden" placeholder="Option text" value={o.optionText} data-localid={o.localId} data-field="optionText" onchange={handleOptionFieldChange}></lightning-input>
+                                            </div>
+                                            <div class="slds-col slds-size_1-of-2">
+                                                <lightning-input label="Key" variant="label-hidden" placeholder="key" value={o.optionKey} data-localid={o.localId} data-field="optionKey" onchange={handleOptionFieldChange}></lightning-input>
+                                            </div>
+                                        </div>
+                                        <lightning-input label="Image URL" variant="label-hidden" placeholder="https://…" value={o.imageUrl} data-localid={o.localId} data-field="imageUrl" onchange={handleOptionFieldChange} class="slds-m-top_xx-small"></lightning-input>
+                                    </div>
+                                    <div class="slds-col slds-grid slds-grid_vertical slds-grid_vertical-align-center">
+                                        <div class="slds-grid slds-grid_vertical-align-center">
+                                            <lightning-button-icon icon-name="utility:up" size="x-small" alternative-text="Move up" data-localid={o.localId} onclick={handleOptionMoveUp} disabled={o.isFirst}></lightning-button-icon>
+                                            <lightning-button-icon icon-name="utility:down" size="x-small" alternative-text="Move down" class="slds-m-left_xx-small" data-localid={o.localId} onclick={handleOptionMoveDown} disabled={o.isLast}></lightning-button-icon>
+                                        </div>
+                                        <div class="slds-grid slds-grid_vertical-align-center slds-m-top_xx-small">
+                                            <lightning-input type="toggle" label="On" variant="label-hidden" checked={o.active} data-localid={o.localId} data-field="active" onchange={handleOptionFieldChange} message-toggle-active="" message-toggle-inactive=""></lightning-input>
+                                            <lightning-button-icon icon-name="utility:delete" size="x-small" variant="bare" alternative-text="Delete" class="slds-m-left_x-small" data-localid={o.localId} onclick={handleOptionDelete}></lightning-button-icon>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                        <template lwc:if={selectedHasNoOptions}>
+                            <div class="slds-p-around_medium slds-text-color_weak slds-text-align_center">No options yet — click Add option</div>
+                        </template>
+                    </div>
+                </template>
+                <template lwc:else>
+                    <div class="slds-p-around_xx-large slds-text-color_weak slds-text-align_center">
+                        Select a question to edit, or click "New question".
+                    </div>
+                </template>
+            </section>
+        </div>
+    </article>
+</template>

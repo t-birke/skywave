@@ -115,8 +115,16 @@
         <tab>Survey_Question__c</tab>
         <visibility>Visible</visibility>
     </tabSettings>
+    <tabSettings>
+        <tab>Skywave_Survey_Author</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
     <classAccesses>
         <apexClass>Skywave_DemoMonitorController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_SurveyAuthorController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <applicationVisibilities>
