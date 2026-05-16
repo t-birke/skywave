@@ -25,7 +25,7 @@ The sitemap declares **consent** at SDK init and **types pages** so post-demo an
 
 | Anti-pattern from electra | Why it's gone here |
 |---|---|
-| `setLoggingLevel('trace')` at top | Spam in production. Use `?debug=1` flag in `site.js` if needed. |
+| `setLoggingLevel('trace')` at top | (Kept for now — verbose logs are too useful during active development to demote. **Switch to `'warn'` before any public rehearsal.**) |
 | `OnException` listener phoning home to a Heroku endpoint | Fine for one-off debug; not a starting-point default. |
 | Declarative click listeners (`actionMappingClicks`) | All event firing happens in `site.js` where the data is at hand. Declarative listeners hide intent across files. |
 | `isAnonymous: 0` (number) | Schema treats it as a string — must be `'0'` or `'1'`. |
@@ -45,6 +45,7 @@ The sitemap declares **consent** at SDK init and **types pages** so post-demo an
 Edit this sitemap when:
 - We add a new SPA stage (e.g. `survey-debrief`) — add a matching `pageTypes` entry.
 - We move the Heroku app to a custom domain — update `cookieDomain`.
+- **Pre-rehearsal cleanup:** demote `setLoggingLevel('trace')` to `'warn'` or `'error'` to keep the audience's projector quiet (and to avoid "what's that orange noise" questions during the demo).
 
 Do **not** edit it for:
 - New `userProfiling` events — they fire from `site.js`.

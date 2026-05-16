@@ -15,10 +15,17 @@
 //
 // Things this sitemap deliberately does NOT do:
 //   - No declarative click listeners (sendEvent calls live in site.js).
-//   - No setLoggingLevel('trace') — debug output behind a ?debug=1 flag in
-//     site.js, off by default in production.
 //   - No diagnostic OnException listener phoning home — debug from the
 //     browser console when needed.
+//
+// Logging: setLoggingLevel('trace') is on by default while we build this
+// out. Demote to 'warn' or 'error' before any public event / production
+// rehearsal — it's the first line of the file.
+
+// Verbose console logging during active development. Flip to 'warn' or
+// 'error' before public events / production. Set early so init() and
+// initSitemap() emit their own diagnostics on every page load.
+SalesforceInteractions.setLoggingLevel('trace');
 
 SalesforceInteractions.init({
   consents: [{
