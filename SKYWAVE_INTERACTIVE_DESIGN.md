@@ -895,3 +895,16 @@ demo itself is stable end-to-end.
 - **Optional local pre-commit hook** to scan staged files for common
   key markers (`-----BEGIN`, `AKIA*`, etc.) — adds an offline guard
   layer; not needed yet.
+
+---
+
+## 16. Backlog (lighter than parking lot — UX polish, P2 features)
+
+The parking lot above is for "deferred until demo is stable." This
+backlog is for "we shipped v1 of X but want a slicker v2 someday."
+Add items as they come up. Don't pre-prioritize.
+
+- **`skywaveSurveyAuthor` LWC drag-and-drop reorder.** v1 ships with
+  up/down arrow buttons on each question and option. Drag-and-drop
+  is slicker on desktop but brittler on touch and adds ~50 LOC; not
+  worth it until the authoring tool gets daily use.
