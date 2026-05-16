@@ -1,0 +1,25 @@
+{
+    "name": "skywave-app",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Skywave Interactive: static consumer site + WebSocket relay subscribed to si Pub/Sub API.",
+    "type": "module",
+    "main": "src/server.js",
+    "engines": {
+        "node": "20.x"
+    },
+    "scripts": {
+        "start": "node src/server.js",
+        "dev": "node --watch -r dotenv/config src/server.js"
+    },
+    "dependencies": {
+        "@grpc/grpc-js": "^1.12.0",
+        "@grpc/proto-loader": "^0.7.13",
+        "avro-js": "^1.12.0",
+        "axios": "^1.7.7",
+        "dotenv": "^16.4.5",
+        "express": "^4.21.0",
+        "jsonwebtoken": "^9.0.2",
+        "ws": "^8.18.0"
+    }
+}
