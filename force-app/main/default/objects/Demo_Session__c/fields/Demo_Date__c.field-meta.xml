@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Demo_Date__c</fullName>
+    <label>Demo Date</label>
+    <description>The day the demo was (or will be) presented. Used in the monitor's session picker so the presenter can find the right run by date.</description>
+    <type>Date</type>
+</CustomField>

@@ -1,16 +1,21 @@
 <template>
     <div class="container slds-p-around_large">
-        <div class="header slds-grid slds-grid_align-spread slds-grid_vertical-align-center">
-            <div>
+        <div class="header slds-grid slds-grid_align-spread slds-grid_vertical-align-start">
+            <div class="title-block">
                 <div class="title">Skywave Interactive</div>
-                <template lwc:if={demoSessionName}>
-                    <div class="subtitle">{demoSessionName} · {activeCount} active sessions</div>
+                <template lwc:if={hasActive}>
+                    <div class="subtitle">
+                        <span class="customer">{customer}</span>
+                        <template lwc:if={demoDate}><span class="dot">·</span><span>{demoDate}</span></template>
+                        <span class="dot">·</span><span>{name}</span>
+                        <span class="dot">·</span><span>{activeCount} active sessions</span>
+                    </div>
                 </template>
                 <template lwc:else>
-                    <div class="subtitle warn">No active Demo Session</div>
+                    <div class="subtitle warn">No active Demo Session — pick one below or create a new one</div>
                 </template>
             </div>
-            <div>
+            <div class="qr-toggle">
                 <lightning-button-stateful
                     label-when-off="QR off"
                     label-when-on="QR on"
@@ -25,10 +30,34 @@
             </div>
         </div>
 
-        <div class="state-pill">
-            <div class="state-label">CURRENT STAGE</div>
-            <div class="state-value">{currentState}</div>
+        <div class="picker-row">
+            <lightning-record-picker
+                label="Active demo session"
+                placeholder="Search by customer, date, or DEMO-####"
+                object-api-name="Demo_Session__c"
+                value={activeId}
+                display-info={pickerDisplayInfo}
+                matching-info={pickerMatchingInfo}
+                onchange={handleSessionChange}>
+            </lightning-record-picker>
         </div>
+
+        <div class="state-block">
+            <div class="state-label">CURRENT STAGE</div>
+            <div class="state-value">{currentStateLabel}</div>
+        </div>
+
+        <template lwc:if={hasActive}>
+            <div class="stage-strip">
+                <template for:each={stageButtons} for:item="s">
+                    <button
+                        key={s.value}
+                        class={s.cssClass}
+                        data-state={s.value}
+                        onclick={handleStageClick}>{s.label}</button>
+                </template>
+            </div>
+        </template>
     </div>
 
     <template lwc:if={qrCodeVisible}>

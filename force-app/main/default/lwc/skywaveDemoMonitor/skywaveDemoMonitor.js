@@ -3,20 +3,62 @@ import { loadScript } from 'lightning/platformResourceLoader';
 import { subscribe, onError } from 'lightning/empApi';
 import QRCodeJS from '@salesforce/resourceUrl/QRCodeJS';
 import getActiveDemoSession from '@salesforce/apex/Skywave_DemoMonitorController.getActiveDemoSession';
+import setActive from '@salesforce/apex/Skywave_DemoMonitorController.setActive';
+import advanceState from '@salesforce/apex/Skywave_DemoMonitorController.advanceState';
 
 const CONSUMER_SITE_URL = 'https://skywave-app-bb0e8666933b.herokuapp.com/';
 const STATE_CHANNEL = '/event/Demo_State_Change__e';
 
+const STAGES = [
+    { value: 'idle', label: 'Idle' },
+    { value: 'scan', label: 'Scan' },
+    { value: 'survey', label: 'Survey' },
+    { value: 'agent_book', label: 'Agent: Book' },
+    { value: 'profile', label: 'Profile' },
+    { value: 'c360', label: 'C360' },
+    { value: 'agent_seat_fail', label: 'Seat (Fail)' },
+    { value: 'agent_seat_pass', label: 'Seat (Pass)' },
+    { value: 'race', label: 'Race' },
+    { value: 'slack', label: 'Slack' },
+    { value: 'done', label: 'Done' }
+];
+
+const STAGE_LABELS = Object.fromEntries(STAGES.map(s => [s.value, s.label]));
+
 export default class SkywaveDemoMonitor extends LightningElement {
+    @track activeId = null;
+    @track name = null;
+    @track customer = null;
+    @track demoDate = null;
     @track currentState = 'idle';
-    @track demoSessionName = null;
     @track activeCount = 0;
 
     qrCodeVisible = true;
     qrCodeGenerated = false;
     qrcodeClass = 'qrcode';
     _qrLibLoaded = false;
-    _stateSubscription = null;
+
+    pickerDisplayInfo = {
+        primaryField: 'Customer__c',
+        additionalFields: ['Demo_Date__c', 'Name']
+    };
+    pickerMatchingInfo = {
+        primaryField: { fieldPath: 'Customer__c' },
+        additionalFields: [{ fieldPath: 'Name' }]
+    };
+
+    get hasActive() { return !!this.activeId; }
+
+    get currentStateLabel() {
+        return STAGE_LABELS[this.currentState] || this.currentState;
+    }
+
+    get stageButtons() {
+        return STAGES.map(s => ({
+            ...s,
+            cssClass: s.value === this.currentState ? 'stage-btn current' : 'stage-btn'
+        }));
+    }
 
     async connectedCallback() {
         try {
@@ -31,35 +73,42 @@ export default class SkywaveDemoMonitor extends LightningElement {
         this.subscribeStateChanges();
     }
 
-    disconnectedCallback() {
-        // empApi subscription auto-cleans on component destroy in v55+, but we
-        // guard against accidental leaks during HMR / tab switches.
-        this._stateSubscription = null;
-    }
-
     async loadActiveSession() {
         try {
             const data = await getActiveDemoSession();
-            if (data) {
-                this.demoSessionName = data.name;
-                this.currentState = data.state || 'idle';
-                this.activeCount = data.contactCount || 0;
-            } else {
-                this.demoSessionName = null;
-            }
+            this.applySession(data);
         } catch (e) {
             console.error('getActiveDemoSession failed', e);
+        }
+    }
+
+    applySession(data) {
+        if (data) {
+            this.activeId = data.id;
+            this.name = data.name;
+            this.customer = data.customer;
+            this.demoDate = data.demoDate;
+            this.currentState = data.state || 'idle';
+            this.activeCount = data.contactCount || 0;
+        } else {
+            this.activeId = null;
+            this.name = null;
+            this.customer = null;
+            this.demoDate = null;
+            this.currentState = 'idle';
+            this.activeCount = 0;
         }
     }
 
     subscribeStateChanges() {
         const callback = (msg) => {
             const payload = msg?.data?.payload || {};
+            // Filter to the active demo session so monitor isn't disturbed
+            // by historical replays from other sessions.
+            if (payload.Demo_Session_Id__c && payload.Demo_Session_Id__c !== this.activeId) return;
             this.currentState = payload.New_State__c || this.currentState;
         };
-        subscribe(STATE_CHANNEL, -1, callback).then((sub) => {
-            this._stateSubscription = sub;
-        });
+        subscribe(STATE_CHANNEL, -1, callback).catch((e) => console.error('subscribe failed', e));
         onError((err) => console.error('empApi error', err));
     }
 
@@ -67,7 +116,6 @@ export default class SkywaveDemoMonitor extends LightningElement {
         if (!this._qrLibLoaded) return;
         const container = this.template.querySelector('.qrcodecontainer');
         if (!container) {
-            // Render hasn't placed the element yet; try again next tick.
             setTimeout(() => this.renderQRCode(), 100);
             return;
         }
@@ -95,5 +143,29 @@ export default class SkywaveDemoMonitor extends LightningElement {
 
     toggleenlarge() {
         this.qrcodeClass = this.qrcodeClass === 'qrcode' ? 'qrcode enlarged' : 'qrcode';
+    }
+
+    async handleSessionChange(event) {
+        const newId = event.detail.recordId;
+        if (!newId || newId === this.activeId) return;
+        try {
+            const data = await setActive({ sessionId: newId });
+            this.applySession(data);
+        } catch (e) {
+            console.error('setActive failed', e);
+        }
+    }
+
+    async handleStageClick(event) {
+        const newState = event.target.dataset.state;
+        if (!newState || newState === this.currentState || !this.activeId) return;
+        // Optimistic — Pub/Sub catch-up will reconcile.
+        this.currentState = newState;
+        try {
+            await advanceState({ sessionId: this.activeId, newState });
+        } catch (e) {
+            console.error('advanceState failed', e);
+            this.loadActiveSession();
+        }
     }
 }
