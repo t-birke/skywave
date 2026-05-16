@@ -25,6 +25,43 @@ public with sharing class Skywave_DemoMonitorController {
         return toWrapper(rows[0]);
     }
 
+    @AuraEnabled(cacheable=true)
+    public static List<ActiveDemoSession> searchSessions(String term) {
+        String trimmed = (term == null) ? '' : term.trim();
+        List<Demo_Session__c> rows;
+        if (trimmed == '') {
+            rows = [
+                SELECT Id, Name, State__c, Customer__c, Demo_Date__c
+                FROM Demo_Session__c
+                ORDER BY Started__c DESC NULLS LAST
+                LIMIT 5
+            ];
+        } else {
+            String pattern = '%' + trimmed + '%';
+            rows = [
+                SELECT Id, Name, State__c, Customer__c, Demo_Date__c
+                FROM Demo_Session__c
+                WHERE Customer__c LIKE :pattern OR Name LIKE :pattern
+                ORDER BY Started__c DESC NULLS LAST
+                LIMIT 5
+            ];
+        }
+        List<ActiveDemoSession> out = new List<ActiveDemoSession>();
+        for (Demo_Session__c d : rows) out.add(toWrapperSkipCount(d));
+        return out;
+    }
+
+    private static ActiveDemoSession toWrapperSkipCount(Demo_Session__c d) {
+        ActiveDemoSession w = new ActiveDemoSession();
+        w.id = d.Id;
+        w.name = d.Name;
+        w.state = d.State__c;
+        w.customer = d.Customer__c;
+        w.demoDate = d.Demo_Date__c;
+        w.contactCount = 0;
+        return w;
+    }
+
     @AuraEnabled
     public static ActiveDemoSession setActive(Id sessionId) {
         // Single-tenant: clear Active__c on whatever else has it, then set on the chosen row.

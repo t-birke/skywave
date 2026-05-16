@@ -31,15 +31,30 @@
         </div>
 
         <div class="picker-row">
-            <lightning-record-picker
-                label="Active demo session"
-                placeholder="Search by customer, date, or DEMO-####"
-                object-api-name="Demo_Session__c"
-                value={activeId}
-                display-info={pickerDisplayInfo}
-                matching-info={pickerMatchingInfo}
-                onchange={handleSessionChange}>
-            </lightning-record-picker>
+            <label class="picker-label">Active demo session</label>
+            <div class="picker-wrap" onclick={openPicker}>
+                <input
+                    class="picker-input"
+                    type="text"
+                    placeholder="Click to pick or type to search…"
+                    value={pickerInputValue}
+                    onfocus={openPicker}
+                    oninput={handlePickerType}
+                    onblur={closePickerSoon}/>
+                <template lwc:if={pickerOpen}>
+                    <ul class="picker-list">
+                        <template for:each={pickerOptions} for:item="o">
+                            <li key={o.id} class="picker-option" data-id={o.id} onmousedown={handlePickerSelect}>
+                                <div class="picker-option-primary">{o.customer}</div>
+                                <div class="picker-option-secondary">{o.name} · {o.demoDate}</div>
+                            </li>
+                        </template>
+                        <template lwc:if={pickerEmpty}>
+                            <li class="picker-empty">No matches</li>
+                        </template>
+                    </ul>
+                </template>
+            </div>
         </div>
 
         <div class="state-block">

@@ -12,12 +12,55 @@
 .subtitle .dot { margin: 0 0.5rem; opacity: 0.5; }
 
 .picker-row {
-    background: #fff;
-    border-radius: 0.5rem;
-    padding: 0.5rem 0.75rem;
     margin-bottom: 1.5rem;
     max-width: 36rem;
 }
+.picker-label {
+    display: block;
+    color: #a8bcd8;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-bottom: 0.25rem;
+}
+.picker-wrap { position: relative; }
+.picker-input {
+    width: 100%;
+    background: #fff;
+    color: #0b1d3a;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #1d4791;
+    border-radius: 0.5rem;
+    font-size: 0.95rem;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+.picker-input:focus { outline: 2px solid #2e6df0; outline-offset: 0; border-color: #2e6df0; }
+.picker-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    color: #0b1d3a;
+    border: 1px solid #1d4791;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 16px 0 rgba(0,0,0,0.25);
+    list-style: none;
+    margin: 0;
+    padding: 0.25rem 0;
+    max-height: 20rem;
+    overflow-y: auto;
+    z-index: 20;
+}
+.picker-option {
+    padding: 0.6rem 0.75rem;
+    cursor: pointer;
+}
+.picker-option:hover { background: #e9f0ff; }
+.picker-option-primary { font-weight: 500; }
+.picker-option-secondary { color: #5a6e8c; font-size: 0.8rem; margin-top: 0.1rem; }
+.picker-empty { padding: 0.75rem; color: #5a6e8c; font-style: italic; text-align: center; }
 
 .state-block {
     display: inline-block;

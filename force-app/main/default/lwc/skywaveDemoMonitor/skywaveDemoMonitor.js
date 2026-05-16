@@ -5,6 +5,7 @@ import QRCodeJS from '@salesforce/resourceUrl/QRCodeJS';
 import getActiveDemoSession from '@salesforce/apex/Skywave_DemoMonitorController.getActiveDemoSession';
 import setActive from '@salesforce/apex/Skywave_DemoMonitorController.setActive';
 import advanceState from '@salesforce/apex/Skywave_DemoMonitorController.advanceState';
+import searchSessions from '@salesforce/apex/Skywave_DemoMonitorController.searchSessions';
 
 const CONSUMER_SITE_URL = 'https://skywave-app-bb0e8666933b.herokuapp.com/';
 const STATE_CHANNEL = '/event/Demo_State_Change__e';
@@ -38,14 +39,12 @@ export default class SkywaveDemoMonitor extends LightningElement {
     qrcodeClass = 'qrcode';
     _qrLibLoaded = false;
 
-    pickerDisplayInfo = {
-        primaryField: 'Customer__c',
-        additionalFields: ['Demo_Date__c', 'Name']
-    };
-    pickerMatchingInfo = {
-        primaryField: { fieldPath: 'Customer__c' },
-        additionalFields: [{ fieldPath: 'Name' }]
-    };
+    @track pickerOpen = false;
+    @track pickerOptions = [];
+    @track pickerInputValue = '';
+    _pickerTypeTimer = null;
+
+    get pickerEmpty() { return this.pickerOpen && this.pickerOptions.length === 0; }
 
     get hasActive() { return !!this.activeId; }
 
@@ -90,6 +89,7 @@ export default class SkywaveDemoMonitor extends LightningElement {
             this.demoDate = data.demoDate;
             this.currentState = data.state || 'idle';
             this.activeCount = data.contactCount || 0;
+            this.pickerInputValue = data.customer || data.name || '';
         } else {
             this.activeId = null;
             this.name = null;
@@ -97,6 +97,45 @@ export default class SkywaveDemoMonitor extends LightningElement {
             this.demoDate = null;
             this.currentState = 'idle';
             this.activeCount = 0;
+            this.pickerInputValue = '';
+        }
+    }
+
+    async openPicker() {
+        this.pickerOpen = true;
+        await this.refreshPickerOptions('');
+    }
+
+    closePickerSoon() {
+        // Delay so the mousedown on a list item fires first.
+        setTimeout(() => { this.pickerOpen = false; }, 150);
+    }
+
+    handlePickerType(event) {
+        const term = event.target.value;
+        this.pickerInputValue = term;
+        clearTimeout(this._pickerTypeTimer);
+        this._pickerTypeTimer = setTimeout(() => this.refreshPickerOptions(term), 150);
+    }
+
+    async refreshPickerOptions(term) {
+        try {
+            this.pickerOptions = await searchSessions({ term: term || '' });
+        } catch (e) {
+            console.error('searchSessions failed', e);
+            this.pickerOptions = [];
+        }
+    }
+
+    async handlePickerSelect(event) {
+        const newId = event.currentTarget.dataset.id;
+        this.pickerOpen = false;
+        if (!newId || newId === this.activeId) return;
+        try {
+            const data = await setActive({ sessionId: newId });
+            this.applySession(data);
+        } catch (e) {
+            console.error('setActive failed', e);
         }
     }
 
@@ -143,17 +182,6 @@ export default class SkywaveDemoMonitor extends LightningElement {
 
     toggleenlarge() {
         this.qrcodeClass = this.qrcodeClass === 'qrcode' ? 'qrcode enlarged' : 'qrcode';
-    }
-
-    async handleSessionChange(event) {
-        const newId = event.detail.recordId;
-        if (!newId || newId === this.activeId) return;
-        try {
-            const data = await setActive({ sessionId: newId });
-            this.applySession(data);
-        } catch (e) {
-            console.error('setActive failed', e);
-        }
     }
 
     async handleStageClick(event) {
