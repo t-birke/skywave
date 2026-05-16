@@ -39,10 +39,16 @@ export default class SkywaveDemoMonitor extends LightningElement {
     qrcodeClass = 'qrcode';
     _qrLibLoaded = false;
 
+    @track showSettings = false;
+
     @track pickerOpen = false;
     @track pickerOptions = [];
     @track pickerInputValue = '';
     _pickerTypeTimer = null;
+
+    toggleSettings() {
+        this.showSettings = !this.showSettings;
+    }
 
     get pickerEmpty() { return this.pickerOpen && this.pickerOptions.length === 0; }
 
@@ -55,7 +61,7 @@ export default class SkywaveDemoMonitor extends LightningElement {
     get stageButtons() {
         return STAGES.map(s => ({
             ...s,
-            cssClass: s.value === this.currentState ? 'stage-btn current' : 'stage-btn'
+            variant: s.value === this.currentState ? 'brand' : 'neutral'
         }));
     }
 

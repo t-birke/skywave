@@ -1,102 +1,57 @@
-.container {
-    background: #0b1d3a;
-    color: #fff;
-    min-height: 100vh;
+.settings-host {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 10;
 }
 
-.header { margin-bottom: 1.5rem; }
-.title { font-size: 2rem; font-weight: 600; letter-spacing: -0.02em; }
-.subtitle { color: #a8bcd8; font-size: 0.95rem; margin-top: 0.25rem; }
-.subtitle.warn { color: #ffb84d; }
-.subtitle .customer { color: #fff; font-weight: 500; }
-.subtitle .dot { margin: 0 0.5rem; opacity: 0.5; }
+.settings-host-button {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 2;
+}
 
-.picker-row {
-    margin-bottom: 1.5rem;
-    max-width: 36rem;
+.button-close {
+    top: .5rem;
+    right: .5rem;
+    position: absolute;
 }
-.picker-label {
-    display: block;
-    color: #a8bcd8;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    margin-bottom: 0.25rem;
+
+.settings-host-extended {
+    background: var(--slds-g-color-neutral-base-100, #fff);
+    border-radius: var(--slds-g-radius-border-2, 0.5rem);
+    box-shadow: var(--slds-g-shadow-2, 0 4px 16px 0 rgba(0,0,0,0.16));
+    width: 32rem;
+    padding: 2.5rem 1.5rem 1.5rem;
 }
+
 .picker-wrap { position: relative; }
-.picker-input {
-    width: 100%;
-    background: #fff;
-    color: #0b1d3a;
-    padding: 0.6rem 0.75rem;
-    border: 1px solid #1d4791;
-    border-radius: 0.5rem;
-    font-size: 0.95rem;
-    font-family: inherit;
-    box-sizing: border-box;
-}
-.picker-input:focus { outline: 2px solid #2e6df0; outline-offset: 0; border-color: #2e6df0; }
+
 .picker-list {
     position: absolute;
     top: calc(100% + 4px);
     left: 0;
     right: 0;
-    background: #fff;
-    color: #0b1d3a;
-    border: 1px solid #1d4791;
-    border-radius: 0.5rem;
-    box-shadow: 0 4px 16px 0 rgba(0,0,0,0.25);
+    background: var(--slds-g-color-neutral-base-100, #fff);
+    border: 1px solid var(--slds-g-color-border-base-1, #c9c9c9);
+    border-radius: var(--slds-g-radius-border-2, 0.25rem);
+    box-shadow: var(--slds-g-shadow-2, 0 2px 8px 0 rgba(0,0,0,0.16));
     list-style: none;
     margin: 0;
     padding: 0.25rem 0;
-    max-height: 20rem;
+    max-height: 18rem;
     overflow-y: auto;
     z-index: 20;
 }
 .picker-option {
-    padding: 0.6rem 0.75rem;
+    padding: 0.5rem 0.75rem;
     cursor: pointer;
 }
-.picker-option:hover { background: #e9f0ff; }
-.picker-option-primary { font-weight: 500; }
-.picker-option-secondary { color: #5a6e8c; font-size: 0.8rem; margin-top: 0.1rem; }
-.picker-empty { padding: 0.75rem; color: #5a6e8c; font-style: italic; text-align: center; }
+.picker-option:hover { background: var(--slds-g-color-neutral-base-95, #f3f3f3); }
 
-.state-block {
-    display: inline-block;
-    background: #12305f;
-    border: 1px solid #1d4791;
-    border-radius: 1rem;
-    padding: 1.25rem 2rem;
-    min-width: 18rem;
-    margin-bottom: 1.5rem;
-}
-.state-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; color: #a8bcd8; }
-.state-value { font-size: 2.25rem; font-weight: 600; margin-top: 0.25rem; text-transform: capitalize; }
-
-.stage-strip {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    max-width: 60rem;
-}
-.stage-btn {
-    padding: 0.6rem 1rem;
-    background: #12305f;
-    color: #a8bcd8;
-    border: 1px solid #1d4791;
-    border-radius: 0.5rem;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-    font-family: inherit;
-}
-.stage-btn:hover { background: #1d4791; color: #fff; }
-.stage-btn.current {
-    background: #2e6df0;
-    color: #fff;
-    border-color: #2e6df0;
-    cursor: default;
+.stage-value {
+    text-transform: capitalize;
 }
 
 .qrcode {
@@ -106,9 +61,9 @@
     width: 18vh;
     height: 18vh;
     background: #fff;
-    border-radius: 1rem;
+    border-radius: var(--slds-g-radius-border-2, 0.5rem);
     overflow: hidden;
-    box-shadow: 0 4px 24px 0 rgba(0,0,0,0.35);
+    box-shadow: var(--slds-g-shadow-3, 0 4px 24px 0 rgba(0,0,0,0.25));
     cursor: pointer;
     transition: width 0.3s, height 0.3s, bottom 0.3s, right 0.3s;
     display: grid;

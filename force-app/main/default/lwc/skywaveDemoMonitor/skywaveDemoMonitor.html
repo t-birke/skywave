@@ -1,79 +1,99 @@
 <template>
-    <div class="container slds-p-around_large">
-        <div class="header slds-grid slds-grid_align-spread slds-grid_vertical-align-start">
-            <div class="title-block">
-                <div class="title">Skywave Interactive</div>
-                <template lwc:if={hasActive}>
-                    <div class="subtitle">
-                        <span class="customer">{customer}</span>
-                        <template lwc:if={demoDate}><span class="dot">·</span><span>{demoDate}</span></template>
-                        <span class="dot">·</span><span>{name}</span>
-                        <span class="dot">·</span><span>{activeCount} active sessions</span>
+    <article class="slds-card">
+        <div class="slds-card__body slds-p-around_large">
+
+            <div class="settings-host">
+                <div class="settings-host-button">
+                    <template lwc:if={showSettings}>
+                        <lightning-button-icon icon-name="utility:close" class="button-close" variant="bare" alternative-text="Close settings" title="Close" onclick={toggleSettings}></lightning-button-icon>
+                    </template>
+                    <template lwc:else>
+                        <lightning-button-icon icon-name="utility:settings" variant="border-filled" alternative-text="Settings" title="Settings" onclick={toggleSettings}></lightning-button-icon>
+                    </template>
+                </div>
+                <template lwc:if={showSettings}>
+                    <div class="settings-host-extended">
+                        <div class="slds-text-heading_medium slds-m-bottom_medium">Demo settings</div>
+
+                        <div class="slds-form-element slds-m-bottom_medium">
+                            <label class="slds-form-element__label">Active demo session</label>
+                            <div class="slds-form-element__control picker-wrap">
+                                <input
+                                    class="slds-input"
+                                    type="text"
+                                    placeholder="Click to pick or type to search…"
+                                    value={pickerInputValue}
+                                    onfocus={openPicker}
+                                    oninput={handlePickerType}
+                                    onblur={closePickerSoon}/>
+                                <template lwc:if={pickerOpen}>
+                                    <ul class="picker-list">
+                                        <template for:each={pickerOptions} for:item="o">
+                                            <li key={o.id} class="picker-option" data-id={o.id} onmousedown={handlePickerSelect}>
+                                                <div class="slds-text-body_regular">{o.customer}</div>
+                                                <div class="slds-text-body_small slds-text-color_weak">{o.name} · {o.demoDate}</div>
+                                            </li>
+                                        </template>
+                                        <template lwc:if={pickerEmpty}>
+                                            <li class="slds-p-around_small slds-text-color_weak slds-text-align_center">No matches</li>
+                                        </template>
+                                    </ul>
+                                </template>
+                            </div>
+                        </div>
+
+                        <template lwc:if={hasActive}>
+                            <div class="slds-form-element slds-m-bottom_medium">
+                                <label class="slds-form-element__label">Advance stage</label>
+                                <div class="slds-form-element__control">
+                                    <lightning-button-group>
+                                        <template for:each={stageButtons} for:item="s">
+                                            <lightning-button
+                                                key={s.value}
+                                                label={s.label}
+                                                data-state={s.value}
+                                                variant={s.variant}
+                                                onclick={handleStageClick}>
+                                            </lightning-button>
+                                        </template>
+                                    </lightning-button-group>
+                                </div>
+                            </div>
+                        </template>
+
+                        <div class="slds-form-element">
+                            <lightning-button-stateful
+                                label-when-off="QR code off"
+                                label-when-on="QR code on"
+                                label-when-hover="turn off"
+                                icon-name-when-off="utility:close"
+                                icon-name-when-on="utility:check"
+                                icon-name-when-hover="utility:close"
+                                selected={qrCodeVisible}
+                                onclick={toggleQrCodeVisibility}
+                                variant="bare">
+                            </lightning-button-stateful>
+                        </div>
                     </div>
                 </template>
-                <template lwc:else>
-                    <div class="subtitle warn">No active Demo Session — pick one below or create a new one</div>
-                </template>
             </div>
-            <div class="qr-toggle">
-                <lightning-button-stateful
-                    label-when-off="QR off"
-                    label-when-on="QR on"
-                    label-when-hover="toggle QR"
-                    icon-name-when-off="utility:close"
-                    icon-name-when-on="utility:check"
-                    icon-name-when-hover="utility:check"
-                    selected={qrCodeVisible}
-                    onclick={toggleQrCodeVisibility}
-                    variant="bare">
-                </lightning-button-stateful>
+
+            <div class="slds-page-header__title">Skywave Interactive</div>
+            <template lwc:if={hasActive}>
+                <p class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
+                    {customer} · {demoDate} · {name} · {activeCount} active sessions
+                </p>
+            </template>
+            <template lwc:else>
+                <p class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">No active demo session — open settings to pick one</p>
+            </template>
+
+            <div class="slds-m-top_x-large">
+                <div class="slds-text-title_caps slds-text-color_weak">Current stage</div>
+                <div class="slds-text-heading_large slds-m-top_xx-small stage-value">{currentStateLabel}</div>
             </div>
         </div>
-
-        <div class="picker-row">
-            <label class="picker-label">Active demo session</label>
-            <div class="picker-wrap" onclick={openPicker}>
-                <input
-                    class="picker-input"
-                    type="text"
-                    placeholder="Click to pick or type to search…"
-                    value={pickerInputValue}
-                    onfocus={openPicker}
-                    oninput={handlePickerType}
-                    onblur={closePickerSoon}/>
-                <template lwc:if={pickerOpen}>
-                    <ul class="picker-list">
-                        <template for:each={pickerOptions} for:item="o">
-                            <li key={o.id} class="picker-option" data-id={o.id} onmousedown={handlePickerSelect}>
-                                <div class="picker-option-primary">{o.customer}</div>
-                                <div class="picker-option-secondary">{o.name} · {o.demoDate}</div>
-                            </li>
-                        </template>
-                        <template lwc:if={pickerEmpty}>
-                            <li class="picker-empty">No matches</li>
-                        </template>
-                    </ul>
-                </template>
-            </div>
-        </div>
-
-        <div class="state-block">
-            <div class="state-label">CURRENT STAGE</div>
-            <div class="state-value">{currentStateLabel}</div>
-        </div>
-
-        <template lwc:if={hasActive}>
-            <div class="stage-strip">
-                <template for:each={stageButtons} for:item="s">
-                    <button
-                        key={s.value}
-                        class={s.cssClass}
-                        data-state={s.value}
-                        onclick={handleStageClick}>{s.label}</button>
-                </template>
-            </div>
-        </template>
-    </div>
+    </article>
 
     <template lwc:if={qrCodeVisible}>
         <div class={qrcodeClass} onclick={toggleenlarge}>
