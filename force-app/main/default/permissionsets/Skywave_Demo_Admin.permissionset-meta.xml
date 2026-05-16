@@ -46,4 +46,12 @@
         <tab>Demo_Session__c</tab>
         <visibility>Visible</visibility>
     </tabSettings>
+    <tabSettings>
+        <tab>Skywave_Demo_Monitor</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <classAccesses>
+        <apexClass>Skywave_DemoMonitorController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
 </PermissionSet>

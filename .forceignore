@@ -27,7 +27,6 @@ node_modules/
 # Org-level metadata we don't want to track
 **/appMenus/**
 **/authproviders/**
-**/flexipages/**
 **/objects/**__dll/**
 **/permissionsetgroups/**
 

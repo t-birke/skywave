@@ -1,0 +1,49 @@
+.container {
+    background: #0b1d3a;
+    color: #fff;
+    min-height: 100vh;
+}
+
+.header { margin-bottom: 2rem; }
+.title { font-size: 2rem; font-weight: 600; letter-spacing: -0.02em; }
+.subtitle { color: #a8bcd8; font-size: 1rem; margin-top: 0.25rem; }
+.subtitle.warn { color: #ffb84d; }
+
+.state-pill {
+    display: inline-block;
+    background: #12305f;
+    border: 1px solid #1d4791;
+    border-radius: 1rem;
+    padding: 1.25rem 2rem;
+    min-width: 16rem;
+}
+.state-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; color: #a8bcd8; }
+.state-value { font-size: 2.25rem; font-weight: 600; margin-top: 0.25rem; text-transform: capitalize; }
+
+.qrcode {
+    position: fixed;
+    bottom: 4vh;
+    right: 4vh;
+    width: 18vh;
+    height: 18vh;
+    background: #fff;
+    border-radius: 1rem;
+    overflow: hidden;
+    box-shadow: 0 4px 24px 0 rgba(0,0,0,0.35);
+    cursor: pointer;
+    transition: width 0.3s, height 0.3s, bottom 0.3s, right 0.3s;
+    display: grid;
+    place-items: center;
+}
+
+.qrcode.enlarged {
+    width: 75vh;
+    height: 75vh;
+    bottom: 50%;
+    right: 50%;
+    transform: translate(50%, 50%);
+}
+
+.qrcodecontainer { display: grid; place-items: center; width: 100%; height: 100%; }
+.qrcodecontainer img,
+.qrcodecontainer canvas { width: 100% !important; height: 100% !important; }
