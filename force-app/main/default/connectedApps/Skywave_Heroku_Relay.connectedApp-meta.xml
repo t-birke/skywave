@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ConnectedApp xmlns="http://soap.sforce.com/2006/04/metadata">
+    <contactEmail>tbirke.fb3f5426f87c5d@salesforce.com</contactEmail>
+    <label>Skywave Heroku Relay</label>
+    <description>Connected App used by the Heroku skywave-app to authenticate into si via JWT-bearer flow. The app subscribes to Demo_State_Change__e via Pub/Sub API and fans events out to phones over WebSocket. The public cert below is paired with secrets/jwt.key on the Heroku side. See SKYWAVE_INTERACTIVE_DESIGN.md and SECRETS.md.</description>
+    <oauthConfig>
+        <callbackUrl>http://localhost</callbackUrl>
+        <certificate>MIID0zCCArugAwIBAgIUVs00ijcDGGoYlilvIJ8m1tyRWbowDQYJKoZIhvcNAQELBQAweTELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAkNBMRYwFAYDVQQHDA1TYW4gRnJhbmNpc2NvMRAwDgYDVQQKDAdTa3l3YXZlMRQwEgYDVQQLDAtJbnRlcmFjdGl2ZTEdMBsGA1UEAwwUc2t5d2F2ZS1oZXJva3UtcmVsYXkwHhcNMjYwNTE2MTI1MjM3WhcNMzYwNTEzMTI1MjM3WjB5MQswCQYDVQQGEwJVUzELMAkGA1UECAwCQ0ExFjAUBgNVBAcMDVNhbiBGcmFuY2lzY28xEDAOBgNVBAoMB1NreXdhdmUxFDASBgNVBAsMC0ludGVyYWN0aXZlMR0wGwYDVQQDDBRza3l3YXZlLWhlcm9rdS1yZWxheTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAJ48SuWVlRufrcL8kGJbKXIyKBM36My8FenxnKGfKjmS1EcI8g6FggE3Sdm2nu651J1/9EGZ2RqLhGOjJYJ9gJxHO3JUhXBNJwwoaFE2R7tp0yjkmUwfRFtQRudeUCGd++wPqJtte3t+XEy8RlUmeIobAAaYITYug27Olmy9Z2tGbV2Z8lgoT5HuQwYlUxGg8y6/Byoqg/pzs+3fk7hM81uBatN8W0ukC4tj370ADGJiCEjh3i2HXsTfkmESCq5qWrsXK2Nk51y0zOJFkHWBqyYwZUZ/7thCZY2dmCx2TBi7mMDfACKUpTjTTzQuWGVemdmlin9tb5dItFaDblGAgk8CAwEAAaNTMFEwHQYDVR0OBBYEFJuQxCYK2DIcGLOVUxrSOy0bvZuMMB8GA1UdIwQYMBaAFJuQxCYK2DIcGLOVUxrSOy0bvZuMMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAGBd6GBM9k3tjWG/pb9rOz96VyVOjMXnitjjc94FXyR1EP/YviWSf2rz35w6niRz8hNEjzLfjFzP+SmO5WjuMfMRjJz4vk8tEMYhJqc/ZWBi0TE/yQLzeU3GbPLdHgBsR4IrUHBsLgEEGDe9WY6xhw31dWqOjTit0bKQ8JoGdU4Una5INeYEnZFX2QOvzEwwZj4i8kurHH2ahYXgGixNf7uk7NDo8IZOY6OmFbQvas1Il+fmbsaH/2OVA2oRIQ2KD4Mw4EhDsU7bqfu+d5CHGdVaaOPfAifwhsApaOWyA6n+RYmGyNKPBI5+r+m8CrshEXcsToNqfYIgxNaBac2ogT0=</certificate>
+        <scopes>Api</scopes>
+        <scopes>RefreshToken</scopes>
+    </oauthConfig>
+</ConnectedApp>
