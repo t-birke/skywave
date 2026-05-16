@@ -118,15 +118,17 @@ public with sharing class Skywave_SurveyAuthorController {
         }
         if (!toDelete.isEmpty()) delete toDelete;
 
+        // Master-detail is non-reparentable: only set Survey_Question__c when
+        // we're creating a new option (Id is blank). For existing options the
+        // parent is already correct and writing it again throws "not writeable".
         List<Survey_Answer_Option__c> toUpsert = new List<Survey_Answer_Option__c>();
         for (OptionInput opt : question.options ?? new List<OptionInput>()) {
             Survey_Answer_Option__c o;
             if (String.isBlank(opt.id)) {
-                o = new Survey_Answer_Option__c();
+                o = new Survey_Answer_Option__c(Survey_Question__c = q.Id);
             } else {
                 o = new Survey_Answer_Option__c(Id = opt.id);
             }
-            o.Survey_Question__c = q.Id;
             o.Option_Text__c = opt.optionText;
             o.Option_Key__c = opt.optionKey;
             o.Image_Url__c = opt.imageUrl;
