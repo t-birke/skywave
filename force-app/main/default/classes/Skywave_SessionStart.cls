@@ -12,7 +12,7 @@
 global without sharing class Skywave_SessionStart {
 
     // TODO Phase 1: surface this via Custom Metadata so we can repoint without code change.
-    private static final String WS_BASE_URL = 'wss://skywave-app.herokuapp.com/ws';
+    private static final String WS_BASE_URL = 'wss://skywave-app-bb0e8666933b.herokuapp.com/ws';
 
     @HttpPost
     global static void post() {
