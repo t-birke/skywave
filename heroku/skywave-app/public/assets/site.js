@@ -100,28 +100,28 @@ function render() {
     root.innerHTML = '';
     const stage = state.stage;
 
-    if (stage === 'survey') {
-        if (state.surveyIndex >= (state.survey?.questions?.length ?? 0)) {
-            // We've finished the local survey loop but the org is still in
-            // 'survey' state — treat as thanks/hold while waiting for advance.
-            setBodyStage('survey');
-            renderThanks();
-        } else {
-            setBodyStage('survey');
-            renderSurveyQuestion();
-        }
-        return;
-    }
-
-    if (stage === 'thanks') {
+    if (stage === 'survey' && state.surveyIndex < (state.survey?.questions?.length ?? 0)) {
+        setBodyStage('survey');
+        renderSurveyQuestion();
+    } else if (stage === 'survey') {
+        setBodyStage('survey');
+        renderThanks();
+    } else if (stage === 'thanks') {
         setBodyStage('thanks');
         renderThanks();
-        return;
+    } else {
+        setBodyStage(stage || 'waiting');
+        renderWaiting();
     }
 
-    // Default: "you're in, hold tight" card showing whatever stage we're in.
-    setBodyStage(stage || 'waiting');
-    renderWaiting();
+    // After dataset.stage is set, ask the SDK to re-evaluate which sitemap
+    // pageType matches. The SDK normally only re-runs isMatch on URL change,
+    // and our SPA never changes URLs.
+    try {
+        if (sdkReady && window.SalesforceInteractions?.reinit) {
+            window.SalesforceInteractions.reinit();
+        }
+    } catch (e) { /* older SDK without reinit; ignore */ }
 }
 
 // ── Consent ────────────────────────────────────────────────────────────────
@@ -154,15 +154,18 @@ async function handleConsent() {
 
     await loadInteractionsSdk();
 
-    // Use literal strings, not SDK constants. Provider must match the
-    // sitemap declaration so we get one consent record per session.
+    // Use literal strings, not SDK constants. updateConsents takes an array
+    // (single object also accepted in some versions; pass an array for
+    // safety). Log what the SDK reports back so we can confirm the call took.
     try {
         if (window.SalesforceInteractions) {
-            window.SalesforceInteractions.updateConsents({
+            const consents = [{
                 purpose:  'Tracking',
                 provider: 'Skywave Interactive',
                 status:   'OptIn'
-            });
+            }];
+            await Promise.resolve(window.SalesforceInteractions.updateConsents(consents));
+            console.log('[skywave] consent applied:', consents);
         }
     } catch (e) {
         console.warn('SDK consent failed', e);
