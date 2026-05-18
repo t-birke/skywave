@@ -6,6 +6,7 @@ import getActiveDemoSession from '@salesforce/apex/Skywave_DemoMonitorController
 import setActive from '@salesforce/apex/Skywave_DemoMonitorController.setActive';
 import advanceState from '@salesforce/apex/Skywave_DemoMonitorController.advanceState';
 import searchSessions from '@salesforce/apex/Skywave_DemoMonitorController.searchSessions';
+import getOptionImageMap from '@salesforce/apex/Skywave_DemoMonitorController.getOptionImageMap';
 
 const CONSUMER_SITE_URL = 'https://skywave-app-bb0e8666933b.herokuapp.com/';
 const STATE_CHANNEL = '/event/Demo_State_Change__e';
@@ -36,7 +37,8 @@ export default class SkywaveDemoMonitor extends LightningElement {
     @track customer = null;
     @track demoDate = null;
     @track currentState = 'idle';
-    @track sessions = []; // [{ sessionId, shortId, lastSeen }]
+    @track sessions = []; // [{ sessionId, shortId, lastSeen, answers: [{questionKey, answerKey, imageUrl, answerText}] }]
+    optionImageMap = {};  // "<questionKey>:<answerKey>" -> Image_Url__c, loaded once on mount
 
     get activeCount() { return this.sessions.length; }
 
@@ -78,6 +80,12 @@ export default class SkywaveDemoMonitor extends LightningElement {
             this.renderQRCode();
         } catch (e) {
             console.error('QRCodeJS load failed', e);
+        }
+
+        try {
+            this.optionImageMap = await getOptionImageMap();
+        } catch (e) {
+            console.error('getOptionImageMap failed', e);
         }
 
         await this.loadActiveSession();
@@ -175,17 +183,53 @@ export default class SkywaveDemoMonitor extends LightningElement {
         const sessionId = payload.Session_Id__c;
         if (!sessionId) return;
         const now = Date.now();
-        // Any event type from a session keeps it alive in the bubble set.
         const existing = this.sessions.find(s => s.sessionId === sessionId);
-        if (existing) {
-            existing.lastSeen = now;
-            this.sessions = [...this.sessions];
+
+        if (!existing) {
+            this.sessions = [
+                ...this.sessions.filter(s => now - s.lastSeen < SESSION_TTL_MS),
+                { sessionId, shortId: sessionId.slice(-8), lastSeen: now, answers: [] }
+            ];
             return;
         }
-        this.sessions = [
-            ...this.sessions.filter(s => now - s.lastSeen < SESSION_TTL_MS),
-            { sessionId, shortId: sessionId.slice(-8), lastSeen: now }
-        ];
+
+        existing.lastSeen = now;
+
+        if (payload.Type__c === 'survey_answer') {
+            this.appendSurveyAnswer(existing, payload);
+        }
+
+        // Force tracked-array refresh
+        this.sessions = [...this.sessions];
+    }
+
+    appendSurveyAnswer(session, payload) {
+        let inner = {};
+        try { inner = payload.Payload_Json__c ? JSON.parse(payload.Payload_Json__c) : {}; }
+        catch (e) { console.warn('survey_answer payload parse failed', e); }
+
+        const questionKey = inner.questionKey;
+        const answerKey = inner.answerKey;
+        if (!questionKey || !answerKey) return;
+
+        // Idempotency — if this question was already answered, replace the
+        // earlier thumb. Lets a phone re-answer (re-renders fire) without
+        // accumulating duplicates.
+        const dedupeKey = `${questionKey}:${answerKey}`;
+        const imageUrl = this.optionImageMap[dedupeKey] || null;
+        const existingIdx = (session.answers || []).findIndex(a => a.questionKey === questionKey);
+
+        const next = {
+            questionKey,
+            answerKey,
+            answerText: inner.answerText || answerKey,
+            imageUrl
+        };
+        if (existingIdx >= 0) {
+            session.answers[existingIdx] = next;
+        } else {
+            session.answers = [...(session.answers || []), next];
+        }
     }
 
     renderQRCode() {

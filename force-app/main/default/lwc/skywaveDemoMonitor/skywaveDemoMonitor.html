@@ -95,9 +95,20 @@
 
             <div class="slds-m-top_x-large">
                 <div class="slds-text-title_caps slds-text-color_weak">Active sessions ({activeCount})</div>
-                <div class="slds-m-top_x-small bubble-row">
+                <div class="slds-m-top_x-small session-list">
                     <template for:each={sessions} for:item="s">
-                        <span key={s.sessionId} class="slds-badge bubble" title={s.sessionId}>{s.shortId}</span>
+                        <div key={s.sessionId} class="session-row">
+                            <span class="slds-badge bubble" title={s.sessionId}>{s.shortId}</span>
+                            <template lwc:if={s.answers.length}>
+                                <div class="answer-strip">
+                                    <template for:each={s.answers} for:item="a">
+                                        <template lwc:if={a.imageUrl}>
+                                            <img key={a.questionKey} class="answer-thumb" src={a.imageUrl} alt={a.answerText} title={a.answerText}/>
+                                        </template>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
                     </template>
                 </div>
             </div>

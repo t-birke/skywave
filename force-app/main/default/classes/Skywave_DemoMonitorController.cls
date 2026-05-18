@@ -82,6 +82,27 @@ public with sharing class Skywave_DemoMonitorController {
         return toWrapper(chosen);
     }
 
+    /**
+     * Returns a flat map of "<questionKey>:<optionKey>" -> imageUrl for all
+     * active questions/options. Monitor LWC calls this once on mount to
+     * resolve survey_answer events to the correct thumbnail without
+     * inflating the Platform Event payload.
+     */
+    @AuraEnabled(cacheable=true)
+    public static Map<String, String> getOptionImageMap() {
+        Map<String, String> out = new Map<String, String>();
+        for (Survey_Answer_Option__c o : [
+            SELECT Image_Url__c, Option_Key__c, Survey_Question__r.Question_Key__c
+            FROM Survey_Answer_Option__c
+            WHERE Active__c = true
+              AND Survey_Question__r.Active__c = true
+              AND Image_Url__c != null
+        ]) {
+            out.put(o.Survey_Question__r.Question_Key__c + ':' + o.Option_Key__c, o.Image_Url__c);
+        }
+        return out;
+    }
+
     @AuraEnabled
     public static String advanceState(Id sessionId, String newState) {
         Demo_Session__c d = new Demo_Session__c(Id = sessionId, State__c = newState);
