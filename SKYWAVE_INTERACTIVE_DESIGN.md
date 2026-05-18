@@ -982,3 +982,25 @@ Add items as they come up. Don't pre-prioritize.
   uptime. Could be a small upload endpoint on `skywave-app` plus a
   file picker in `skywaveSurveyAuthor`. Until then, only use HTTPS
   URLs from hosts that allow hotlinking.
+
+- **Materialize `ssot__ContactPointConsent__dlm` from
+  `PrivacyConsentLog × ContactPointEmail` join.** v1 maps the SDK's
+  `consentLog` event to `ssot__PrivacyConsentLog__dlm` only — that's
+  the audit log, NOT the source of truth for "is this contact point
+  currently opted in." The canonical query DMO is
+  `ssot__ContactPointConsent__dlm`, keyed on
+  ContactPoint × DataUsePurpose × ConsentStatus. The SDK can't
+  populate it directly because `consentLog` events are anonymous
+  (keyed on `deviceId` only, no email yet at consent time).
+  Salesforce expects a Data Cloud transform / calculated insight
+  that joins each PrivacyConsentLog row with the same-deviceId
+  ContactPointEmail row (which lands once the user creates a
+  profile) and upserts a ContactPointConsent row.
+  Why deferred: requires authoring a transform, seeding
+  `ConsentStatus` and `DataUsePurpose` reference rows, and is only
+  needed for production marketing/activation use cases — not for a
+  demo where consent is binary and audit-log queries are sufficient.
+  Pick this up if/when we add Marketing Cloud activations or a
+  compliance-audit beat to the demo.
+  Reference: `~/dev/claude-skills/sf-interactions-sdk/recipes/consent.md`
+  § "The Consent DMO Chain".
