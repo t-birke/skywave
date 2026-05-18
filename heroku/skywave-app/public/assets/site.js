@@ -154,17 +154,23 @@ async function handleConsent() {
 
     await loadInteractionsSdk();
 
-    // Use literal strings, not SDK constants. updateConsents takes an array
-    // (single object also accepted in some versions; pass an array for
-    // safety). Log what the SDK reports back so we can confirm the call took.
+    // The SDK's accepted status literal is "Opt In" (with a space) —
+    // that's what the c360a runtime expects, and it's what
+    // SalesforceInteractions.ConsentStatus.OptIn resolves to. The "OptIn"
+    // (no space) form gets rejected with "Unrecognized consent status".
+    // Confirmed empirically against the c360a SDK in May 2026.
+    //
+    // Provider must match the sitemap declaration (none, since we removed
+    // it from the sitemap) so the consent record is unambiguous.
     try {
         if (window.SalesforceInteractions) {
+            const SI = window.SalesforceInteractions;
             const consents = [{
-                purpose:  'Tracking',
+                purpose:  SI.ConsentPurpose?.Tracking ?? 'Tracking',
                 provider: 'Skywave Interactive',
-                status:   'OptIn'
+                status:   SI.ConsentStatus?.OptIn ?? 'Opt In'
             }];
-            await Promise.resolve(window.SalesforceInteractions.updateConsents(consents));
+            await Promise.resolve(SI.updateConsents(consents));
             console.log('[skywave] consent applied:', consents);
         }
     } catch (e) {
