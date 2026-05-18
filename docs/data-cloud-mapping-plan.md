@@ -16,10 +16,31 @@ This doc lists every Web Connector event we send and where it maps. It exists to
 
 The one custom DMO we need is `Survey_Response_DMO` — there is no standard DMO for "user took a survey and answered with key/text pairs."
 
+## DLO topology — one Behavioral_Events DLO for ALL Engagement types
+
+After data streams ran, `si` has these DLOs from the Web Connector:
+
+| DLO | Category | Source events | PK |
+|---|---|---|---|
+| `skywave_app_Behavioral_Events_*__dll` | Engagement | `consentLog`, `userProfiling`, `catalog` (combined) | `eventId` |
+| `skywave_app_contactPointEmail_*__dll` | Profile | `contactPointEmail` only | `deviceId` |
+| `skywave_app_identity_*__dll` | Profile | `identity` only | `deviceId` |
+| `skywave_app_partyIdentification_*__dll` | Profile | `partyIdentification` only | `deviceId` |
+
+The Web Connector folds all Engagement event types into one wide
+`Behavioral_Events` DLO with prefixed columns (`userProfiling_attributesAnswerKey`,
+`consentLog_provider`, `catalog_id`, etc.). Profile events each get
+their own DLO. This is Salesforce's standard pattern and matches how
+the CRM connector ships its DMOs.
+
+Mapping consequence: **the one Engagement DLO maps to THREE DMOs via
+three eventType-filtered mappings.** The four Profile DLOs each map
+to one DMO 1-to-1, no filtering.
+
 ## Event-by-event mapping
 
 ### 1. `consentLog` (Engagement)
-- **Source DLO**: `<connector>_consentLog` (auto-created by Web Connector when streams are configured).
+- **Source DLO**: `skywave_app_Behavioral_Events_*__dll`, **filtered to `eventType='consentLog'`**.
 - **Target DMO**: `ConsentLog__dlm` (Salesforce-standard).
 - **Why standard**: Consent ledger is a regulated artifact; Data Cloud ships a dedicated DMO for it that activations and audit reports already understand.
 - **Field-level mapping**:
@@ -30,12 +51,12 @@ The one custom DMO we need is `Survey_Response_DMO` — there is no standard DMO
   | `dateTime` | `EventDateTime__c` | Consent timestamp |
   | `deviceId` | `DeviceId__c` | Anonymous identifier |
   | `sessionId` | `SessionId__c` | Browser session |
-  | `provider` | `Provider__c` | We send `'Skywave Interactive'` |
-  | `purpose` | `Purpose__c` | We send `'Tracking'` |
-  | `status` | `Status__c` | We send `'Opt In'` (with space — SDK literal) |
+  | `consentLog_provider` | `Provider__c` | `'Skywave Interactive'` |
+  | `consentLog_purpose` | `Purpose__c` | `'Tracking'` |
+  | `consentLog_status` | `Status__c` | `'Opt In'` (with space) |
 
 ### 2. `userProfiling` (Engagement, **CUSTOM DMO**)
-- **Source DLO**: `<connector>_userProfiling`.
+- **Source DLO**: `skywave_app_Behavioral_Events_*__dll`, **filtered to `eventType='userProfiling'`**.
 - **Target DMO**: **`Survey_Response__dlm`** (custom — we create it).
 - **Why custom**: There is no standard DMO for "answered survey question X with answer Y." We need this DMO so the agent's RTDG can grab the survey answers as a related dimension off the unified Individual.
 - **DMO field schema**:
@@ -46,15 +67,15 @@ The one custom DMO we need is `Survey_Response_DMO` — there is no standard DMO
   | `EventDateTime__c` | DateTime | `dateTime` | When tapped |
   | `DeviceId__c` | Text | `deviceId` | Join key to `Individual` |
   | `SessionId__c` | Text | `sessionId` | Demo session correlation |
-  | `QuestionKey__c` | Text | `attributesQuestionKey` | Stable key, e.g. `fav_destination` |
-  | `QuestionText__c` | Text | `attributesQuestion` | Full text — agent reads verbatim |
-  | `AnswerKey__c` | Text | `attributesAnswerKey` | Stable key, e.g. `tyo` |
-  | `AnswerText__c` | Text | `attributesAnswer` | Full text — agent reads verbatim |
+  | `QuestionKey__c` | Text | `userProfiling_attributesQuestionKey` | Stable key, e.g. `fav_destination` |
+  | `QuestionText__c` | Text | `userProfiling_attributesQuestion` | Full text — agent reads verbatim |
+  | `AnswerKey__c` | Text | `userProfiling_attributesAnswerKey` | Stable key, e.g. `tyo` |
+  | `AnswerText__c` | Text | `userProfiling_attributesAnswer` | Full text — agent reads verbatim |
 
   Adding `__dlm` is the standard suffix; the create call we make uses `Survey_Response` as the developer name.
 
 ### 3. `catalog` (Engagement)
-- **Source DLO**: `<connector>_catalog`.
+- **Source DLO**: `skywave_app_Behavioral_Events_*__dll`, **filtered to `eventType='catalog'`**.
 - **Target DMO**: `EngagementInteraction__dlm` (Salesforce-standard).
 - **Why standard**: Browse/view tracking is exactly what `EngagementInteraction` exists for. The agent and downstream personalization features expect catalog views to land here.
 - **Field-level mapping**:
@@ -65,14 +86,14 @@ The one custom DMO we need is `Survey_Response_DMO` — there is no standard DMO
   | `dateTime` | `EventDateTime__c` | When viewed |
   | `deviceId` | `DeviceId__c` | Anonymous identifier |
   | `sessionId` | `SessionId__c` | Browser session |
-  | `id` | `EngagementId__c` | The thing viewed (e.g. `amenity:lounge`) |
-  | `type` | `EngagementType__c` | The noun (e.g. `Amenity`) |
-  | `interactionName` | `InteractionName__c` | e.g. `View Catalog Object` |
-  | `sourceUrl` | `SourceUrl__c` | URL where viewed |
-  | `sourcePageType` | `PageType__c` | Sitemap-resolved page type |
+  | `catalog_id` | `EngagementId__c` | The thing viewed (e.g. `amenity:lounge`) |
+  | `catalog_type` | `EngagementType__c` | The noun (e.g. `Amenity`) |
+  | `catalog_interactionName` | `InteractionName__c` | e.g. `View Catalog Object` |
+  | `catalog_sourceUrl` | `SourceUrl__c` | URL where viewed |
+  | `catalog_sourcePageType` | `PageType__c` | Sitemap-resolved page type |
 
 ### 4. `contactPointEmail` (Profile, IR-substrate)
-- **Source DLO**: `<connector>_contactPointEmail`.
+- **Source DLO**: `skywave_app_contactPointEmail_*__dll` (1:1, no filter).
 - **Target DMO**: **`ContactPointEmail__dlm`** (Salesforce-standard, IR exact-match target A).
 - **Why standard**: This DMO **must** be standard. The IR ruleset's "match on email" rule reads `ContactPointEmail__dlm.EmailAddress__c` exactly. The CRM connector also lands Contact emails into this same standard DMO. Custom would break IR.
 - **Field-level mapping**:
@@ -86,7 +107,7 @@ The one custom DMO we need is `Survey_Response_DMO` — there is no standard DMO
   | `sessionId` | `SessionId__c` | |
 
 ### 5. `contactPointPhone` (Profile, IR-substrate)
-- **Source DLO**: `<connector>_contactPointPhone`.
+- **Source DLO**: not yet created — we don't fire `contactPointPhone` in v1.
 - **Target DMO**: **`ContactPointPhone__dlm`** (Salesforce-standard).
 - **Why standard**: Same reason as email — IR rules match against the standard DMO.
 - **Note for v1**: We don't fire `contactPointPhone` yet (profile form doesn't capture phone). Mapping is documented now so we don't have to revisit when phone is added in v2.
@@ -101,7 +122,7 @@ The one custom DMO we need is `Survey_Response_DMO` — there is no standard DMO
   | `sessionId` | `SessionId__c` |
 
 ### 6. `partyIdentification` (Profile, IR-substrate)
-- **Source DLO**: `<connector>_partyIdentification`.
+- **Source DLO**: `skywave_app_partyIdentification_*__dll` (1:1, no filter).
 - **Target DMO**: **`PartyIdentification__dlm`** (Salesforce-standard, IR exact-match target B).
 - **Why standard**: This DMO is the join-key table for IR. The CRM connector lands `Contact.Id` into it from the CRM side; we land the same value from the browser side via the SDK. Exact-match on `PartyIdentificationId__c` (which holds the `userId` value) is what merges browser and CRM Individuals.
 - **Field-level mapping**:
@@ -117,7 +138,7 @@ The one custom DMO we need is `Survey_Response_DMO` — there is no standard DMO
   | `sessionId` | `SessionId__c` | |
 
 ### 7. `identity` (Profile, the "isAnonymous flip")
-- **Source DLO**: `<connector>_identity`.
+- **Source DLO**: `skywave_app_identity_*__dll` (1:1, no filter).
 - **Target DMO**: **`Individual__dlm`** (Salesforce-standard).
 - **Why standard**: `Individual` is the root DMO of the entire Customer Data Model. The IR ruleset publishes the Unified Individual to this same DMO. The CRM connector lands `Contact` rows here too. The Real-Time Data Graph's root node is `Individual`. Custom would isolate us from everything Data Cloud ships.
 - **Note**: The `identity` event populates `Individual` only. It does **not** populate `ContactPointEmail`, `ContactPointPhone`, or `PartyIdentification` — even though the SDK lets you put email/phone fields on the identity event. The four-event burst (this + the three contact-point/party events) is what the docs call the IR-friendly pattern.
