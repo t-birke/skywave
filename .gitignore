@@ -37,6 +37,10 @@ genAiPlannerBundles/
 nanobanana-output/
 brochure/
 
+# Finder copy/paste duplicates — never commit
+**/*\ copy.*
+**/*\ copy\ [0-9]*.*
+
 # Secrets — never commit anything matching these
 .secrets/
 secrets/
