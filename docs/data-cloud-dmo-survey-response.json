@@ -1,0 +1,17 @@
+{
+  "name": "Survey_Response",
+  "label": "Survey Response",
+  "category": "Engagement",
+  "description": "Skywave Interactive — survey answers.",
+  "dataSpaceName": "default",
+  "fields": [
+    { "name": "Id__c",            "label": "Survey Response Id", "dataType": "Text",     "isPrimaryKey": true  },
+    { "name": "EventDateTime__c", "label": "Event Date Time",    "dataType": "DateTime", "isPrimaryKey": false },
+    { "name": "DeviceId__c",      "label": "Device Id",          "dataType": "Text",     "isPrimaryKey": false },
+    { "name": "SessionId__c",     "label": "Session Id",         "dataType": "Text",     "isPrimaryKey": false },
+    { "name": "QuestionKey__c",   "label": "Question Key",       "dataType": "Text",     "isPrimaryKey": false },
+    { "name": "QuestionText__c",  "label": "Question Text",      "dataType": "Text",     "isPrimaryKey": false },
+    { "name": "AnswerKey__c",     "label": "Answer Key",         "dataType": "Text",     "isPrimaryKey": false },
+    { "name": "AnswerText__c",    "label": "Answer Text",        "dataType": "Text",     "isPrimaryKey": false }
+  ]
+}
