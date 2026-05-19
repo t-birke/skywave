@@ -136,17 +136,50 @@
         <object>MessagingSession</object>
         <storeOutputAutomatically>true</storeOutputAutomatically>
     </recordLookups>
-    <start>
+    <recordUpdates>
+        <description>Persist the Session_ID prechat value onto the MessagingSession custom field so the agent's linked variable can read it.</description>
+        <name>Set_Session_ID</name>
+        <label>Set Session ID on MessagingSession</label>
         <locationX>0</locationX>
         <locationY>0</locationY>
         <connector>
             <targetReference>Route_to_Agent</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Id</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>recordId</elementReference>
+            </value>
+        </filters>
+        <inputAssignments>
+            <field>Session_ID__c</field>
+            <value>
+                <elementReference>Session_ID</elementReference>
+            </value>
+        </inputAssignments>
+        <object>MessagingSession</object>
+    </recordUpdates>
+    <start>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Set_Session_ID</targetReference>
         </connector>
     </start>
     <status>Active</status>
     <variables>
         <description>The recordId is used to assign a messaging session to an Agent</description>
         <name>recordId</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <description>The Session_ID hidden prechat parameter from Skywave_Channel — the visitor's anonymous deviceId. Mapped here via MessagingChannel.customParameters.actionParameterMappings, then written to MessagingSession.Session_ID__c by the Set_Session_ID element.</description>
+        <name>Session_ID</name>
         <dataType>String</dataType>
         <isCollection>false</isCollection>
         <isInput>true</isInput>

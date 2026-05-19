@@ -64,26 +64,33 @@ async function loadEswSnippet(deviceId) {
         return false;
     }
 
-    // Set the Session_ID hidden prechat field as soon as the snippet's
-    // prechatAPI is available. Prechat value is a bare string, NOT
-    // { value: '...' } — runtime rejects the wrapped form.
+    // Set the Session_ID hidden prechat field on TWO lifecycle events to
+    // defeat ECv2 timing issues (Salesforce engineering noted intermittent
+    // cases where hidden fields aren't picked up at conversation start):
+    //   1. onEmbeddedMessagingReady — armed before the user can tap chat.
+    //   2. onEmbeddedMessagingConversationStarted — defensive re-set in
+    //      case any intermediate snippet bootstrap state cleared it.
     //
-    // The chat button itself is hidden/shown via CSS keyed off
-    // body[data-stage] (see site.css). This avoids a race against the
-    // snippet's internal button-creation lifecycle, which doesn't expose
-    // a reliable hook point in our config (utilAPI.hideChatButton throws
-    // "API not available before onEmbeddedMessagingButtonCreated event is
-    // fired" even after that event has fired, in some flows).
-    window.addEventListener('onEmbeddedMessagingReady', () => {
+    // Prechat value is a bare string, NOT { value: '...' } — runtime
+    // rejects the wrapped form.
+    //
+    // The chat button visibility is controlled via CSS in site.css
+    // (utilAPI.hideChatButton / hideChatButtonOnLoad are platform-broken
+    // in ECv2 as of April 2026).
+    const setSessionPrechat = (eventName) => {
         try {
             if (deviceId) {
                 window.embeddedservice_bootstrap.prechatAPI.setHiddenPrechatFields({
                     Session_ID: deviceId
                 });
-                console.log('[esw] Session_ID prechat field set:', deviceId);
+                console.log(`[esw] Session_ID prechat field set on ${eventName}:`, deviceId);
             }
-        } catch (e) { console.warn('[esw] setHiddenPrechatFields failed', e); }
-    }, { once: true });
+        } catch (e) { console.warn(`[esw] setHiddenPrechatFields failed on ${eventName}`, e); }
+    };
+    window.addEventListener('onEmbeddedMessagingReady', () =>
+        setSessionPrechat('Ready'), { once: true });
+    window.addEventListener('onEmbeddedMessagingConversationStarted', () =>
+        setSessionPrechat('ConversationStarted'), { once: true });
     const ready = Promise.resolve();
 
     try {

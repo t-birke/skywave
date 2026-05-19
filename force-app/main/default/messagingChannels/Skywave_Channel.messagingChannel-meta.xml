@@ -14,7 +14,7 @@
     </automatedResponses>
     <customParameters>
         <actionParameterMappings>
-            <actionParameterName>MessagingSession.Session_ID__c</actionParameterName>
+            <actionParameterName>Session_ID</actionParameterName>
         </actionParameterMappings>
         <name>Session_ID</name>
         <masterLabel>Session ID</masterLabel>
