@@ -42,20 +42,37 @@ global without sharing class Skywave_SessionIdentify {
             return;
         }
 
-        List<MessagingSession> sessions = [
-            SELECT Id, Session_ID__c
-            FROM MessagingSession
-            WHERE ConversationId = :conversationId
-            ORDER BY CreatedDate DESC
-            LIMIT 1
-        ];
-        if (sessions.isEmpty()) {
+        // The MessagingSession record is sometimes not yet visible to the
+        // running user the moment the conversation is created (the platform
+        // creates the record but read-visibility takes a beat). The JS
+        // posts immediately on onEmbeddedMessagingConversationStarted, so
+        // we may race the platform's commit — retry briefly before giving
+        // up. Apex doesn't have setTimeout, so we burn a CPU-bound delay
+        // via Datetime polling. Three attempts at ~500ms each = 1.5s max.
+        MessagingSession ms = null;
+        for (Integer attempt = 0; attempt < 3; attempt++) {
+            List<MessagingSession> sessions = [
+                SELECT Id, Session_ID__c
+                FROM MessagingSession
+                WHERE ConversationId = :conversationId
+                ORDER BY CreatedDate DESC
+                LIMIT 1
+            ];
+            if (!sessions.isEmpty()) {
+                ms = sessions[0];
+                break;
+            }
+            if (attempt < 2) {
+                Long start = System.currentTimeMillis();
+                while (System.currentTimeMillis() - start < 500) { /* spin */ }
+            }
+        }
+        if (ms == null) {
             res.statusCode = 404;
             res.responseBody = Blob.valueOf('{"error":"no_messaging_session"}');
             return;
         }
 
-        MessagingSession ms = sessions[0];
         if (ms.Session_ID__c != sessionId) {
             ms.Session_ID__c = sessionId;
             update ms;
