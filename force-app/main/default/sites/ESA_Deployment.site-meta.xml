@@ -55,6 +55,17 @@
     <siteIframeWhiteListUrls>
         <url>%%SCRATCH_ORG_VF_HOST%%</url>
     </siteIframeWhiteListUrls>
+    <!-- The Skywave consumer site is hosted on Heroku, not on a Salesforce
+         site host. Without these entries the chat iframe load is blocked
+         by the LWR CSP `frame-ancestors` directive on the embedding page.
+         Allow both the specific app host and the herokuapp.com wildcard so
+         this works across Heroku app renames. -->
+    <siteIframeWhiteListUrls>
+        <url>skywave-app-bb0e8666933b.herokuapp.com</url>
+    </siteIframeWhiteListUrls>
+    <siteIframeWhiteListUrls>
+        <url>*.herokuapp.com</url>
+    </siteIframeWhiteListUrls>
     <siteType>ChatterNetwork</siteType>
     <urlPathPrefix>ESADeploymentvforce</urlPathPrefix>
 </CustomSite>

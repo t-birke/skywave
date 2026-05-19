@@ -65,30 +65,49 @@ async function loadEswSnippet(deviceId) {
         return false;
     }
 
-    // setHiddenPrechatFields and utilAPI.hideChatButton are only available
-    // after the snippet finishes booting and dispatches onEmbeddedMessagingReady.
+    // Two different events fire during snippet bootstrap:
+    //   - onEmbeddedMessagingReady       → prechatAPI is available
+    //   - onEmbeddedMessagingButtonCreated → utilAPI.hideChatButton/showChatButton is available
+    // The button-created event fires AFTER ready, so we wire each on its own
+    // listener. The prechat field's value is a bare string, NOT { value: '...' }
+    // (despite older blog snippets showing the wrapped form — runtime rejects it).
     const ready = new Promise((resolve) => {
-        let settled = false;
-        const onReady = () => {
-            if (settled) return;
-            settled = true;
+        let prechatDone = false;
+        let buttonDone = false;
+        const settle = () => { if (prechatDone && buttonDone) resolve(); };
+
+        window.addEventListener('onEmbeddedMessagingReady', () => {
             try {
                 if (deviceId) {
                     window.embeddedservice_bootstrap.prechatAPI.setHiddenPrechatFields({
-                        Session_ID: { value: deviceId }
+                        Session_ID: deviceId
                     });
                     console.log('[esw] Session_ID prechat field set:', deviceId);
                 }
             } catch (e) { console.warn('[esw] setHiddenPrechatFields failed', e); }
+            prechatDone = true;
+            settle();
+        }, { once: true });
+
+        window.addEventListener('onEmbeddedMessagingButtonCreated', () => {
             try {
                 window.embeddedservice_bootstrap.utilAPI.hideChatButton();
                 eswButtonVisible = false;
             } catch (e) { console.warn('[esw] hideChatButton failed', e); }
-            resolve();
-        };
-        window.addEventListener('onEmbeddedMessagingReady', onReady, { once: true });
-        // Defensive timeout: if Ready never fires, resolve so we don't hang.
-        setTimeout(() => { if (!settled) { settled = true; console.warn('[esw] ready timeout'); resolve(); } }, 8000);
+            buttonDone = true;
+            settle();
+            // After the button exists, sync visibility to the current stage in
+            // case we already advanced past the consent screen.
+            syncEswButtonVisibility();
+        }, { once: true });
+
+        // Defensive timeout: if either event never fires, resolve so we don't hang.
+        setTimeout(() => {
+            if (!prechatDone || !buttonDone) {
+                console.warn('[esw] ready timeout (prechatDone=', prechatDone, 'buttonDone=', buttonDone, ')');
+                resolve();
+            }
+        }, 8000);
     });
 
     try {
