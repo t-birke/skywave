@@ -89,8 +89,33 @@ async function loadEswSnippet(deviceId) {
     };
     window.addEventListener('onEmbeddedMessagingReady', () =>
         setSessionPrechat('Ready'), { once: true });
-    window.addEventListener('onEmbeddedMessagingConversationStarted', () =>
-        setSessionPrechat('ConversationStarted'), { once: true });
+
+    // WORKAROUND: ECv2 doesn't propagate custom hidden prechat parameters
+    // to the session-handler flow's input variable (May 2026). The
+    // setHiddenPrechatFields call above sets the value on the SDK side
+    // but it never reaches MessagingSession.Session_ID__c via the
+    // platform path. Until the platform fix ships, we POST the deviceId
+    // directly to a public Apex endpoint when the conversation starts.
+    // Once Salesforce closes that gap, drop this listener and rely on
+    // setHiddenPrechatFields alone (already in place above).
+    window.addEventListener('onEmbeddedMessagingConversationStarted', (e) => {
+        setSessionPrechat('ConversationStarted');
+        const conversationId = e?.detail?.conversationId;
+        if (!conversationId || !deviceId) {
+            console.warn('[esw] no conversationId/deviceId on ConversationStarted; skipping identify',
+                { conversationId, deviceId });
+            return;
+        }
+        fetch('/api/session/identify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ conversationId, sessionId: deviceId })
+        }).then((r) => {
+            console.log(`[esw] /api/session/identify ${r.status}`);
+        }).catch((err) => {
+            console.warn('[esw] /api/session/identify failed', err);
+        });
+    }, { once: true });
     const ready = Promise.resolve();
 
     try {
