@@ -63,13 +63,14 @@ async function forwardToApex(method, apexPath, body, res, label) {
 }
 
 app.post('/api/session/start',     (req, res) => forwardToApex('POST', '/skywave/session/start',    req.body, res, 'session/start'));
-// Workaround: the ECv2 hidden prechat field doesn't propagate to the
-// session-handler routing flow's input variable in May 2026. Stamp the
-// deviceId onto MessagingSession.Session_ID__c via Apex instead. Remove
-// this route once the platform path works (see SKYWAVE_INTERACTIVE_DESIGN.md
-// § 16 backlog "Replace Session_ID JS-side write with the standard ECv2
-// prechat path").
-app.post('/api/session/identify',  (req, res) => forwardToApex('POST', '/skywave/session/identify', req.body, res, 'session/identify'));
+// Note: /api/session/identify is NOT a Heroku route — phones POST
+// directly to the skywave_api Force.com Site:
+//   https://<orghost>.my.salesforce-sites.com/skywave/services/apexrest/skywave/session/identify
+// That endpoint publishes a Skywave_Identify_Session__e PE and a
+// trigger handles the MessagingSession update in System Mode. Phase 6
+// backlog: rewrite the rest of the endpoints (session/start, survey/answer,
+// race/tick, profile) to the same pattern to remove the Heroku-throughput
+// bottleneck for 500-phone scale.
 app.get('/api/survey/schema',   (_,   res) => forwardToApex('GET',  '/skywave/survey/schema',  null,     res, 'survey/schema'));
 app.post('/api/survey/answer',  (req, res) => forwardToApex('POST', '/skywave/survey/answer',  req.body, res, 'survey/answer'));
 app.post('/api/race/tick',      (req, res) => forwardToApex('POST', '/skywave/race/tick',      req.body, res, 'race/tick'));

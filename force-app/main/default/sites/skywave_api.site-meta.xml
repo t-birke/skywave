@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+    Force.com Site that exposes Skywave's anonymous Apex REST endpoints
+    to the consumer site. Phones POST through the CORS proxy to the
+    site's host, the request runs as the Sites Guest User, and Apex
+    handles it without JWT-bearer auth. Decouples phones from the
+    Heroku JWT relay → no per-request bottleneck on the integration
+    user, scale tests cleanly to 500+ concurrent phones.
+
+    This is NOT an LWR Experience Cloud site (ESA_Deployment is, used
+    only as the host for the chat snippet). This is a bare Force.com
+    Site whose only purpose is to expose REST endpoints.
+-->
+<CustomSite xmlns="http://soap.sforce.com/2006/04/metadata">
+    <active>true</active>
+    <allowGuestPaymentsApi>false</allowGuestPaymentsApi>
+    <allowHomePage>false</allowHomePage>
+    <allowStandardAnswersPages>false</allowStandardAnswersPages>
+    <allowStandardIdeasPages>false</allowStandardIdeasPages>
+    <allowStandardLookups>false</allowStandardLookups>
+    <allowStandardPortalPages>false</allowStandardPortalPages>
+    <allowStandardSearch>false</allowStandardSearch>
+    <authorizationRequiredPage>Unauthorized</authorizationRequiredPage>
+    <bandwidthExceededPage>BandwidthExceeded</bandwidthExceededPage>
+    <browserXssProtection>true</browserXssProtection>
+    <cachePublicVisualforcePagesInProxyServers>true</cachePublicVisualforcePagesInProxyServers>
+    <clickjackProtectionLevel>SameOriginOnly</clickjackProtectionLevel>
+    <contentSniffingProtection>true</contentSniffingProtection>
+    <enableAuraRequests>false</enableAuraRequests>
+    <fileNotFoundPage>FileNotFound</fileNotFoundPage>
+    <genericErrorPage>Exception</genericErrorPage>
+    <inMaintenancePage>InMaintenance</inMaintenancePage>
+    <indexPage>FileNotFound</indexPage>
+    <masterLabel>Skywave API</masterLabel>
+    <redirectToCustomDomain>false</redirectToCustomDomain>
+    <referrerPolicyOriginWhenCrossOrigin>true</referrerPolicyOriginWhenCrossOrigin>
+    <siteType>Visualforce</siteType>
+    <urlPathPrefix>skywave</urlPathPrefix>
+</CustomSite>

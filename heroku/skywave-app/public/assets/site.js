@@ -106,24 +106,19 @@ async function loadEswSnippet(deviceId) {
                 { conversationId, deviceId });
             return;
         }
-        // The MessagingSession record is created by the platform but isn't
-        // immediately visible to the integration user via SOQL — empirically
-        // 5-10s of replication lag (standard-license user reading a record
-        // owned by Automated Process). The Apex endpoint also retries with
-        // backoff, but combined we still race the first agent turn. Delay
-        // the POST so the field is in place by the time the user sends
-        // their first message (typing latency >> 5s in practice).
-        setTimeout(() => {
-            fetch('/api/session/identify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ conversationId, sessionId: deviceId })
-            }).then((r) => {
-                console.log(`[esw] /api/session/identify ${r.status}`);
-            }).catch((err) => {
-                console.warn('[esw] /api/session/identify failed', err);
-            });
-        }, 5000);
+        // POST directly to the skywave_api Force.com Site (anonymous, no
+        // Heroku JWT relay). The endpoint publishes a Platform Event; a
+        // trigger handles the MessagingSession update in System Mode.
+        // Decoupled from licensing constraints and Heroku throughput.
+        fetch('https://trailsignup-fb3f5426f87c5d.my.salesforce-sites.com/skywave/services/apexrest/skywave/session/identify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ conversationId, sessionId: deviceId })
+        }).then((r) => {
+            console.log(`[esw] /skywave/session/identify ${r.status}`);
+        }).catch((err) => {
+            console.warn('[esw] /skywave/session/identify failed', err);
+        });
     }, { once: true });
     const ready = Promise.resolve();
 

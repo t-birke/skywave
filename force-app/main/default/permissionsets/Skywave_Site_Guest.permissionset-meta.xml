@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Permission set for the skywave_api Site Guest User. Grants the bare
+  minimum needed for the public REST endpoint:
+    - Apex class access on Skywave_SessionIdentify (executes the
+      endpoint logic)
+    - Apex class access on Skywave_RestUtil (parseBody helper)
+    - Create on Skywave_Identify_Session__e (publish the platform event)
+
+  No object/field perms on MessagingSession — the trigger does that
+  in System Mode. Defense in depth: anonymous traffic can publish the
+  event but cannot directly read or write the messaging session.
+-->
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Apex + Platform Event publish for the skywave_api site guest user. Anonymous-traffic-safe.</description>
+    <hasActivationRequired>false</hasActivationRequired>
+    <label>Skywave Site Guest</label>
+    <classAccesses>
+        <apexClass>Skywave_SessionIdentify</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_RestUtil</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>false</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>Skywave_Identify_Session__e</object>
+        <viewAllRecords>false</viewAllRecords>
+    </objectPermissions>
+</PermissionSet>
