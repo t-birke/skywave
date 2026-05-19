@@ -65,16 +65,19 @@ async function loadEswSnippet(deviceId) {
         return false;
     }
 
-    // Two different events fire during snippet bootstrap:
-    //   - onEmbeddedMessagingReady       → prechatAPI is available
-    //   - onEmbeddedMessagingButtonCreated → utilAPI.hideChatButton/showChatButton is available
-    // The button-created event fires AFTER ready, so we wire each on its own
-    // listener. The prechat field's value is a bare string, NOT { value: '...' }
-    // (despite older blog snippets showing the wrapped form — runtime rejects it).
+    // The bootstrap fires two relevant lifecycle events:
+    //   - onEmbeddedMessagingReady          → prechatAPI is available
+    //   - onEmbeddedMessagingButtonCreated  → utilAPI.hideChatButton is available
+    // In practice the button-created event seems unreliable in some
+    // configurations, so for utilAPI we BOTH listen for the event AND poll
+    // — whichever wins, we hide the button.
+    //
+    // Prechat value is a bare string, NOT { value: '...' } (runtime rejects
+    // the wrapped form with "you must specify a string ... instead of object").
     const ready = new Promise((resolve) => {
         let prechatDone = false;
-        let buttonDone = false;
-        const settle = () => { if (prechatDone && buttonDone) resolve(); };
+        let buttonHidden = false;
+        const settle = () => { if (prechatDone && buttonHidden) resolve(); };
 
         window.addEventListener('onEmbeddedMessagingReady', () => {
             try {
@@ -89,22 +92,28 @@ async function loadEswSnippet(deviceId) {
             settle();
         }, { once: true });
 
-        window.addEventListener('onEmbeddedMessagingButtonCreated', () => {
+        // Belt-and-braces button hide: try the event first, then poll.
+        const tryHideButton = () => {
+            if (buttonHidden) return;
             try {
                 window.embeddedservice_bootstrap.utilAPI.hideChatButton();
+                buttonHidden = true;
                 eswButtonVisible = false;
-            } catch (e) { console.warn('[esw] hideChatButton failed', e); }
-            buttonDone = true;
-            settle();
-            // After the button exists, sync visibility to the current stage in
-            // case we already advanced past the consent screen.
-            syncEswButtonVisibility();
-        }, { once: true });
+                console.log('[esw] chat button hidden');
+                clearInterval(pollHandle);
+                settle();
+                syncEswButtonVisibility();
+            } catch (_) { /* not ready yet — keep polling */ }
+        };
+        window.addEventListener('onEmbeddedMessagingButtonCreated', tryHideButton, { once: true });
+        const pollHandle = setInterval(tryHideButton, 200);
 
-        // Defensive timeout: if either event never fires, resolve so we don't hang.
+        // Defensive timeout: if button never becomes hideable (e.g. event
+        // never fires AND polling never succeeds), give up after 8s.
         setTimeout(() => {
-            if (!prechatDone || !buttonDone) {
-                console.warn('[esw] ready timeout (prechatDone=', prechatDone, 'buttonDone=', buttonDone, ')');
+            clearInterval(pollHandle);
+            if (!prechatDone || !buttonHidden) {
+                console.warn('[esw] ready timeout (prechatDone=', prechatDone, 'buttonHidden=', buttonHidden, ')');
                 resolve();
             }
         }, 8000);
