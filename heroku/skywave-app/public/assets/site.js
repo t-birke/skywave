@@ -106,11 +106,16 @@ async function loadEswSnippet(deviceId) {
                 { conversationId, deviceId });
             return;
         }
-        // POST directly to the skywave_api Force.com Site (anonymous, no
-        // Heroku JWT relay). The endpoint publishes a Platform Event; a
-        // trigger handles the MessagingSession update in System Mode.
-        // Decoupled from licensing constraints and Heroku throughput.
-        fetch('https://trailsignup-fb3f5426f87c5d.my.salesforce-sites.com/skywave/services/apexrest/skywave/session/identify', {
+        // POST to the skywave_api Force.com Site (anonymous, no Heroku
+        // JWT relay). The endpoint publishes a Platform Event; a trigger
+        // handles the MessagingSession update in System Mode.
+        //
+        // Routed via the team's CORS proxy because Salesforce Sites'
+        // CORS handling for guest-callable Apex is unreliable (same
+        // proxy electra uses, see SKYWAVE_INTERACTIVE_DESIGN.md).
+        const SITES_URL = 'https://trailsignup-fb3f5426f87c5d.my.salesforce-sites.com/skywave/services/apexrest/skywave/session/identify';
+        const CORS_PROXY = 'https://abc-proxy-2552551e6d2c.herokuapp.com/';
+        fetch(CORS_PROXY + SITES_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ conversationId, sessionId: deviceId })
