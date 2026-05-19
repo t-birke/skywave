@@ -23,8 +23,7 @@ const AGENT_STAGES = new Set(['agent_book', 'agent_seat_fail', 'agent_seat_pass'
 
 let config = { interactionsSdkUrl: null, esw: null };
 let sdkReady = false;
-let eswReady = false;        // bootstrap loaded + onEmbeddedMessagingReady fired
-let eswButtonVisible = false; // tracks utilAPI.show/hideChatButton state
+let eswReady = false;        // bootstrap loaded + init() called
 
 async function loadConfig() {
     try {
@@ -65,62 +64,40 @@ async function loadEswSnippet(deviceId) {
         return false;
     }
 
-    // The bootstrap fires two relevant lifecycle events:
-    //   - onEmbeddedMessagingReady          → prechatAPI is available
-    //   - onEmbeddedMessagingButtonCreated  → utilAPI.hideChatButton is available
-    // In practice the button-created event seems unreliable in some
-    // configurations, so for utilAPI we BOTH listen for the event AND poll
-    // — whichever wins, we hide the button.
+    // Set the Session_ID hidden prechat field as soon as the snippet's
+    // prechatAPI is available. Prechat value is a bare string, NOT
+    // { value: '...' } — runtime rejects the wrapped form.
     //
-    // Prechat value is a bare string, NOT { value: '...' } (runtime rejects
-    // the wrapped form with "you must specify a string ... instead of object").
-    const ready = new Promise((resolve) => {
-        let prechatDone = false;
-        let buttonHidden = false;
-        const settle = () => { if (prechatDone && buttonHidden) resolve(); };
-
-        window.addEventListener('onEmbeddedMessagingReady', () => {
-            try {
-                if (deviceId) {
-                    window.embeddedservice_bootstrap.prechatAPI.setHiddenPrechatFields({
-                        Session_ID: deviceId
-                    });
-                    console.log('[esw] Session_ID prechat field set:', deviceId);
-                }
-            } catch (e) { console.warn('[esw] setHiddenPrechatFields failed', e); }
-            prechatDone = true;
-            settle();
-        }, { once: true });
-
-        // Belt-and-braces button hide: try the event first, then poll.
-        const tryHideButton = () => {
-            if (buttonHidden) return;
-            try {
-                window.embeddedservice_bootstrap.utilAPI.hideChatButton();
-                buttonHidden = true;
-                eswButtonVisible = false;
-                console.log('[esw] chat button hidden');
-                clearInterval(pollHandle);
-                settle();
-                syncEswButtonVisibility();
-            } catch (_) { /* not ready yet — keep polling */ }
-        };
-        window.addEventListener('onEmbeddedMessagingButtonCreated', tryHideButton, { once: true });
-        const pollHandle = setInterval(tryHideButton, 200);
-
-        // Defensive timeout: if button never becomes hideable (e.g. event
-        // never fires AND polling never succeeds), give up after 8s.
-        setTimeout(() => {
-            clearInterval(pollHandle);
-            if (!prechatDone || !buttonHidden) {
-                console.warn('[esw] ready timeout (prechatDone=', prechatDone, 'buttonHidden=', buttonHidden, ')');
-                resolve();
+    // The chat button itself is hidden/shown via CSS keyed off
+    // body[data-stage] (see site.css). This avoids a race against the
+    // snippet's internal button-creation lifecycle, which doesn't expose
+    // a reliable hook point in our config (utilAPI.hideChatButton throws
+    // "API not available before onEmbeddedMessagingButtonCreated event is
+    // fired" even after that event has fired, in some flows).
+    window.addEventListener('onEmbeddedMessagingReady', () => {
+        try {
+            if (deviceId) {
+                window.embeddedservice_bootstrap.prechatAPI.setHiddenPrechatFields({
+                    Session_ID: deviceId
+                });
+                console.log('[esw] Session_ID prechat field set:', deviceId);
             }
-        }, 8000);
-    });
+        } catch (e) { console.warn('[esw] setHiddenPrechatFields failed', e); }
+    }, { once: true });
+    const ready = Promise.resolve();
 
     try {
         window.embeddedservice_bootstrap.settings.language = 'en_US';
+        // hideChatButtonOnLoad is the v1 setting Salesforce documents for
+        // "load the snippet but don't show a button"; in ECv2 it's only
+        // partially supported (Salesforce Support, Apr 2026: "the
+        // hideChatButtonOnLoad snippet setting is not yet supported in the
+        // V2 client … the product team is working on it"). For now it's
+        // best-effort — when the platform ships full support our config
+        // already opts in. We pair it with utilAPI.launchChat() at agent-
+        // stage time so the chat opens regardless of whether the button is
+        // visible.
+        window.embeddedservice_bootstrap.settings.hideChatButtonOnLoad = true;
         window.embeddedservice_bootstrap.init(
             esw.orgId, esw.escName, esw.siteUrl, { scrt2URL: esw.scrt2Url }
         );
@@ -134,22 +111,17 @@ async function loadEswSnippet(deviceId) {
     return true;
 }
 
-// Toggle the chat button based on whether the current stage is one of the
-// agent stages. Idempotent — safe to call on every render().
-function syncEswButtonVisibility() {
-    if (!eswReady || !window.embeddedservice_bootstrap?.utilAPI) return;
-    const shouldShow = AGENT_STAGES.has(state.stage);
-    if (shouldShow && !eswButtonVisible) {
-        try {
-            window.embeddedservice_bootstrap.utilAPI.showChatButton();
-            eswButtonVisible = true;
-        } catch (e) { console.warn('[esw] showChatButton failed', e); }
-    } else if (!shouldShow && eswButtonVisible) {
-        try {
-            window.embeddedservice_bootstrap.utilAPI.hideChatButton();
-            eswButtonVisible = false;
-        } catch (e) { console.warn('[esw] hideChatButton failed', e); }
-    }
+// On agent stages, programmatically open the chat via utilAPI.launchChat().
+// The chat button itself may or may not be visible depending on whether
+// hideChatButtonOnLoad has finally been honored by the platform — either
+// way, the user lands in chat. Idempotent: launchChat is a no-op when
+// chat is already open.
+function syncEswChatLaunch() {
+    if (!eswReady || !window.embeddedservice_bootstrap?.utilAPI?.launchChat) return;
+    if (!AGENT_STAGES.has(state.stage)) return;
+    try {
+        window.embeddedservice_bootstrap.utilAPI.launchChat();
+    } catch (e) { console.warn('[esw] launchChat failed', e); }
 }
 
 async function loadInteractionsSdk() {
@@ -248,8 +220,10 @@ function render() {
         }
     } catch (e) { /* older SDK without reinit; ignore */ }
 
-    // Reveal/hide the Agentforce chat button based on the current stage.
-    syncEswButtonVisibility();
+    // On agent stages, launch the chat directly. Until the platform fully
+    // supports hideChatButtonOnLoad in v2, the button may stay visible —
+    // launching the chat unconditionally still gets the user to the agent.
+    syncEswChatLaunch();
 }
 
 // ── Consent ────────────────────────────────────────────────────────────────
