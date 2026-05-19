@@ -25,6 +25,18 @@ variables:
     EndUserLanguage: linked string
         source: @MessagingSession.EndUserLanguage
         description: "MessagingSession EndUserLanguage"
+    Session_ID: linked string
+        source: @MessagingSession.Session_ID__c
+        description: "Skywave anonymous deviceId — populated by the Session_ID hidden prechat parameter on Skywave_Channel. Used by the Skywave_ResolveSession action to look up declared survey preferences from the Real-Time Data Graph."
+    survey_summary: mutable string
+        label: "Survey Summary"
+        description: "Natural-language summary of the visitor's survey answers (favourite destination, cabin class, etc.) keyed off Session_ID."
+    survey_responses_json: mutable string
+        label: "Survey Responses (JSON)"
+        description: "Structured JSON map of question_key → {questionText, answerText, answerKey} for fine-grained reasoning."
+    survey_resolved: mutable boolean = False
+        label: "Survey Resolved"
+        description: "True once Skywave_ResolveSession has run for this conversation."
     VerifiedCustomerId: mutable string
         description: "Verified customer contact ID"
     Latest_Flight_Search_Results: mutable object
@@ -216,7 +228,18 @@ subagent flight_management:
                     set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
                     set @variables.retrieve_active_booking_done = @outputs.success
 
+            if @variables.survey_resolved is False:
+                run @actions.resolve_session
+                    with sessionId = @variables.Session_ID
+                    set @variables.survey_summary = @outputs.summary
+                    set @variables.survey_responses_json = @outputs.responsesJson
+                    set @variables.survey_resolved = True
+
             | Assist Lauren with her flight bookings. The customer is already authenticated — never ask for email or identification.
+
+            if @variables.survey_summary is not None and @variables.survey_summary != "":
+                | Before this conversation, the visitor answered a short travel-preferences survey. {!@variables.survey_summary}
+                  Use these declared preferences to make your suggestions more personal — for example, lean toward their stated favourite destination when offering flights, propose their preferred cabin class without asking, and respect their seat preference. Do NOT enumerate the survey answers back to the user; weave them in naturally.
 
             if @variables.active_bookings is None:
                 | Lauren currently has no flights booked. Let her know and offer to search for flights.
@@ -234,6 +257,10 @@ subagent flight_management:
               After calling any action, present the results in your text response using exact values. Do NOT call the same action again unless the user asks for a new search or change.
 
         actions:
+            resolve_session: @actions.resolve_session
+                description: "Look up the visitor's declared survey answers from Data Cloud using the deviceId. Runs once at the start of flight management; outputs are cached in @variables.survey_summary and @variables.survey_responses_json."
+                with sessionId = ...
+
             identify_customer: @actions.resolve_contact
                 description: "Look up a customer by their email address to identify them"
                 available when @variables.resolved_contact_id == ""
@@ -280,6 +307,41 @@ subagent flight_management:
                 with requested_change = ...
 
     actions:
+        resolve_session:
+            description: "Resolves the visitor's anonymous deviceId (Session_ID) to their declared survey answers from Data Cloud. Returns a natural-language summary plus a JSON map of question_key → {questionText, answerText, answerKey}."
+            label: "Resolve Session Context"
+            require_user_confirmation: False
+            include_in_progress_indicator: False
+            target: "apex://Skywave_ResolveSession"
+
+            inputs:
+                "sessionId": string
+                    description: "The Skywave anonymous deviceId, sourced from MessagingSession.Session_ID__c via the Session_ID linked variable."
+                    label: "Session ID"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "answerCount": number
+                    description: "How many distinct survey questions the visitor has answered."
+                    label: "Answer Count"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__numberType"
+                "responsesJson": string
+                    description: "JSON map of question_key → {questionText, answerText, answerKey} for fine-grained reasoning."
+                    label: "Survey Responses (JSON)"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "summary": string
+                    description: "One-line natural-language summary of the visitor's declared preferences. Intended for direct use in agent reasoning."
+                    label: "Summary"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+
         Reschedule_Flights:
             description: "Reschedule flights based on user tier and reservation booking type"
             label: "Reschedule Flights"

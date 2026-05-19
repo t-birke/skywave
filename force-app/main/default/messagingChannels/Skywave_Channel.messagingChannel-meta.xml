@@ -13,6 +13,9 @@
         <type>HelpResponse</type>
     </automatedResponses>
     <customParameters>
+        <actionParameterMappings>
+            <actionParameterName>MessagingSession.Session_ID__c</actionParameterName>
+        </actionParameterMappings>
         <name>Session_ID</name>
         <masterLabel>Session ID</masterLabel>
         <externalParameterName>Session_ID</externalParameterName>
