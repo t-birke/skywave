@@ -111,17 +111,20 @@ async function loadEswSnippet(deviceId) {
     return true;
 }
 
-// On agent stages, programmatically open the chat via utilAPI.launchChat().
-// The chat button itself may or may not be visible depending on whether
-// hideChatButtonOnLoad has finally been honored by the platform — either
-// way, the user lands in chat. Idempotent: launchChat is a no-op when
-// chat is already open.
-function syncEswChatLaunch() {
-    if (!eswReady || !window.embeddedservice_bootstrap?.utilAPI?.launchChat) return;
-    if (!AGENT_STAGES.has(state.stage)) return;
-    try {
-        window.embeddedservice_bootstrap.utilAPI.launchChat();
-    } catch (e) { console.warn('[esw] launchChat failed', e); }
+// Toggle a body data-attribute that CSS uses to show/hide the chat button.
+//
+// We hide the button via CSS rather than utilAPI.hideChatButton because
+// the v2 API for hiding is platform-broken (Salesforce-confirmed April
+// 2026): hideChatButtonOnLoad setting is ignored, hideChatButton API
+// throws "API not available before onEmbeddedMessagingButtonCreated",
+// and polling around it interferes with the snippet's own bootstrap.
+//
+// The button is mounted in the parent-page DOM (not in the chat iframe),
+// so CSS on the host page can target it. Only the chat *panel* lives in
+// an iframe, and we don't need to touch that.
+function syncEswButtonVisibility() {
+    if (typeof document === 'undefined' || !document.body) return;
+    document.body.dataset.eswVisible = AGENT_STAGES.has(state.stage) ? '1' : '0';
 }
 
 async function loadInteractionsSdk() {
@@ -220,10 +223,10 @@ function render() {
         }
     } catch (e) { /* older SDK without reinit; ignore */ }
 
-    // On agent stages, launch the chat directly. Until the platform fully
-    // supports hideChatButtonOnLoad in v2, the button may stay visible —
-    // launching the chat unconditionally still gets the user to the agent.
-    syncEswChatLaunch();
+    // Show/hide the chat BUTTON (not the panel) based on the current stage.
+    // User taps the button themselves to open the panel — that's the
+    // standard MIAW interaction pattern.
+    syncEswButtonVisibility();
 }
 
 // ── Consent ────────────────────────────────────────────────────────────────

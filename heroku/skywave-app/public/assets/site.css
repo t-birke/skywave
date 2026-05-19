@@ -164,3 +164,22 @@ body {
     line-height: 1.2;
 }
 
+
+/* Hide the Agentforce chat BUTTON (not the panel) until we reach an
+ * agent stage. The button is rendered in the host page's DOM under
+ * the standard ECv2 wrapper — not in the chat iframe — so a CSS rule
+ * on the host page can target it directly.
+ *
+ * We do this in CSS because the v2 platform APIs for button hiding
+ * (hideChatButtonOnLoad setting, utilAPI.hideChatButton method) are
+ * acknowledged-broken by Salesforce as of April 2026. site.js sets
+ * body[data-esw-visible="1"] only on agent stages.
+ *
+ * The chat *panel* is unreachable from this CSS (it's in an iframe),
+ * but we don't need to touch it — once the user taps the button at
+ * agent stage, the panel opens via the snippet's own logic. */
+body:not([data-esw-visible="1"]) #embedded-messaging,
+body:not([data-esw-visible="1"]) embedded-messaging {
+    display: none !important;
+    pointer-events: none !important;
+}
