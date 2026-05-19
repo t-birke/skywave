@@ -1,9 +1,26 @@
 # Skywave Interactive — Design Document
 
-> Status: **DRAFT v0.2** — for alignment before any implementation work.
+> Status: **DRAFT v0.3** — for alignment before any implementation work.
 > Reference predecessor: *Electra Interactive* (~2 years old).
 > This doc lays out the demo, the architecture, the components, the data flow,
 > the open questions, and the build sequence. Nothing is built yet.
+>
+> Changelog v0.2 → v0.3: aligned build phases against the demo talk track
+> (`docs/demo-walkthrough.md`); Phase 2 monitor LWC gets a **world-map +
+> cookie-bubble visualization** for Chapter 1; Phase 4 profile form gains the
+> `Phone` field (required for Chapter 9 voice handoff) and clarifies that the
+> selfie capture + Base64 → ContentDocument upload and the C360 reveal page
+> are **ports of existing electra implementations**, not redesigns; new
+> **Phase 4.5 — observability** wires the `SDO_Agentforce_Observability`
+> QBrix and seeds simulated STDM traces so Chapter 6's "seat-change intent
+> jumps out" aggregate is visible with a 20-person audience; new **Phase
+> 5.5 — voice channel** provisions a phone number, wires Service Cloud
+> Voice into `Skywave_Airlines_Agent`, and sets up caller-id → Contact
+> lookup for Chapter 9; Phase 5 prep gains explicit checkpoints for
+> off-topic-subagent fallback, a determinism example for the stage-7
+> narrative, and a Testing-Center-on-the-projector rehearsal for Chapter 8;
+> §16 backlog gains "agent-driven HXL account creation" and "proactive
+> personalised first agent turn" as v2 candidates.
 >
 > Changelog v0.1 → v0.2: stage 7 redesigned as a **Claude-Code-driven headless
 > extension** (new §6 + new skill in §3); org target locked to **SDO** (not
@@ -667,6 +684,18 @@ Get sign-off on the architecture and the stage-by-stage flow.
 - Monitor LWC subscribes to `Demo_Event__e` via empApi and renders
   the live "answers coming in" tile per question (filters on
   `type="survey_answer"`)
+- Monitor LWC **world-map visualization** (Chapter 1 of talk track):
+  background world map with Skywave's flight routes drawn on it; on
+  every `type="session_started"` event a bubble appears at a route
+  endpoint (or random over the map) showing the last 8 chars of
+  the `sessionId` (the cookie); on the corresponding
+  `type="survey_answer"` events the bubble morphs from a cookie label
+  to a small preference indicator (icon/glyph derived from the
+  answered options). Purpose: makes the abstract "anonymous profile"
+  story tangible during the survey beat — the audience sees their
+  own bubble appear and then carry their preferences. Reuses
+  electra's bubble/avatar grid component shape; the map background +
+  the cookie→preference morph are new.
 - DC wiring: confirm Interactions SDK `userProfiling` events are
   flowing into the Engagement DLO; build `Audience_Profile_DMO`
   joining it with Contact via `session_id`; build the Real-Time
@@ -688,7 +717,20 @@ Get sign-off on the architecture and the stage-by-stage flow.
   the user's preferences without being told.
 
 ### Phase 4 — profile + C360 reveal
-- Profile form, photo upload, Contact creation
+- Profile form fields: **first name, last name, email, phone, selfie**.
+  The `phone` field is **required for Chapter 9** (voice channel
+  handoff) — without it we cannot offer "anyone who entered a phone
+  number, please call this number"; mark it required on the form.
+  Validate as E.164.
+- Selfie capture: **port from electra** — phone camera takes a selfie
+  in-browser; submitted to Apex as a Base64 data URL inside the
+  profile-creation request; Apex decodes and creates a
+  `ContentVersion` linked to the new `Contact`. The implementation
+  exists in electra (`tbirke@dc.auto` / `~/dev/electra-interactive-sfmetadata`)
+  end-to-end and just needs porting + reskinning, **not** redesign.
+- Contact creation: write `FirstName`, `LastName`, `Email`, `Phone`,
+  `Session_Id__c`, `Demo_Session__c` lookup, link to the
+  ContentVersion produced from the selfie.
 - Add `Contact.Session_Id__c` (Text, External Id) — populated by the
   profile-creation Apex with the `sessionId` from the request payload
 - Apex helper that, given a `sessionId`, runs SOQL into Data Cloud DLOs
@@ -696,12 +738,73 @@ Get sign-off on the architecture and the stage-by-stage flow.
   C360 reveal screen and for anything else that needs to stitch
   anonymous → known on the live path (see §5b)
 - Wire avatar URL into monitor LWC's grid
+- **C360 reveal Lightning page (the Chapter 3 ending beat).** This is
+  a **port-and-brush-up** of the electra Contact page, not a fresh
+  design. Pull the existing electra Contact flexipage shape — engagement
+  events component, declared-prefs panel, computed affinities, mileage
+  tier display, related lists for `Reservation__c` /
+  `Reservation_Segment__c` / `Flight__c` — and adapt it for `si`'s
+  Skywave branding + the Skywave-specific Contact fields. Goal: when
+  the presenter lands on a Contact mid-demo, the page already looks
+  like a "rich C360" without further work.
 - **Demoable:** all prior phone steps + presenter pulls one Contact and
   shows full C360 instantly (no IR-job wait).
 
+### Phase 4.5 — Agentforce Observability (Chapter 6 setup)
+Chapter 6 of the talk track is an Observability tour: the presenter
+opens Agentforce Studio, spots a low-satisfaction "seat change intent"
+in the aggregate view, drills into a single conversation, and narrates
+the trace (lightning-action markers, state-variable values, reasoning
+steps, raw prompt/response). Without this wiring there is nothing to
+drill into.
+
+- Install / verify the **`SDO_Agentforce_Observability` QBrix** on `si`
+  (custom objects + SalesforceDotCom data streams + the
+  "Agentforce Analytics Foundations" data kit DMO mappings).
+- Confirm `Skywave_Airlines_Agent` sessions are landing as STDM rows
+  in Data Cloud and surfacing in Agentforce Studio's
+  Optimization / Insights / Analytics dashboards.
+- **Seed simulated traces** so a 20-person live audience produces a
+  meaningful "seat change intent has low satisfaction" aggregate:
+  script that injects ~50–100 synthetic prior sessions, biased so
+  seat-change requests cluster as low-satisfaction (i.e. the gap the
+  audience is about to discover in Chapter 5/6). Real audience
+  traces from the demo run get added on top. Without seeding the
+  aggregate looks empty and Chapter 6 falls flat.
+- Decide whether the synthetic and real traces are visually
+  distinguishable (probably not — they're meant to read as a single
+  pool to the audience).
+
+Defer to the **`agentforce-observability-data`** and
+**`sf-ai-agentforce-observability`** skills for the QBrix install
+mechanics, STDM schema details, and parquet-extraction patterns.
+This phase is "wire it up + seed it"; it is *not* re-deriving the
+Observability data model.
+
+- **Demoable:** presenter opens Agentforce Studio mid-demo, sees a
+  populated aggregate dashboard with seat-change intent visibly
+  underperforming, drills into one trace and walks the audience
+  through the reasoning + action timeline.
+
 ### Phase 5 — agentforce extensibility via Claude skill (stages 6–8)
 - Confirm `Skywave_ChangeSeat` works end-to-end against `Reservation_Segment__c` from a current-state agent invocation
+- **Verify the off-topic subagent fallback** (Chapter 6 stage-fail line:
+  "agent does not find an action … so it correctly diverts to the
+  off-topic subagent"). The default Agentforce off-topic subagent ships
+  out of the box; we just need to confirm `Skywave_Airlines_Agent`
+  actually uses it and that the on-brand reply is acceptable for a
+  live audience. If the canned response is too generic, lightly
+  customize the off-topic subagent's instruction so the Chapter-6
+  failure looks intentional rather than broken.
 - Author the **stripped baseline** of `Skywave_Airlines_Agent.agent` (no `seat_selection`) and tag it in git
+- **Pick the determinism example** for Chapter 7's narration ("this
+  transition happens regardless of LLM output"). Likely candidates
+  inside the new `seat_selection` subagent: a hard transition from
+  "ask for seat preference" → "call `Skywave_ChangeSeat`" once a
+  valid seat code is captured in a state variable; or a refusal
+  guard that fires deterministically when the booking is < 72h
+  out. Pre-script the line the presenter will say while pointing
+  at the `.agent` source.
 - Author the **`skywave-extend-agent` Claude skill** per §6:
   - Phase 1: inspect (`sf org display`, queries)
   - Phase 2: diff
@@ -710,10 +813,49 @@ Get sign-off on the architecture and the stage-by-stage flow.
   - Phase 5: chain into `testing-agentforce` skill to scaffold test spec
   - Phase 6: `sf agent test run`
   - Phase 7: summary
+- **Testing Center UI tour for Chapter 8.** The skill scaffolds + runs
+  tests in the terminal, but the talk track narrates **Testing Center
+  in Agentforce Studio** with the test cases visible (incl. the
+  "agentically generated" angle). Ensure the tests the skill creates
+  surface as an `AiEvaluationDefinition` that's visible in the
+  Testing Center UI, and rehearse the click-path: open Testing
+  Center → show the just-created test suite → show pass results.
 - Author `scripts/reset-agent.sh` for between-audience resets
 - Idempotency check (already-extended detection + git reset)
 - Rehearse 5×, time it, fix anything > 120s
 - **Demoable:** the whole "fail → Claude on the projector → succeed" flow under 2 minutes.
+
+### Phase 5.5 — voice channel (Chapter 9 setup)
+Chapter 9 is "the agent is multimodal — anyone who entered a phone
+number, please call this number and put your phone on speaker." This
+needs the voice channel wired before the demo runs.
+
+- Provision a phone number in `si` and connect it to Service Cloud
+  Voice (SDOs make this straightforward — no real telephony carrier
+  contract needed for a demo).
+- Add the **voice channel** to `Skywave_Airlines_Agent` so the same
+  agent (and its now-extended `seat_selection` subagent) answers
+  inbound calls.
+- **Caller ID → Contact lookup**: routing flow / pre-chat resolver
+  matches the inbound caller's E.164 number against
+  `Contact.Phone` (populated in Phase 4); when it matches, set the
+  agent's verified-contact variables so the seat change runs as the
+  authenticated audience member. This is what makes the talk-track
+  line "the agent is allowed to change the seat … only the
+  combination of agent access AND user authorisation makes it
+  possible" actually true on the call.
+- Confirm the language warning ("language not supported for voice
+  mode") doesn't fire — `en_US` should be fine but check.
+- Confirm the published phone number is shareable / dialable from
+  the venue (no toll restrictions, no SDO-internal-only limit).
+
+Defer the wiring mechanics to the **`setting-up-agentforce-voice`**
+and **`voice-agent-demo`** skills — both target exactly this kind of
+SDO voice setup.
+
+- **Demoable:** an audience member calls the published number from
+  the room, the agent picks up, recognises them by phone number,
+  changes their seat, hangs up. (Rehearse on a non-presenter phone.)
 
 ### Phase 6 — trolley race
 - `devicemotion` capture on phone, throttling, transmission
@@ -983,6 +1125,26 @@ Add items as they come up. Don't pre-prioritize.
   file picker in `skywaveSurveyAuthor`. Until then, only use HTTPS
   URLs from hosts that allow hotlinking.
 
+- **Agent-driven account creation with HXL components (talk-track
+  "option A").** v1 ships option B — the phone redirects to a profile
+  form page after Chapter 2. Option A is conversational: the agent
+  itself interviews the user for `firstName`, `lastName`, `email`,
+  `phone`, with rich inline HXL components (form fields rendered
+  inside the chat bubble) to capture them, plus the selfie step.
+  Stronger demo of conversational UX and a better story for
+  "everything in one channel," but considerably more authoring work
+  in the agent and on the HXL component side. Pick this up after v1
+  is stable.
+
+- **Proactive personalised first agent turn.** Talk-track Chapter 2
+  has the agent volunteer a destination based on declared prefs
+  ("it asks me if I want to book a flight to New York") *before*
+  the user types anything. v1 keeps it simple: the agent reads the
+  profile after the user's first message and personalises from
+  there. Worth exploring whether a true unsolicited proactive
+  opening turn is on-brand and reliable enough; trade-offs in
+  Agentforce's standard turn model.
+
 - **Materialize `ssot__ContactPointConsent__dlm` from
   `PrivacyConsentLog × ContactPointEmail` join.** v1 maps the SDK's
   `consentLog` event to `ssot__PrivacyConsentLog__dlm` only — that's
@@ -1004,3 +1166,20 @@ Add items as they come up. Don't pre-prioritize.
   compliance-audit beat to the demo.
   Reference: `~/dev/claude-skills/sf-interactions-sdk/recipes/consent.md`
   § "The Consent DMO Chain".
+
+- **Verify IR cross-DMO match end-to-end after Contact creation.** The
+  `Skywave Unified Individual` IR ruleset is published on `si` with two
+  exact-match rules: ContactPointEmail.EmailAddress and the cross-DMO
+  rule on PartyIdentification.IdentificationNumber → Individual.AnonymousId__c.
+  Currently nothing to match against — Phase 4 (profile creation) hasn't
+  shipped, so no Contact rows land in CRM-side DMOs. Once profile
+  creation is live AND Apex stamps `Contact.AnonymousId__c` with the
+  SDK's deviceId, we should:
+  1. Run a session through consent → survey → profile creation.
+  2. Wait for CRM connector + IR run cadence.
+  3. Query `IndividualIdentityLink__dlm` for the deviceId — expect one
+     row from the SDK source DLO and one from the CRM connector both
+     resolving to the same `UnifiedIndividualId`.
+  4. If only one source resolves, debug: usually the CRM-side
+     PartyIdentification mapping is missing or `Contact.AnonymousId__c`
+     is empty.
