@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8"?>
 <MessagingChannel xmlns="http://soap.sforce.com/2006/04/metadata">
     <automatedResponses>
         <autoResponseContentType>TextResponse</autoResponseContentType>
@@ -12,15 +12,21 @@
         <response>Text STOP to opt out of further messages.</response>
         <type>HelpResponse</type>
     </automatedResponses>
+    <customParameters>
+        <name>Session_ID</name>
+        <masterLabel>Session ID</masterLabel>
+        <externalParameterName>Session_ID</externalParameterName>
+        <parameterDataType>String</parameterDataType>
+    </customParameters>
     <masterLabel>Skywave Channel</masterLabel>
     <messagingChannelType>EmbeddedMessaging</messagingChannelType>
     <messagingKeywords>
         <keyword>cancel</keyword>
-        <keyword>stopall</keyword>
-        <keyword>stop</keyword>
-        <keyword>unsubscribe</keyword>
         <keyword>end</keyword>
         <keyword>quit</keyword>
+        <keyword>stop</keyword>
+        <keyword>stopall</keyword>
+        <keyword>unsubscribe</keyword>
         <keywordType>OptOut</keywordType>
         <language>en_US</language>
     </messagingKeywords>

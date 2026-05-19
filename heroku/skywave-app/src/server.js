@@ -26,9 +26,20 @@ app.get('/healthz', (_, res) => {
 // is set on Heroku — that gets populated once the Web Connector is created
 // in si Setup and we know the appId. Until then the consumer site runs
 // without the SDK and Apex mints the sessionId.
+//
+// The four ESW_* values configure the Enhanced Messaging for Web v2 widget.
+// They come from the org after the EmbeddedServiceConfig is published; the
+// `siteUrl` value is the one returned by the scrt2 config endpoint, NOT the
+// path on the underlying CustomSite (scrt2 normalizes vforce suffixes off).
 app.get('/api/config', (_, res) => {
     res.json({
-        interactionsSdkUrl: process.env.SF_INTERACTIONS_SDK_URL || null
+        interactionsSdkUrl: process.env.SF_INTERACTIONS_SDK_URL || null,
+        esw: {
+            orgId:    process.env.SF_ESW_ORG_ID    || null,
+            escName:  process.env.SF_ESW_ESC_NAME  || null,
+            siteUrl:  process.env.SF_ESW_SITE_URL  || null,
+            scrt2Url: process.env.SF_ESW_SCRT2_URL || null
+        }
     });
 });
 

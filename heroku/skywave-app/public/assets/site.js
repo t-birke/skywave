@@ -17,14 +17,111 @@
 const CONSENT_KEY = 'skywave.consent.v1';
 const root = document.getElementById('root');
 
-let config = { interactionsSdkUrl: null };
+// Stages on which the Agentforce chat button should be visible. Other
+// stages (consent / survey / waiting) keep it hidden via utilAPI.
+const AGENT_STAGES = new Set(['agent_book', 'agent_seat_fail', 'agent_seat_pass']);
+
+let config = { interactionsSdkUrl: null, esw: null };
 let sdkReady = false;
+let eswReady = false;        // bootstrap loaded + onEmbeddedMessagingReady fired
+let eswButtonVisible = false; // tracks utilAPI.show/hideChatButton state
 
 async function loadConfig() {
     try {
         const res = await fetch('/api/config');
         config = await res.json();
     } catch (e) { console.warn('config fetch failed', e); }
+}
+
+// Load the ECv2 (Enhanced Messaging for Web v2) chat snippet. Idempotent —
+// safe to call multiple times. Wires the deviceId as a hidden prechat
+// parameter (`Session_ID`) and immediately hides the chat button until a
+// later stage flip reveals it.
+//
+// Requires the four ESW values from /api/config (driven by Heroku Config Vars
+// SF_ESW_*). If any is missing we silently skip — the consumer site still
+// works, just without chat.
+async function loadEswSnippet(deviceId) {
+    if (eswReady) return true;
+    const esw = config.esw || {};
+    if (!esw.orgId || !esw.escName || !esw.siteUrl || !esw.scrt2Url) {
+        console.warn('[esw] config incomplete; skipping chat snippet load', esw);
+        return false;
+    }
+
+    // The bootstrap script defines window.embeddedservice_bootstrap and
+    // installs onEmbeddedMessagingReady before we need it.
+    await new Promise((resolve) => {
+        const s = document.createElement('script');
+        s.src = `${esw.siteUrl}/assets/js/bootstrap.min.js`;
+        s.async = true;
+        s.onload = () => resolve();
+        s.onerror = () => { console.warn('[esw] bootstrap.min.js failed to load'); resolve(); };
+        document.head.appendChild(s);
+    });
+
+    if (!window.embeddedservice_bootstrap) {
+        console.warn('[esw] embeddedservice_bootstrap is undefined after script load');
+        return false;
+    }
+
+    // setHiddenPrechatFields and utilAPI.hideChatButton are only available
+    // after the snippet finishes booting and dispatches onEmbeddedMessagingReady.
+    const ready = new Promise((resolve) => {
+        let settled = false;
+        const onReady = () => {
+            if (settled) return;
+            settled = true;
+            try {
+                if (deviceId) {
+                    window.embeddedservice_bootstrap.prechatAPI.setHiddenPrechatFields({
+                        Session_ID: { value: deviceId }
+                    });
+                    console.log('[esw] Session_ID prechat field set:', deviceId);
+                }
+            } catch (e) { console.warn('[esw] setHiddenPrechatFields failed', e); }
+            try {
+                window.embeddedservice_bootstrap.utilAPI.hideChatButton();
+                eswButtonVisible = false;
+            } catch (e) { console.warn('[esw] hideChatButton failed', e); }
+            resolve();
+        };
+        window.addEventListener('onEmbeddedMessagingReady', onReady, { once: true });
+        // Defensive timeout: if Ready never fires, resolve so we don't hang.
+        setTimeout(() => { if (!settled) { settled = true; console.warn('[esw] ready timeout'); resolve(); } }, 8000);
+    });
+
+    try {
+        window.embeddedservice_bootstrap.settings.language = 'en_US';
+        window.embeddedservice_bootstrap.init(
+            esw.orgId, esw.escName, esw.siteUrl, { scrt2URL: esw.scrt2Url }
+        );
+    } catch (e) {
+        console.warn('[esw] init failed', e);
+        return false;
+    }
+
+    await ready;
+    eswReady = true;
+    return true;
+}
+
+// Toggle the chat button based on whether the current stage is one of the
+// agent stages. Idempotent — safe to call on every render().
+function syncEswButtonVisibility() {
+    if (!eswReady || !window.embeddedservice_bootstrap?.utilAPI) return;
+    const shouldShow = AGENT_STAGES.has(state.stage);
+    if (shouldShow && !eswButtonVisible) {
+        try {
+            window.embeddedservice_bootstrap.utilAPI.showChatButton();
+            eswButtonVisible = true;
+        } catch (e) { console.warn('[esw] showChatButton failed', e); }
+    } else if (!shouldShow && eswButtonVisible) {
+        try {
+            window.embeddedservice_bootstrap.utilAPI.hideChatButton();
+            eswButtonVisible = false;
+        } catch (e) { console.warn('[esw] hideChatButton failed', e); }
+    }
 }
 
 async function loadInteractionsSdk() {
@@ -122,6 +219,9 @@ function render() {
             window.SalesforceInteractions.reinit();
         }
     } catch (e) { /* older SDK without reinit; ignore */ }
+
+    // Reveal/hide the Agentforce chat button based on the current stage.
+    syncEswButtonVisibility();
 }
 
 // ── Consent ────────────────────────────────────────────────────────────────
@@ -214,6 +314,12 @@ async function handleConsent() {
         state.stage = data.currentState || 'idle';
         connectWs(data.wsUrl);
         await loadSurveySchema();   // best-effort prefetch — used when stage flips to survey
+        // Pre-load + hide the Agentforce chat snippet now so it's warm by the
+        // time the presenter advances the demo to an agent stage. The
+        // deviceId is the same one that travels via the partyIdentification
+        // event above; it lands on MessagingSession via the hidden Session_ID
+        // prechat parameter.
+        loadEswSnippet(sdkId).catch((e) => console.warn('[esw] snippet load failed', e));
         render();
     } catch (e) {
         console.error('session/start failed', e);
