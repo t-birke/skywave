@@ -17,6 +17,34 @@ const BATCH_SIZE = 10;
 
 let schemaCache = new Map(); // schemaId -> avro.Type
 
+// Reconnect state lives at module scope so each retry uses a single
+// scheduled timer. Without this, both `error` and `end` events would
+// each schedule their own reconnect and we'd get an exponential
+// connection storm that exhausts memory (seen May 2026 when the
+// integration user lost a permset and Pub/Sub auth started failing
+// instantly — hundreds of reconnects per second OOM'd the dyno).
+let reconnectTimer = null;
+let reconnectAttempts = 0;
+const RECONNECT_BASE_MS = 5_000;
+const RECONNECT_MAX_MS = 5 * 60_000;  // cap at 5 min
+
+function scheduleReconnect(onEvent, reason) {
+    if (reconnectTimer) return; // already scheduled — let it run
+    const backoff = Math.min(
+        RECONNECT_BASE_MS * Math.pow(2, reconnectAttempts),
+        RECONNECT_MAX_MS
+    );
+    reconnectAttempts += 1;
+    console.warn(`Pub/Sub reconnect #${reconnectAttempts} in ${backoff}ms (${reason})`);
+    reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        startPubSubSubscriber(onEvent).catch((err) => {
+            console.error('Pub/Sub reconnect failed:', err.message);
+            scheduleReconnect(onEvent, 'reconnect-error');
+        });
+    }, backoff);
+}
+
 export async function startPubSubSubscriber(onEvent) {
     const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
         keepCase: true,
@@ -62,15 +90,14 @@ export async function startPubSubSubscriber(onEvent) {
         stream.write({ topic_name: TOPIC, num_requested: BATCH_SIZE });
     });
 
+    // Both `error` and `end` fire when the stream dies. We only want ONE
+    // reconnect attempt scheduled at a time — scheduleReconnect dedupes.
     stream.on('error', (err) => {
         console.error('Pub/Sub stream error:', err.code, err.details ?? err.message);
-        // Reconnect after a backoff so a token refresh / transient error doesn't kill the dyno
-        setTimeout(() => startPubSubSubscriber(onEvent).catch(console.error), 5000);
+        scheduleReconnect(onEvent, `error: ${err.code}`);
     });
-
     stream.on('end', () => {
-        console.warn('Pub/Sub stream ended; reconnecting in 5s');
-        setTimeout(() => startPubSubSubscriber(onEvent).catch(console.error), 5000);
+        scheduleReconnect(onEvent, 'stream ended');
     });
 
     // Initial subscribe message — replay_preset 1 = LATEST (only new events)
@@ -79,6 +106,9 @@ export async function startPubSubSubscriber(onEvent) {
         num_requested: BATCH_SIZE,
         replay_preset: 'LATEST'
     });
+
+    // Connection succeeded; reset the retry counter.
+    reconnectAttempts = 0;
 
     console.log(`subscribed to ${TOPIC}`);
     return stream;
