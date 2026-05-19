@@ -88,15 +88,11 @@ async function loadEswSnippet(deviceId) {
 
     try {
         window.embeddedservice_bootstrap.settings.language = 'en_US';
-        // hideChatButtonOnLoad is the v1 setting Salesforce documents for
-        // "load the snippet but don't show a button"; in ECv2 it's only
-        // partially supported (Salesforce Support, Apr 2026: "the
-        // hideChatButtonOnLoad snippet setting is not yet supported in the
-        // V2 client … the product team is working on it"). For now it's
-        // best-effort — when the platform ships full support our config
-        // already opts in. We pair it with utilAPI.launchChat() at agent-
-        // stage time so the chat opens regardless of whether the button is
-        // visible.
+        // hideChatButtonOnLoad is partially supported in ECv2 (Salesforce
+        // Support, Apr 2026: "not yet supported in the V2 client … the
+        // product team is working on it"). Set it anyway — forward-
+        // compatible, no harm. CSS in site.css does the actual hiding for
+        // now via body[data-esw-visible].
         window.embeddedservice_bootstrap.settings.hideChatButtonOnLoad = true;
         window.embeddedservice_bootstrap.init(
             esw.orgId, esw.escName, esw.siteUrl, { scrt2URL: esw.scrt2Url }
