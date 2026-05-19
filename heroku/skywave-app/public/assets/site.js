@@ -182,6 +182,25 @@ async function handleConsent() {
         catch (_) { return null; }
     })();
 
+    // Fire a partyIdentification event keyed on the anonymous deviceId. This
+    // creates a PartyIdentification DMO row that Identity Resolution can
+    // match against once a CRM-side Contact lands with the same deviceId
+    // mirrored into Contact.AnonymousId__c (Phase 4).
+    try {
+        if (window.SalesforceInteractions && sdkId) {
+            window.SalesforceInteractions.sendEvent({
+                user: { attributes: {
+                    eventType: 'partyIdentification',
+                    IDName:    'AnonymousId',
+                    IDType:    'CookieId',
+                    userId:    sdkId
+                }}
+            });
+        }
+    } catch (e) {
+        console.warn('partyIdentification sendEvent failed', e);
+    }
+
     try {
         const res = await fetch('/api/session/start', {
             method: 'POST',
