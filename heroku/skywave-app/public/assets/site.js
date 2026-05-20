@@ -17,6 +17,30 @@
 const CONSENT_KEY = 'skywave.consent.v1';
 const root = document.getElementById('root');
 
+// Canonical stage order. The visitor walks down this list at their own
+// pace; the moderator's stage is a *ceiling*, not a teleport target.
+// Stages must match the Demo_Session__c.State__c picklist values so the
+// WS stage_changed payload can be looked up by name.
+const STAGE_ORDER = [
+    'idle',
+    'scan',
+    'survey',
+    'thanks',          // post-survey waiting card; auto-set when survey ends
+    'agent_book',
+    'profile',
+    'c360',
+    'agent_seat_fail',
+    'agent_seat_pass',
+    'race',
+    'slack',
+    'done'
+];
+
+function stageIndex(stage) {
+    const i = STAGE_ORDER.indexOf(stage);
+    return i === -1 ? 0 : i;
+}
+
 // Stages on which the Agentforce chat button should be visible. Other
 // stages (consent / survey / waiting) keep it hidden via utilAPI.
 const AGENT_STAGES = new Set(['agent_book', 'agent_seat_fail', 'agent_seat_pass']);
@@ -170,7 +194,7 @@ async function loadEswSnippet(deviceId) {
 // an iframe, and we don't need to touch that.
 function syncEswButtonVisibility() {
     if (typeof document === 'undefined' || !document.body) return;
-    document.body.dataset.eswVisible = AGENT_STAGES.has(state.stage) ? '1' : '0';
+    document.body.dataset.eswVisible = AGENT_STAGES.has(effectiveStage()) ? '1' : '0';
 }
 
 async function loadInteractionsSdk() {
@@ -208,7 +232,13 @@ async function loadInteractionsSdk() {
 let state = {
     sessionId: null,
     demoSessionId: null,
-    stage: null,
+    // Visitor's own progress through the stage list. Set initially to
+    // 'idle' on consent, then advanced as they complete each step
+    // (e.g. survey → thanks). Never advanced beyond moderatorStage.
+    visitorStage: null,
+    // Moderator's current stage — pushed via WS on every stage_changed
+    // event. Acts as a ceiling: visitor can never see a stage past it.
+    moderatorStage: null,
     ws: null,
     wsConnected: false,
     survey: null,        // { questions: [...] } — fetched once on Accept
@@ -217,6 +247,55 @@ let state = {
     answers: {},         // questionKey → { questionText, answerText, answerKey }
     surveyComplete: false // true once we've POSTed the survey summary upstream
 };
+
+// Effective stage shown to the visitor.
+//
+// Up to and including the survey, the visitor walks the funnel at
+// their own pace, capped by the moderator. Past `thanks` (i.e. once
+// the visitor has finished the survey) the moderator drives the
+// screen — there's nothing past survey the visitor can self-advance
+// through, and the agent stages, profile, c360 etc. only make sense
+// once the moderator is leading the room there.
+//
+// Scenarios:
+//  • Late arrival (mod on agent_book, visitor just consented):
+//    visitor walks idle → survey → thanks; once they hit thanks,
+//    effectiveStage jumps to the moderator's stage (agent_book).
+//  • Early finisher (mod on survey, visitor done):
+//    visitor sits on thanks; moderator's still on survey, so
+//    effectiveStage = thanks. When mod advances past thanks, visitor
+//    follows.
+function effectiveStage() {
+    const v = state.visitorStage;
+    const m = state.moderatorStage;
+    if (!v && !m) return null;
+    if (!v) return m;
+    if (!m) return v;
+    // Past thanks → moderator drives the screen.
+    if (stageIndex(v) >= stageIndex('thanks')) return m;
+    // Up to thanks → visitor walks at their own pace, capped by mod.
+    return stageIndex(v) <= stageIndex(m) ? v : m;
+}
+
+// Whether to show the holding card. True when visitor has finished
+// their self-driven prefix (reached `thanks`) but the moderator hasn't
+// caught up yet. Past thanks the moderator drives, so the visitor can
+// always see *something* once moderator is past thanks too.
+function isWaitingForModerator() {
+    const v = state.visitorStage;
+    const m = state.moderatorStage;
+    if (!v || !m) return false;
+    return stageIndex(v) >= stageIndex('thanks')
+        && stageIndex(m) < stageIndex('thanks');
+}
+
+// Advance the visitor's own stage forward (never back) to `target`.
+// No-op if target is null/unknown or not later in STAGE_ORDER.
+function advanceVisitorStage(target) {
+    if (!target) return;
+    if (stageIndex(target) <= stageIndex(state.visitorStage)) return;
+    state.visitorStage = target;
+}
 
 function el(tag, attrs = {}, ...children) {
     const node = document.createElement(tag);
@@ -241,12 +320,28 @@ function setBodyStage(stage) {
     }
 }
 
-// Single render function — picks a screen based on state.stage. Called
-// after every stage change from the WS handler, after consent, and
-// after each survey answer (to advance to the next question).
+// Single render function — picks a screen based on effectiveStage().
+// Called after every stage change from the WS handler, after consent,
+// and after each survey answer.
 function render() {
     root.innerHTML = '';
-    const stage = state.stage;
+
+    // Visitor has caught up to (or past) the moderator's ceiling: show
+    // a holding screen until the moderator advances. Don't surface
+    // visitor-side progress they can't act on.
+    if (isWaitingForModerator()) {
+        setBodyStage('waiting');
+        renderHolding();
+        try {
+            if (sdkReady && window.SalesforceInteractions?.reinit) {
+                window.SalesforceInteractions.reinit();
+            }
+        } catch (e) { /* ignore */ }
+        syncEswButtonVisibility();
+        return;
+    }
+
+    const stage = effectiveStage();
 
     if (stage === 'survey' && state.surveyIndex < (state.survey?.questions?.length ?? 0)) {
         setBodyStage('survey');
@@ -364,7 +459,20 @@ async function handleConsent() {
         if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
         state.sessionId = data.sessionId;
         state.demoSessionId = data.demoSessionId;
-        state.stage = data.currentState || 'idle';
+        // The visitor walks the funnel themselves. The moderator's
+        // current state is the ceiling — it tells the visitor how far
+        // they're allowed to walk, not where to teleport. Late arrivals
+        // start at the survey (the first interactive screen) and move
+        // forward at their own pace; anyone who runs ahead lands on a
+        // holding card until the moderator catches up.
+        //
+        // Skipping idle/scan because consent itself is the implicit
+        // "scan completed" signal — the visitor wouldn't be here
+        // otherwise.
+        state.moderatorStage = data.currentState || 'idle';
+        state.visitorStage = stageIndex(state.moderatorStage) >= stageIndex('survey')
+            ? 'survey'
+            : state.moderatorStage;
         connectWs(data.wsUrl);
         await loadSurveySchema();   // best-effort prefetch — used when stage flips to survey
         // Pre-load + hide the Agentforce chat snippet now so it's warm by the
@@ -402,11 +510,13 @@ function connectWs(wsUrl) {
         try {
             const msg = JSON.parse(m.data);
             if (msg.type === 'stage_changed') {
-                const previous = state.stage;
-                state.stage = msg.newState || state.stage;
-                if (previous !== state.stage) {
-                    // Reset survey position when (re)entering the survey stage
-                    if (state.stage === 'survey') state.surveyIndex = 0;
+                const previous = state.moderatorStage;
+                state.moderatorStage = msg.newState || state.moderatorStage;
+                if (previous !== state.moderatorStage) {
+                    // Moderator advance can unblock a visitor who was
+                    // parked on the holding screen; just re-render.
+                    // visitorStage is owned entirely by visitor actions
+                    // (survey completion etc.) and is never touched here.
                     render();
                 }
             }
@@ -525,6 +635,12 @@ async function handleAnswer(event) {
     // Advance to next question after a short visual confirmation.
     setTimeout(() => {
         state.surveyIndex += 1;
+        // Survey just ended — visitor's earned stage moves up to
+        // `thanks`. Past this, the moderator drives.
+        const total = state.survey?.questions?.length ?? 0;
+        if (state.surveyIndex >= total) {
+            advanceVisitorStage('thanks');
+        }
         render();
     }, 350);
 }
@@ -534,7 +650,7 @@ async function handleAnswer(event) {
 function renderWaiting() {
     const stagePill = el('span',
         { class: state.wsConnected ? 'stage-pill' : 'stage-pill disconnected' },
-        state.wsConnected ? (state.stage || '…') : 'reconnecting…'
+        state.wsConnected ? (effectiveStage() || '…') : 'reconnecting…'
     );
     root.append(
         el('div', { class: 'center' },
@@ -544,6 +660,27 @@ function renderWaiting() {
                 el('h1', {}, 'You’re in'),
                 el('p', {}, 'Stay on this screen. We’ll guide you through the experience together.'),
                 el('div', { class: 'center' }, stagePill)
+            ),
+            el('div', { class: 'session-info' },
+                el('div', { class: 'session-info-label' }, 'Session'),
+                el('div', { class: 'session-info-value' }, state.sessionId || '')
+            )
+        )
+    );
+}
+
+// Holding card for visitors who finished their self-driven prefix
+// (survey + thanks) but the moderator hasn't reached `thanks` yet.
+// Plain "the demo will continue shortly" — deliberately not "you're
+// ahead", we don't shame the eager.
+function renderHolding() {
+    root.append(
+        el('div', { class: 'center' },
+            el('div', { class: 'brand' }, 'Skywave'),
+            el('div', { class: 'brand-sub' }, 'Interactive'),
+            el('div', { class: 'card' },
+                el('h1', {}, 'Stand by'),
+                el('p', {}, 'The demo will continue shortly.')
             ),
             el('div', { class: 'session-info' },
                 el('div', { class: 'session-info-label' }, 'Session'),
