@@ -333,11 +333,11 @@ subagent flight_management:
                 set @variables.Latest_Flight_Search_Results = @outputs.options
 
             book_flight: @actions.book_flight
-                description: "Books the flight the visitor has confirmed. Pass @variables.selected_fare_class as fareClass — it was pinned during the search step and is the only authoritative value. After this succeeds, the post-booking sequence (profile, payment, confirm) begins."
+                description: "Books the flight the visitor has confirmed. Pass the fare class the visitor agreed to (Economy / Premium Economy / Business / First — exact string). After this succeeds, the post-booking sequence (profile, payment, confirm) begins."
                 with contactId = @variables.resolved_contact_id
                 with flightId = ...
                 with travelDate = ...
-                with fareClass = @variables.selected_fare_class
+                with fareClass = ...
                 with checkedBags = ...
                 with seatPreference = ...
                 set @variables.flight_booking_detail = @outputs.booking
@@ -660,9 +660,9 @@ subagent flight_management:
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
                 "fareClass": string
-                    description: "Fare class: Economy, Premium Economy, Business, or First"
+                    description: "Fare class the visitor agreed to during search: Economy, Premium Economy, Business, or First. If blank, the action defaults to Economy."
                     label: "Fare Class"
-                    is_required: True
+                    is_required: False
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
                 "checkedBags": object

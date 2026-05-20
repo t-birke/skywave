@@ -10,7 +10,7 @@ public class Skywave_BookFlight {
         @InvocableVariable(label='Travel Date' description='Date of travel (YYYY-MM-DD)' required=true)
         public String travelDate;
         
-        @InvocableVariable(label='Fare Class' description='Fare class: Economy, Premium Economy, Business, or First' required=true)
+        @InvocableVariable(label='Fare Class' description='Fare class: Economy, Premium Economy, Business, or First. If blank, defaults to Economy.')
         public String fareClass;
         
         @InvocableVariable(label='Checked Bags' description='Number of checked bags')
