@@ -81,6 +81,18 @@ variables:
     selected_payment_method: mutable string = ""
         label: "Selected Payment Method"
         description: "The payment method the visitor chose: Apple Pay, Saved card, or Demo card. Set after the visitor picks; passed to process_payment."
+    profile_collected: mutable boolean = False
+        label: "Profile Collected"
+        description: "True once update_profile succeeded for the current pending booking. Tells the agent NOT to ask for name/email again."
+    payment_processed: mutable boolean = False
+        label: "Payment Processed"
+        description: "True once process_payment succeeded. Tells the agent NOT to ask for payment method again."
+    booking_confirmed: mutable boolean = False
+        label: "Booking Confirmed"
+        description: "True once confirm_booking succeeded. The post-booking sequence is complete; the agent should NOT re-run any of those steps."
+    booked_confirmation_codes: mutable string = ""
+        label: "Booked Confirmation Codes"
+        description: "Comma-separated codes from the most recent confirm_booking. Used so the agent can quote them again if asked, without re-running the action."
 
 language:
     default_locale: "en_US"
@@ -246,24 +258,24 @@ subagent flight_management:
                     set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
                     set @variables.retrieve_active_booking_done = @outputs.success
 
-            | Assist Lauren with her flight bookings. The customer is already authenticated — never ask for email or identification.
+            | Assist the visitor with their flight bookings. They are anonymous — never ask for any identification (no name, no email, no phone) until the post-booking profile step. Address them in second person ("you", "your") rather than guessing a name.
 
             if @variables.survey_summary is not None and @variables.survey_summary != "":
                 | Before this conversation, the visitor answered a short travel-preferences survey. {!@variables.survey_summary}
                   Use these declared preferences to make your suggestions more personal — for example, lean toward their stated favourite destination when offering flights, propose their preferred cabin class without asking, and respect their seat preference. Do NOT enumerate the survey answers back to the user; weave them in naturally.
 
             if @variables.active_bookings is None:
-                | Lauren currently has no flights booked. Let her know and offer to search for flights.
+                | The visitor has no flights booked yet. Offer to search for flights.
 
             if @variables.active_bookings is not None:
-                | Here are Lauren's current bookings: {!@variables.active_bookings}
-                  When the user asks about her bookings, give a SHORT one-line summary per booking — trip type (one-way vs return), origin and destination cities, and how far out it is (e.g., "in 3 days", "in about 2 months"). Then ask which booking she means. Do NOT dump every field unless asked.
+                | Here are the visitor's current bookings: {!@variables.active_bookings}
+                  When the user asks about their bookings, give a SHORT one-line summary per booking — trip type (one-way vs return), origin and destination cities, and how far out it is (e.g., "in 3 days", "in about 2 months"). Then ask which booking they mean. Do NOT dump every field unless asked.
                   When presenting full details, use the exact values returned — do NOT paraphrase or round. Do NOT use the show_command tool. Always compose your response as direct text.
 
-            | If the user wants to CANCEL a booking, identify which booking from active_bookings, then state the booking's cancellationConditions in plain language and ask her to confirm. Once she confirms, call {!@actions.cancel_booking} with the booking's bookingReference. After the action returns, relay the confirmationMessage to the user using its exact values (refund amount, payment method) — do NOT paraphrase the numbers.
+            | If the user wants to CANCEL a booking, identify which booking from active_bookings, then state the booking's cancellationConditions in plain language and ask them to confirm. Once they confirm, call {!@actions.cancel_booking} with the booking's bookingReference. After the action returns, relay the confirmationMessage to the user using its exact values (refund amount, payment method) — do NOT paraphrase the numbers.
               If the user wants to change a seat, use the {!@actions.change_seat} action.
               If the user wants to book a new flight or reschedule, use {!@actions.Reschedule_Flights} to find available options and check eligibility.
-              If the user wants to search for flights, use {!@actions.search_flights} with origin, destination, and departure date.
+              If the user wants to search for flights, use {!@actions.search_flights} with origin, destination, departure date, AND the fare class derived from their stated preference (or survey-implied default — Window-seat business travelers get Business unless they say otherwise). Passing the fare class is required for accurate pricing.
               If the user has confirmed specific flight details from search results (flightId, travelDate, fareClass), use {!@actions.book_flight} with all required parameters.
               After calling any action, present the results in your text response using exact values. Do NOT call the same action again unless the user asks for a new search or change.
 
@@ -279,11 +291,20 @@ subagent flight_management:
               - Set @variables.selected_total_price to the exact price string from the matching FlightOption.
               When you ask the visitor to confirm the booking, quote {!@variables.selected_total_price} verbatim. When you call {!@actions.book_flight}, pass {!@variables.selected_fare_class} as fareClass. After book_flight succeeds, the booking object's `total` is the source of truth — quote it exactly. The price the visitor sees during search, during confirmation, and after booking MUST be identical.
 
-            | After {!@actions.book_flight} returns success, the booking is in "Pending Confirmation" status — it is NOT yet ticketed. The visitor still needs to (1) provide name + email and (2) pay before the ticket is issued. Sequence:
-              1. Tell the visitor the booking is pending and ask for their full name and email. Once both are provided, call {!@actions.update_profile} with firstName, lastName, and email.
-              2. If update_profile succeeds, present three payment options to the visitor in plain text: "Apple Pay", "Saved card", or "Demo card". Set @variables.selected_payment_method to whichever the visitor chooses (use the exact strings — no synonyms). Call {!@actions.process_payment} passing selected_payment_method.
-              3. If process_payment succeeds, immediately call {!@actions.confirm_booking}. Tell the visitor their ticket is confirmed and quote the confirmationCodes returned alongside the totalCharged from process_payment.
-              Do NOT ask for name/email before booking — only after. Do NOT call confirm_booking before process_payment succeeds; it will reject as unpaid.
+            | POST-BOOKING SEQUENCE — after {!@actions.book_flight} returns success, the booking is in "Pending Confirmation" status (NOT yet ticketed). Three remaining steps, each gated by a flag so you don't repeat work already done. Look at the flags BEFORE asking the visitor for anything:
+
+              Step A — profile collection (only if @variables.profile_collected is False):
+                Ask for full name and email. Once both are provided, call {!@actions.update_profile}. If it succeeds, the action sets profile_collected = True. Do not ask for name or email again after profile_collected is True.
+
+              Step B — payment (only if @variables.profile_collected is True AND @variables.payment_processed is False):
+                Present exactly three payment options in plain text: "Apple Pay", "Saved card", or "Demo card". Set @variables.selected_payment_method to whichever the visitor chooses (use the exact strings — no synonyms). Call {!@actions.process_payment}. If it succeeds, the action sets payment_processed = True.
+
+              Step C — confirm (only if @variables.payment_processed is True AND @variables.booking_confirmed is False):
+                Immediately call {!@actions.confirm_booking}. After it succeeds, tell the visitor their ticket is confirmed and quote the confirmationCodes alongside the totalCharged from the previous payment step.
+
+              If @variables.booking_confirmed is True, the booking flow is complete. Do NOT call any of these three actions again. If the visitor asks for the confirmation code, quote {!@variables.booked_confirmation_codes} from memory. If they want a NEW booking, the variables will reset when they pick a new flight.
+
+              Do NOT ask for name/email before book_flight succeeds. Do NOT call confirm_booking before process_payment succeeds — it will reject as unpaid.
 
         actions:
             resolve_session: @actions.resolve_session
@@ -300,13 +321,15 @@ subagent flight_management:
                 with "Input:New_Flight_Requested" = ...
 
             search_flights: @actions.search_flights
+                description: "Searches the schedule for matching flights and returns priced FlightOption records. Pass fareClass — without it the price defaults to Economy and confuses the visitor."
                 with departureDate = ...
                 with destination = ...
                 with origin = ...
+                with fareClass = ...
                 set @variables.Latest_Flight_Search_Results = @outputs.options
 
             book_flight: @actions.book_flight
-                description: "Books the flight the visitor has confirmed. Pass @variables.selected_fare_class as fareClass — it was pinned during the search step and is the only authoritative value."
+                description: "Books the flight the visitor has confirmed. Pass @variables.selected_fare_class as fareClass — it was pinned during the search step and is the only authoritative value. After this succeeds, the post-booking sequence (profile, payment, confirm) begins."
                 with contactId = @variables.resolved_contact_id
                 with flightId = ...
                 with travelDate = ...
@@ -316,22 +339,29 @@ subagent flight_management:
                 set @variables.flight_booking_detail = @outputs.booking
                 set @variables.flight_booking_error_detail = @outputs.errorMessage
                 set @variables.flight_booking_error_flag = @outputs.success
+                set @variables.profile_collected = False
+                set @variables.payment_processed = False
+                set @variables.booking_confirmed = False
 
             update_profile: @actions.update_profile
-                description: "Writes the visitor's first name, last name, and email onto the anonymous Contact after a flight is booked. Call this only AFTER book_flight succeeded and the visitor has provided their full name and email."
+                description: "Writes the visitor's first name, last name, and email onto the anonymous Contact after a flight is booked. Call ONLY when @variables.profile_collected is False AND book_flight has succeeded."
                 with contactId = @variables.resolved_contact_id
                 with firstName = ...
                 with lastName = ...
                 with email = ...
+                set @variables.profile_collected = @outputs.success
 
             process_payment: @actions.process_payment
-                description: "Charges the chosen payment method against every Pending Confirmation booking for the contact. Call this only AFTER update_profile succeeded and the visitor has chosen Apple Pay, Saved card, or Demo card."
+                description: "Charges the chosen payment method. Call ONLY when @variables.profile_collected is True AND @variables.payment_processed is False."
                 with contactId = @variables.resolved_contact_id
                 with paymentMethod = @variables.selected_payment_method
+                set @variables.payment_processed = @outputs.success
 
             confirm_booking: @actions.confirm_booking
-                description: "Flips Paid Pending bookings to Confirmed. Call this only AFTER process_payment succeeds — the action will refuse to confirm any unpaid booking."
+                description: "Flips Paid Pending bookings to Confirmed. Call ONLY when @variables.payment_processed is True AND @variables.booking_confirmed is False."
                 with contactId = @variables.resolved_contact_id
+                set @variables.booking_confirmed = @outputs.success
+                set @variables.booked_confirmation_codes = @outputs.confirmationCodes
 
             get_bookings: @actions.get_bookings
                 with contactId = ...
@@ -441,6 +471,12 @@ subagent flight_management:
                     description: "The origin Airport Code in 3-Letter IATA format"
                     label: "Origin Airport Code (IATA)"
                     is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "fareClass": string
+                    description: "The fare class the visitor is searching for: Economy, Premium Economy, Business, or First. Required for accurate pricing — without it the action defaults to Economy and the prices in the response won't match what the visitor expects."
+                    label: "Fare Class"
+                    is_required: False
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
 
