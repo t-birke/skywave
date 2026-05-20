@@ -10,7 +10,7 @@ public class Skywave_BookFlight {
         @InvocableVariable(label='Travel Date' description='Date of travel (YYYY-MM-DD)' required=true)
         public String travelDate;
         
-        @InvocableVariable(label='Fare Class' description='Fare class: Basic, Choice, Choice Preferred, or Choice Extra' required=true)
+        @InvocableVariable(label='Fare Class' description='Fare class: Economy, Premium Economy, Business, or First' required=true)
         public String fareClass;
         
         @InvocableVariable(label='Checked Bags' description='Number of checked bags')
@@ -20,7 +20,7 @@ public class Skywave_BookFlight {
         public String seatPreference;
     }
 
-    @InvocableMethod(label='Book Flight' description='Creates a flight reservation for the customer')
+    @InvocableMethod(label='Book Flight' description='Creates a flight booking for the customer')
     public static List<Result> bookFlight(List<Request> requests) {
         List<Result> results = new List<Result>();
         
@@ -33,20 +33,32 @@ public class Skywave_BookFlight {
     
     private static Result executeBooking(Request req) {
         Result r = new Result();
-        
+
         try {
+            // Normalise the fare class up front so price + Booking
+            // both use the canonical name. If the agent says "business"
+            // we book and price as Choice Extra, not stash an invalid
+            // picklist value.
+            String canonicalFareClass = Skywave_FareClass.normalize(req.fareClass);
+            if (canonicalFareClass == null) {
+                r.success = false;
+                r.errorMessage = 'Unknown fare class: ' + req.fareClass +
+                    '. Use Economy, Premium Economy, Business, or First.';
+                return r;
+            }
+
             // Query the flight details
             Flight__c flight = [
                 SELECT Id, Name, Flight_Number__c, Origin__c, Destination__c,
                        Scheduled_Departure_Time__c, Scheduled_Arrival_Time__c,
                        Duration_Minutes__c, Aircraft_Type__c,
-                       Base_Price_Basic__c, Base_Price_Choice__c,
-                       Base_Price_Choice_Preferred__c, Base_Price_Choice_Extra__c
+                       Base_Price_Economy__c, Base_Price_Premium_Economy__c,
+                       Base_Price_Business__c, Base_Price_First__c
                 FROM Flight__c
                 WHERE Id = :req.flightId
                 LIMIT 1
             ];
-            
+
             // Query the contact for loyalty tier
             Contact contact = [
                 SELECT Id, Name, Membership_Tier__c
@@ -54,48 +66,47 @@ public class Skywave_BookFlight {
                 WHERE Id = :req.contactId
                 LIMIT 1
             ];
-            
-            // Calculate price
-            Decimal basePrice = getPriceForFareClass(flight, req.fareClass);
+
+            // Calculate price using the canonical class
+            Decimal basePrice = getPriceForFareClass(flight, canonicalFareClass);
             Decimal totalAmount = basePrice;
-            
-            // Create the reservation
-            Reservation__c reservation = new Reservation__c();
-            reservation.Contact__c = req.contactId;
-            reservation.Confirmation_Code__c = generateConfirmationCode();
-            // Pending until Phase 4 profile creation flips it to Confirmed.
-            // The booking is "made" but needs the visitor's real name/email
-            // to actually be issued. See Phase 3.5/Phase 4 in the design doc.
-            reservation.Status__c = 'Pending Confirmation';
-            reservation.Fare_Class__c = req.fareClass;
-            reservation.Total_Amount__c = totalAmount;
-            reservation.Checked_Bags__c = req.checkedBags != null ? req.checkedBags : 0;
-            reservation.Booking_Date__c = Date.today();
-            
-            insert reservation;
-            
+
+            // Create the booking
+            Booking__c booking = new Booking__c();
+            booking.Contact__c = req.contactId;
+            booking.Confirmation_Code__c = generateConfirmationCode();
+            // Pending until Phase 4 profile creation + payment flip it to Confirmed.
+            // The booking is "made" but the ticket is not yet issued.
+            booking.Status__c = 'Pending Confirmation';
+            booking.Fare_Class__c = canonicalFareClass;
+            booking.Total_Amount__c = totalAmount;
+            booking.Checked_Bags__c = req.checkedBags != null ? req.checkedBags : 0;
+            booking.Booking_Date__c = Date.today();
+
+            insert booking;
+
             // Parse travel date
             Date travelDateParsed = Date.valueOf(req.travelDate);
-            
+
             // Calculate departure and arrival DateTimes
             DateTime departureDateTime = DateTime.newInstance(
-                travelDateParsed, 
+                travelDateParsed,
                 flight.Scheduled_Departure_Time__c
             );
-            
+
             DateTime arrivalDateTime = DateTime.newInstance(
                 travelDateParsed,
                 flight.Scheduled_Arrival_Time__c
             );
-            
+
             // Handle overnight flights
             if (flight.Scheduled_Arrival_Time__c < flight.Scheduled_Departure_Time__c) {
                 arrivalDateTime = arrivalDateTime.addDays(1);
             }
-            
-            // Create the reservation segment
-            Reservation_Segment__c segment = new Reservation_Segment__c();
-            segment.Reservation__c = reservation.Id;
+
+            // Create the booking segment
+            Booking_Segment__c segment = new Booking_Segment__c();
+            segment.Booking__c = booking.Id;
             segment.Flight__c = flight.Id;
             segment.Travel_Date__c = travelDateParsed;
             segment.Departure_DateTime__c = departureDateTime;
@@ -103,12 +114,12 @@ public class Skywave_BookFlight {
             segment.Segment_Order__c = 1;
             segment.Segment_Status__c = 'Scheduled';
             segment.Seat_Number__c = assignSeat(req.seatPreference);
-            
+
             insert segment;
-            
+
             // Build the response
             r.success = true;
-            r.booking = buildBookingResponse(reservation, flight, segment, contact);
+            r.booking = buildBookingResponse(booking, flight, segment, contact);
             
         } catch (Exception e) {
             r.success = false;
@@ -120,16 +131,17 @@ public class Skywave_BookFlight {
     }
     
     private static Decimal getPriceForFareClass(Flight__c flight, String fareClass) {
-        if (fareClass == 'Basic' && flight.Base_Price_Basic__c != null) {
-            return flight.Base_Price_Basic__c;
-        } else if (fareClass == 'Choice' && flight.Base_Price_Choice__c != null) {
-            return flight.Base_Price_Choice__c;
-        } else if (fareClass == 'Choice Preferred' && flight.Base_Price_Choice_Preferred__c != null) {
-            return flight.Base_Price_Choice_Preferred__c;
-        } else if (fareClass == 'Choice Extra' && flight.Base_Price_Choice_Extra__c != null) {
-            return flight.Base_Price_Choice_Extra__c;
+        // Caller normalises before invoking — fareClass is canonical.
+        if (fareClass == Skywave_FareClass.ECONOMY && flight.Base_Price_Economy__c != null) {
+            return flight.Base_Price_Economy__c;
+        } else if (fareClass == Skywave_FareClass.PREMIUM_ECONOMY && flight.Base_Price_Premium_Economy__c != null) {
+            return flight.Base_Price_Premium_Economy__c;
+        } else if (fareClass == Skywave_FareClass.BUSINESS && flight.Base_Price_Business__c != null) {
+            return flight.Base_Price_Business__c;
+        } else if (fareClass == Skywave_FareClass.FIRST && flight.Base_Price_First__c != null) {
+            return flight.Base_Price_First__c;
         }
-        return flight.Base_Price_Choice__c != null ? flight.Base_Price_Choice__c : 0;
+        return flight.Base_Price_Economy__c != null ? flight.Base_Price_Economy__c : 0;
     }
     
     private static String generateConfirmationCode() {
@@ -164,32 +176,33 @@ public class Skywave_BookFlight {
     }
     
     private static Booking buildBookingResponse(
-        Reservation__c reservation,
+        Booking__c bookingRow,
         Flight__c flight,
-        Reservation_Segment__c segment,
+        Booking_Segment__c segment,
         Contact contact
     ) {
         Booking b = new Booking();
-        b.bookingReference = reservation.Confirmation_Code__c;
-        b.total = '$' + reservation.Total_Amount__c.setScale(2).toPlainString();
-        
+        b.bookingReference = bookingRow.Confirmation_Code__c;
+        b.total = '$' + bookingRow.Total_Amount__c.setScale(2).toPlainString();
+
         // Set conditions based on fare class
-        if (reservation.Fare_Class__c == 'Basic') {
+        String canonical = Skywave_FareClass.normalizeOrDefault(bookingRow.Fare_Class__c);
+        if (canonical == Skywave_FareClass.ECONOMY) {
             b.rebookingConditions = 'Change fee $99, plus fare difference';
-            b.cancellationConditions = 'Non-refundable';
-            b.checkedBaggageAllowance = 'Not included (fees apply)';
-        } else if (reservation.Fare_Class__c == 'Choice') {
-            b.rebookingConditions = 'No change fee, plus fare difference';
             b.cancellationConditions = 'Cancellation fee $99';
             b.checkedBaggageAllowance = '1 bag (50lbs)';
-        } else if (reservation.Fare_Class__c == 'Choice Preferred') {
+        } else if (canonical == Skywave_FareClass.PREMIUM_ECONOMY) {
             b.rebookingConditions = 'No change fee, plus fare difference';
-            b.cancellationConditions = 'Fully refundable';
+            b.cancellationConditions = 'Cancellation fee $99';
             b.checkedBaggageAllowance = '2 bags (50lbs each)';
-        } else { // Choice Extra
+        } else if (canonical == Skywave_FareClass.BUSINESS) {
             b.rebookingConditions = 'No change fee, plus fare difference';
             b.cancellationConditions = 'Fully refundable';
-            b.checkedBaggageAllowance = '3 bags (50lbs each)';
+            b.checkedBaggageAllowance = '2 bags (70lbs each)';
+        } else { // First
+            b.rebookingConditions = 'No change fee, plus fare difference';
+            b.cancellationConditions = 'Fully refundable';
+            b.checkedBaggageAllowance = '3 bags (70lbs each)';
         }
         
         // Apply loyalty tier benefits
@@ -208,7 +221,7 @@ public class Skywave_BookFlight {
         f.destinationDateTime = formatDateTime(segment.Arrival_DateTime__c);
         f.originCity = getAirportCity(flight.Origin__c);
         f.destinationCity = getAirportCity(flight.Destination__c);
-        f.bookingClass = reservation.Fare_Class__c;
+        f.bookingClass = bookingRow.Fare_Class__c;
         f.numberOfFlights = 1;
         f.segments = new List<Segment>();
         
@@ -224,7 +237,7 @@ public class Skywave_BookFlight {
         s.arrivalCity = getAirportCity(flight.Destination__c);
         s.arrivalAirport = getAirportName(flight.Destination__c);
         s.arrivalAirportCode = flight.Destination__c;
-        s.bookingClass = reservation.Fare_Class__c;
+        s.bookingClass = bookingRow.Fare_Class__c;
         s.operatingAircraft = flight.Aircraft_Type__c;
         s.operatingAirline = 'Skywave Airlines';
         
@@ -263,11 +276,14 @@ public class Skywave_BookFlight {
             'IAH' => 'Houston',
             'BOS' => 'Boston',
             'SFO' => 'San Francisco',
-            'EWR' => 'Newark'
+            'EWR' => 'Newark',
+            'LHR' => 'London',
+            'HND' => 'Tokyo',
+            'SYD' => 'Sydney'
         };
         return airportCities.containsKey(airportCode) ? airportCities.get(airportCode) : airportCode;
     }
-    
+
     private static String getAirportName(String airportCode) {
         Map<String, String> airportNames = new Map<String, String>{
             'ATL' => 'Hartsfield-Jackson Atlanta International',
@@ -284,7 +300,10 @@ public class Skywave_BookFlight {
             'IAH' => 'George Bush Intercontinental',
             'BOS' => 'Boston Logan International',
             'SFO' => 'San Francisco International',
-            'EWR' => 'Newark Liberty International'
+            'EWR' => 'Newark Liberty International',
+            'LHR' => 'London Heathrow',
+            'HND' => 'Tokyo Haneda',
+            'SYD' => 'Sydney Kingsford Smith'
         };
         return airportNames.containsKey(airportCode) ? airportNames.get(airportCode) : airportCode;
     }

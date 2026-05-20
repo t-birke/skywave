@@ -2,8 +2,8 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Status__c</fullName>
     <label>Status</label>
-    <description>Current status of the reservation</description>
-    <inlineHelpText>Select the current status of this reservation</inlineHelpText>
+    <description>Current status of the booking</description>
+    <inlineHelpText>Select the current status of this booking</inlineHelpText>
     <type>Picklist</type>
     <required>true</required>
     <valueSet>

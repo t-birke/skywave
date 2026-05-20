@@ -10,23 +10,23 @@
 
 Customer Information:
 - Membership Tier: Gold
-- Previous Reservation Type: Choice
+- Previous Reservation Type: Premium Economy
 
 Available Flights (SEA to JFK):
 
 Flight 1388: Departs 1:15 PM, Arrives 9:35 PM, Nonstop, 5h 20m
-  Basic: $0, Choice: $0, Choice Preferred: $15, Choice Extra: $36
+  Economy: $0, Premium Economy: $0, Business: $15, First: $36
 
 Flight 2104: Departs 4:45 PM, Arrives 1:05 AM+1, Nonstop, 5h 20m
-  Basic: $0, Choice: $0, Choice Preferred: $25, Choice Extra: $45
+  Economy: $0, Premium Economy: $0, Business: $25, First: $45
 
 Flight 3909: Departs 10:30 PM, Arrives 6:50 AM+1, Nonstop, 5h 20m (Fastest)
-  Basic: $0, Choice: $0, Choice Preferred: $15, Choice Extra: $36
+  Economy: $0, Premium Economy: $0, Business: $15, First: $36
 
 Booking Policies:
 - Gold tier members may rebook at no additional charge for same-day flights.
-- Choice fare bookings allow free rebooking up to 24 hours before departure.
-- Basic fare bookings have a $75 change fee.
+- Premium Economy fare bookings allow free rebooking up to 24 hours before departure.
+- Economy fare bookings have a $75 change fee.
 - All rebookings are subject to fare difference.
 
 Instructions:

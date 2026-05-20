@@ -6,8 +6,8 @@
     <inlineHelpText>Select the flight from the master schedule</inlineHelpText>
     <type>Lookup</type>
     <referenceTo>Flight__c</referenceTo>
-    <relationshipLabel>Reservation Segments</relationshipLabel>
-    <relationshipName>Reservation_Segments</relationshipName>
+    <relationshipLabel>Booking Segments</relationshipLabel>
+    <relationshipName>Booking_Segments</relationshipName>
     <required>true</required>
     <deleteConstraint>Restrict</deleteConstraint>
 </CustomField>

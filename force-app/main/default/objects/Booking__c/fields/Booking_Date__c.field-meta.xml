@@ -2,8 +2,8 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Booking_Date__c</fullName>
     <label>Booking Date</label>
-    <description>Date and time when the reservation was created</description>
-    <inlineHelpText>The date and time this reservation was booked</inlineHelpText>
+    <description>Date and time when the booking was created</description>
+    <inlineHelpText>The date and time this booking was placed</inlineHelpText>
     <type>DateTime</type>
     <required>false</required>
     <defaultValue>NOW()</defaultValue>

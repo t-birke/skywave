@@ -25,6 +25,72 @@ public without sharing class Skywave_SeedBookingData {
         return 'Skywave booking seed complete.';
     }
 
+    /**
+     * Re-prices every seeded Flight__c using the current Economy
+     * floor + multipliers (PE 1.9x, Business 4.3x, First 7x). Use
+     * this after tweaking the seed's `routes` table to push the new
+     * numbers onto already-inserted rows; reseed alone is idempotent
+     * and won't update them.
+     */
+    @AuraEnabled
+    public static String repriceFlights() {
+        Map<String, Decimal> economyByFlight = new Map<String, Decimal>{
+            'SW1100' => 650,
+            'SW1200' => 850,
+            'SW1300' => 1100,
+            'SW2100' => 220,
+            'SW2200' => 250,
+            'SW2300' => 950
+        };
+        List<Flight__c> flights = [
+            SELECT Id, Flight_Number__c,
+                   Base_Price_Economy__c, Base_Price_Premium_Economy__c,
+                   Base_Price_Business__c, Base_Price_First__c
+            FROM Flight__c
+            WHERE Flight_Number__c IN :economyByFlight.keySet()
+        ];
+        for (Flight__c f : flights) {
+            Decimal economy = economyByFlight.get(f.Flight_Number__c);
+            f.Base_Price_Economy__c         = economy;
+            f.Base_Price_Premium_Economy__c = (economy * 1.9).setScale(2);
+            f.Base_Price_Business__c        = (economy * 4.3).setScale(2);
+            f.Base_Price_First__c           = (economy * 7.0).setScale(2);
+        }
+        if (!flights.isEmpty()) update flights;
+        return 'Repriced ' + flights.size() + ' flights.';
+    }
+
+    /**
+     * Flips every seeded Flight__c to operate every day of the week.
+     * Existing flights from earlier seeds had restricted schedules
+     * (e.g. SW1200 only Mon/Wed/Fri/Sun) which broke "book me a flight
+     * tomorrow" when tomorrow happened to fall on an excluded day.
+     */
+    @AuraEnabled
+    public static String makeAllFlightsDaily() {
+        Set<String> nums = new Set<String>{
+            'SW1100','SW1200','SW1300','SW2100','SW2200','SW2300'
+        };
+        List<Flight__c> flights = [
+            SELECT Id, Operates_Monday__c, Operates_Tuesday__c, Operates_Wednesday__c,
+                   Operates_Thursday__c, Operates_Friday__c, Operates_Saturday__c,
+                   Operates_Sunday__c
+            FROM Flight__c
+            WHERE Flight_Number__c IN :nums
+        ];
+        for (Flight__c f : flights) {
+            f.Operates_Monday__c    = true;
+            f.Operates_Tuesday__c   = true;
+            f.Operates_Wednesday__c = true;
+            f.Operates_Thursday__c  = true;
+            f.Operates_Friday__c    = true;
+            f.Operates_Saturday__c  = true;
+            f.Operates_Sunday__c    = true;
+        }
+        if (!flights.isEmpty()) update flights;
+        return 'Updated ' + flights.size() + ' flights to operate daily.';
+    }
+
     // ── 1. Product2 (aircraft types) ────────────────────────────────────────
     private static void seedAircraftTypes() {
         Map<String, Map<String, Object>> types = new Map<String, Map<String, Object>>{
@@ -160,14 +226,17 @@ public without sharing class Skywave_SeedBookingData {
         };
 
         // route specs: number, origin, destination, dept-time-h:m, arr-time-h:m,
-        //              duration-min, tail, days(comma), priceBasic
+        //              duration-min, tail, days(comma), priceEconomy
+        // All routes operate daily for demo reliability — "tomorrow" always
+        // returns options regardless of when the demo runs.
+        String dailyDays = 'Mon,Tue,Wed,Thu,Fri,Sat,Sun';
         List<List<Object>> routes = new List<List<Object>>{
-            new List<Object>{ 'SW1100', 'JFK', 'LHR', 21, 30,  9, 30, 420, 'N99999', 'Mon,Tue,Wed,Thu,Fri,Sat,Sun', 800 },
-            new List<Object>{ 'SW1200', 'JFK', 'HND', 13,  0, 16, 30, 825, 'N99999', 'Mon,Wed,Fri,Sun',           1100 },
-            new List<Object>{ 'SW1300', 'JFK', 'SYD', 22, 30,  7,  0, 1230, 'N99999', 'Tue,Thu,Sat',              1400 },
-            new List<Object>{ 'SW2100', 'ORD', 'SFO',  9,  0, 11, 45, 285,  'N12345', 'Mon,Tue,Wed,Thu,Fri,Sat,Sun', 280 },
-            new List<Object>{ 'SW2200', 'JFK', 'LAX',  8, 30, 11, 30, 360,  'N24680', 'Mon,Tue,Wed,Thu,Fri,Sat,Sun', 320 },
-            new List<Object>{ 'SW2300', 'LHR', 'HND', 11,  0,  7, 30, 690,  'N99999', 'Mon,Wed,Fri',               1200 }
+            new List<Object>{ 'SW1100', 'JFK', 'LHR', 21, 30,  9, 30, 420, 'N99999', dailyDays, 650 },
+            new List<Object>{ 'SW1200', 'JFK', 'HND', 13,  0, 16, 30, 825, 'N99999', dailyDays, 850 },
+            new List<Object>{ 'SW1300', 'JFK', 'SYD', 22, 30,  7,  0, 1230, 'N99999', dailyDays, 1100 },
+            new List<Object>{ 'SW2100', 'ORD', 'SFO',  9,  0, 11, 45, 285,  'N12345', dailyDays, 220 },
+            new List<Object>{ 'SW2200', 'JFK', 'LAX',  8, 30, 11, 30, 360,  'N24680', dailyDays, 250 },
+            new List<Object>{ 'SW2300', 'LHR', 'HND', 11,  0,  7, 30, 690,  'N99999', dailyDays, 950 }
         };
 
         Set<String> flightNumbers = new Set<String>();
@@ -183,7 +252,7 @@ public without sharing class Skywave_SeedBookingData {
             if (existing.contains(num)) continue;
             String tail = (String) r[8];
             String typeName = codeToName.get(tailToCode.get(tail));
-            Decimal basic = (Decimal) r[10];
+            Decimal economy = (Decimal) r[10];
             Set<String> days = new Set<String>(((String) r[9]).split(','));
 
             Flight__c f = new Flight__c(
@@ -204,10 +273,10 @@ public without sharing class Skywave_SeedBookingData {
                 Operates_Friday__c    = days.contains('Fri'),
                 Operates_Saturday__c  = days.contains('Sat'),
                 Operates_Sunday__c    = days.contains('Sun'),
-                Base_Price_Basic__c            = basic,
-                Base_Price_Choice__c           = (basic * 1.3).setScale(2),
-                Base_Price_Choice_Preferred__c = (basic * 1.8).setScale(2),
-                Base_Price_Choice_Extra__c     = (basic * 2.5).setScale(2)
+                Base_Price_Economy__c         = economy,
+                Base_Price_Premium_Economy__c = (economy * 1.9).setScale(2),
+                Base_Price_Business__c        = (economy * 4.3).setScale(2),
+                Base_Price_First__c           = (economy * 7.0).setScale(2)
             );
             toInsert.add(f);
         }

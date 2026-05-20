@@ -72,6 +72,15 @@ variables:
         label: "Booking Outcome"
     resolved_contact_id: mutable string = "003000000000000"
         description: "Resolved contact ID for the current user (demo: pre-authenticated as Lauren)"
+    selected_fare_class: mutable string = ""
+        label: "Selected Fare Class"
+        description: "The canonical fare class (Economy, Premium Economy, Business, First) the visitor has agreed to. Once set after a flight search, it must be the value passed to book_flight and quoted to the visitor."
+    selected_total_price: mutable string = ""
+        label: "Selected Total Price"
+        description: "The total price string (e.g. '$1430.00') tied to the selected_fare_class. Once set, the agent quotes this exact value at confirmation; it must NOT be re-derived."
+    selected_payment_method: mutable string = ""
+        label: "Selected Payment Method"
+        description: "The payment method the visitor chose: Apple Pay, Saved card, or Demo card. Set after the visitor picks; passed to process_payment."
 
 language:
     default_locale: "en_US"
@@ -258,6 +267,24 @@ subagent flight_management:
               If the user has confirmed specific flight details from search results (flightId, travelDate, fareClass), use {!@actions.book_flight} with all required parameters.
               After calling any action, present the results in your text response using exact values. Do NOT call the same action again unless the user asks for a new search or change.
 
+            | FARE CLASSES — Skywave offers four fare classes. Always use these exact strings when calling actions and when quoting them back to the visitor:
+              - Economy
+              - Premium Economy
+              - Business
+              - First
+              Treat industry synonyms as the canonical name (e.g. "main cabin" / "coach" → Economy; "economy plus" → Premium Economy; "business class" → Business; "first class" → First). Always present the canonical name back to the visitor.
+
+            | PRICE & FARE CLASS PINNING — Once the visitor commits to a flight + fare class from the search results, store both into variables and never re-derive them:
+              - Set @variables.selected_fare_class to one of: Economy / Premium Economy / Business / First.
+              - Set @variables.selected_total_price to the exact price string from the matching FlightOption.
+              When you ask the visitor to confirm the booking, quote {!@variables.selected_total_price} verbatim. When you call {!@actions.book_flight}, pass {!@variables.selected_fare_class} as fareClass. After book_flight succeeds, the booking object's `total` is the source of truth — quote it exactly. The price the visitor sees during search, during confirmation, and after booking MUST be identical.
+
+            | After {!@actions.book_flight} returns success, the booking is in "Pending Confirmation" status — it is NOT yet ticketed. The visitor still needs to (1) provide name + email and (2) pay before the ticket is issued. Sequence:
+              1. Tell the visitor the booking is pending and ask for their full name and email. Once both are provided, call {!@actions.update_profile} with firstName, lastName, and email.
+              2. If update_profile succeeds, present three payment options to the visitor in plain text: "Apple Pay", "Saved card", or "Demo card". Set @variables.selected_payment_method to whichever the visitor chooses (use the exact strings — no synonyms). Call {!@actions.process_payment} passing selected_payment_method.
+              3. If process_payment succeeds, immediately call {!@actions.confirm_booking}. Tell the visitor their ticket is confirmed and quote the confirmationCodes returned alongside the totalCharged from process_payment.
+              Do NOT ask for name/email before booking — only after. Do NOT call confirm_booking before process_payment succeeds; it will reject as unpaid.
+
         actions:
             resolve_session: @actions.resolve_session
                 description: "Look up the visitor's declared survey answers from the anonymous Contact created at survey-complete time, keyed by the chat conversationId. Runs once at the start of flight management; outputs are cached in @variables.survey_summary and @variables.survey_responses_json."
@@ -279,15 +306,32 @@ subagent flight_management:
                 set @variables.Latest_Flight_Search_Results = @outputs.options
 
             book_flight: @actions.book_flight
+                description: "Books the flight the visitor has confirmed. Pass @variables.selected_fare_class as fareClass — it was pinned during the search step and is the only authoritative value."
                 with contactId = @variables.resolved_contact_id
                 with flightId = ...
                 with travelDate = ...
-                with fareClass = ...
+                with fareClass = @variables.selected_fare_class
                 with checkedBags = ...
                 with seatPreference = ...
                 set @variables.flight_booking_detail = @outputs.booking
                 set @variables.flight_booking_error_detail = @outputs.errorMessage
                 set @variables.flight_booking_error_flag = @outputs.success
+
+            update_profile: @actions.update_profile
+                description: "Writes the visitor's first name, last name, and email onto the anonymous Contact after a flight is booked. Call this only AFTER book_flight succeeded and the visitor has provided their full name and email."
+                with contactId = @variables.resolved_contact_id
+                with firstName = ...
+                with lastName = ...
+                with email = ...
+
+            process_payment: @actions.process_payment
+                description: "Charges the chosen payment method against every Pending Confirmation booking for the contact. Call this only AFTER update_profile succeeded and the visitor has chosen Apple Pay, Saved card, or Demo card."
+                with contactId = @variables.resolved_contact_id
+                with paymentMethod = @variables.selected_payment_method
+
+            confirm_booking: @actions.confirm_booking
+                description: "Flips Paid Pending bookings to Confirmed. Call this only AFTER process_payment succeeds — the action will refuse to confirm any unpaid booking."
+                with contactId = @variables.resolved_contact_id
 
             get_bookings: @actions.get_bookings
                 with contactId = ...
@@ -296,7 +340,7 @@ subagent flight_management:
                 set @variables.retrieve_active_booking_done = @outputs.success
 
             change_seat: @actions.change_seat
-                with reservationSegmentId = ...
+                with bookingSegmentId = ...
                 with newSeatNumber = ...
                 with seatPreference = ...
 
@@ -351,7 +395,7 @@ subagent flight_management:
                     complex_data_type_name: "lightning__textType"
 
         Reschedule_Flights:
-            description: "Reschedule flights based on user tier and reservation booking type"
+            description: "Reschedule flights based on user tier and booking type"
             label: "Reschedule Flights"
             require_user_confirmation: False
             include_in_progress_indicator: False
@@ -408,6 +452,149 @@ subagent flight_management:
                     is_used_by_planner: True
                     complex_data_type_name: "@apexClassType/c__Skywave_FlightSearch$FlightOption"
 
+        update_profile:
+            description: "Writes the visitor's first name, last name, and email onto the anonymous Contact created at survey time. Used by Phase 4 once a booking has been placed and the visitor provides their real identity."
+            label: "Update Visitor Profile"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Saving your details"
+            target: "apex://Skywave_UpdateContact"
+
+            inputs:
+                "contactId": string
+                    description: "The anonymous Contact Id to update (resolved at session start)."
+                    label: "Contact Id"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "firstName": string
+                    description: "The visitor's first name (>= 2 chars)."
+                    label: "First Name"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "lastName": string
+                    description: "The visitor's last name (>= 2 chars)."
+                    label: "Last Name"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "email": string
+                    description: "The visitor's email address (must contain @)."
+                    label: "Email"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "success": boolean
+                    description: "True if the profile update succeeded."
+                    label: "success"
+                    is_displayable: True
+                    is_used_by_planner: True
+                "errorMessage": string
+                    description: "Reason the update failed (validation or DML error)."
+                    label: "error message"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "contactId": string
+                    description: "The Contact Id that was updated."
+                    label: "Updated Contact Id"
+                    is_displayable: False
+                    is_used_by_planner: True
+
+        process_payment:
+            description: "Charges the chosen payment method against every Pending Confirmation booking for the Contact. Demo only — no real charge. Three accepted methods: Apple Pay, Saved card, Demo card."
+            label: "Process Payment"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Processing payment"
+            target: "apex://Skywave_ProcessPayment"
+
+            inputs:
+                "contactId": string
+                    description: "The Contact whose Pending Confirmation bookings should be charged."
+                    label: "Contact Id"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "paymentMethod": string
+                    description: "Apple Pay, Saved card, or Demo card. Use one of these exact strings."
+                    label: "Payment Method"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "success": boolean
+                    description: "True if the payment completed."
+                    label: "success"
+                    is_displayable: True
+                    is_used_by_planner: True
+                "errorMessage": string
+                    description: "Reason payment failed (e.g. unknown method)."
+                    label: "error message"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "paidCount": number
+                    description: "How many bookings were marked Paid."
+                    label: "Paid Count"
+                    is_displayable: True
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__numberType"
+                "totalCharged": string
+                    description: "Total amount charged across the paid bookings (e.g. $1430.00)."
+                    label: "Total Charged"
+                    is_displayable: True
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "paymentMethod": string
+                    description: "The method that was used."
+                    label: "Payment Method"
+                    is_displayable: True
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+
+        confirm_booking:
+            description: "Flips Paid Pending Confirmation bookings to Confirmed. Refuses to confirm any booking still Unpaid. Call after process_payment."
+            label: "Confirm Pending Bookings"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Issuing your ticket"
+            target: "apex://Skywave_ConfirmBooking"
+
+            inputs:
+                "contactId": string
+                    description: "The Contact whose Pending Confirmation bookings should be flipped to Confirmed."
+                    label: "Contact Id"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "success": boolean
+                    description: "True if the action completed without error."
+                    label: "success"
+                    is_displayable: True
+                    is_used_by_planner: True
+                "errorMessage": string
+                    description: "Reason the confirm failed."
+                    label: "error message"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "confirmedCount": number
+                    description: "How many bookings were flipped to Confirmed."
+                    label: "Confirmed Count"
+                    is_displayable: True
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__numberType"
+                "confirmationCodes": string
+                    description: "Comma-separated list of confirmation codes that were just confirmed."
+                    label: "Confirmation Codes"
+                    is_displayable: True
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+
         book_flight:
             description: "Books a flight. Requires contactId, flightId from search results, travel date, and fare class."
             label: "Book Flight"
@@ -436,7 +623,7 @@ subagent flight_management:
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
                 "fareClass": string
-                    description: "Fare class: Basic, Choice, Choice Preferred, or Choice Extra"
+                    description: "Fare class: Economy, Premium Economy, Business, or First"
                     label: "Fare Class"
                     is_required: True
                     is_user_input: False
@@ -550,7 +737,7 @@ subagent flight_management:
                     is_used_by_planner: True
 
         change_seat:
-            description: "Change seat selection for a flight reservation segment"
+            description: "Change seat selection for a flight booking segment"
             label: "Change Seat"
             require_user_confirmation: False
             include_in_progress_indicator: True
@@ -558,9 +745,9 @@ subagent flight_management:
             target: "apex://Skywave_ChangeSeat"
 
             inputs:
-                "reservationSegmentId": string
-                    description: "The Reservation Segment ID to change seat for"
-                    label: "Reservation Segment ID"
+                "bookingSegmentId": string
+                    description: "The Booking Segment ID to change seat for"
+                    label: "Booking Segment ID"
                     is_required: True
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
@@ -733,7 +920,7 @@ subagent seat_selection:
 
         actions:
             change_seat: @actions.change_seat
-                with reservationSegmentId = ...
+                with bookingSegmentId = ...
                 with newSeatNumber = ...
                 with seatPreference = ...
                 set @variables.flight_booking_error_detail = @outputs.errorMessage
@@ -741,14 +928,14 @@ subagent seat_selection:
 
     actions:
         change_seat:
-            description: "Change seat selection for a flight reservation segment"
+            description: "Change seat selection for a flight booking segment"
             label: "Change Seat"
             target: "apex://Skywave_ChangeSeat"
 
             inputs:
-                reservationSegmentId: string
-                    description: "The Reservation Segment ID to change seat for"
-                    label: "Reservation Segment ID"
+                bookingSegmentId: string
+                    description: "The Booking Segment ID to change seat for"
+                    label: "Booking Segment ID"
                     is_required: True
                     complex_data_type_name: "lightning__textType"
                 newSeatNumber: string

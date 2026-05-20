@@ -150,22 +150,22 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>Flight__c.Base_Price_Basic__c</field>
+        <field>Flight__c.Base_Price_Economy__c</field>
         <readable>false</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>Flight__c.Base_Price_Choice_Extra__c</field>
+        <field>Flight__c.Base_Price_Premium_Economy__c</field>
         <readable>false</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>Flight__c.Base_Price_Choice_Preferred__c</field>
+        <field>Flight__c.Base_Price_Business__c</field>
         <readable>false</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>Flight__c.Base_Price_Choice__c</field>
+        <field>Flight__c.Base_Price_First__c</field>
         <readable>false</readable>
     </fieldPermissions>
     <fieldPermissions>
@@ -205,22 +205,22 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>Reservation_Segment__c.Seat_Number__c</field>
+        <field>Booking_Segment__c.Seat_Number__c</field>
         <readable>false</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>Reservation__c.Booking_Date__c</field>
+        <field>Booking__c.Booking_Date__c</field>
         <readable>false</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>Reservation__c.Checked_Bags__c</field>
+        <field>Booking__c.Checked_Bags__c</field>
         <readable>false</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>Reservation__c.Number_of_Passengers__c</field>
+        <field>Booking__c.Number_of_Passengers__c</field>
         <readable>false</readable>
     </fieldPermissions>
     <layoutAssignments>
@@ -231,12 +231,6 @@
     </layoutAssignments>
     <layoutAssignments>
         <layout>Flight__c-Flight Layout</layout>
-    </layoutAssignments>
-    <layoutAssignments>
-        <layout>Reservation_Segment__c-Reservation Segment Layout</layout>
-    </layoutAssignments>
-    <layoutAssignments>
-        <layout>Reservation__c-Reservation Layout</layout>
     </layoutAssignments>
     <pageAccesses>
         <apexPage>AnswersHome</apexPage>

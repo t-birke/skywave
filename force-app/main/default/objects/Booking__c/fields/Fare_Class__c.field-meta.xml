@@ -2,8 +2,8 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Fare_Class__c</fullName>
     <label>Fare Class</label>
-    <description>The fare class purchased for this reservation</description>
-    <inlineHelpText>Select the fare class for this reservation</inlineHelpText>
+    <description>The fare class purchased for this booking</description>
+    <inlineHelpText>Select the fare class for this booking</inlineHelpText>
     <type>Picklist</type>
     <required>true</required>
     <valueSet>
@@ -11,24 +11,24 @@
         <valueSetDefinition>
             <sorted>false</sorted>
             <value>
-                <fullName>Basic</fullName>
-                <default>false</default>
-                <label>Basic</label>
-            </value>
-            <value>
-                <fullName>Choice</fullName>
+                <fullName>Economy</fullName>
                 <default>true</default>
-                <label>Choice</label>
+                <label>Economy</label>
             </value>
             <value>
-                <fullName>Choice Preferred</fullName>
+                <fullName>Premium Economy</fullName>
                 <default>false</default>
-                <label>Choice Preferred</label>
+                <label>Premium Economy</label>
             </value>
             <value>
-                <fullName>Choice Extra</fullName>
+                <fullName>Business</fullName>
                 <default>false</default>
-                <label>Choice Extra</label>
+                <label>Business</label>
+            </value>
+            <value>
+                <fullName>First</fullName>
+                <default>false</default>
+                <label>First</label>
             </value>
         </valueSetDefinition>
     </valueSet>

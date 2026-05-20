@@ -294,7 +294,7 @@ topic flight_management:
                 set @variables.retrieve_active_booking_done = @outputs.success
 
             change_seat: @actions.change_seat
-                with reservationSegmentId = ...
+                with bookingSegmentId = ...
                 with newSeatNumber = ...
                 with seatPreference = ...
 
@@ -318,7 +318,7 @@ topic flight_management:
 
     actions:
         Reschedule_Flights:
-            description: "Reschedule flights based on user tier and reservation booking type"
+            description: "Reschedule flights based on user tier and booking type"
             label: "Reschedule Flights"
             require_user_confirmation: False
             include_in_progress_indicator: False
@@ -403,7 +403,7 @@ topic flight_management:
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
                 "fareClass": string
-                    description: "Fare class: Basic, Choice, Choice Preferred, or Choice Extra"
+                    description: "Fare class: Economy, Premium Economy, Business, or First"
                     label: "Fare Class"
                     is_required: True
                     is_user_input: False
@@ -533,7 +533,7 @@ topic flight_management:
                     is_used_by_planner: True
 
         change_seat:
-            description: "Change seat selection for a flight reservation segment"
+            description: "Change seat selection for a flight booking segment"
             label: "Change Seat"
             require_user_confirmation: False
             include_in_progress_indicator: True
@@ -541,9 +541,9 @@ topic flight_management:
             target: "apex://Skywave_ChangeSeat"
                                                                                 
             inputs:
-                "reservationSegmentId": string
-                    description: "The Reservation Segment ID to change seat for"
-                    label: "Reservation Segment ID"
+                "bookingSegmentId": string
+                    description: "The Booking Segment ID to change seat for"
+                    label: "Booking Segment ID"
                     is_required: True
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
@@ -704,7 +704,7 @@ topic seat_selection:
 
         actions:
             change_seat: @actions.change_seat
-                with reservationSegmentId = ...
+                with bookingSegmentId = ...
                 with newSeatNumber = ...
                 with seatPreference = ...
                 set @variables.flight_booking_error_detail = @outputs.errorMessage
@@ -722,14 +722,14 @@ topic seat_selection:
 
     actions:
         change_seat:
-            description: "Change seat selection for a flight reservation segment"
+            description: "Change seat selection for a flight booking segment"
             label: "Change Seat"
             target: "apex://Skywave_ChangeSeat"
                                                                                 
             inputs:
-                reservationSegmentId: string
-                    description: "The Reservation Segment ID to change seat for"
-                    label: "Reservation Segment ID"
+                bookingSegmentId: string
+                    description: "The Booking Segment ID to change seat for"
+                    label: "Booking Segment ID"
                     is_required: True
                     complex_data_type_name: "lightning__textType"
                 newSeatNumber: string

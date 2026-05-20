@@ -146,7 +146,7 @@
         <fields>Status__c</fields>
         <fields>Fare_Class__c</fields>
         <fields>Total_Amount__c</fields>
-        <relatedList>Reservation__c.Contact__c</relatedList>
+        <relatedList>Booking__c.Contact__c</relatedList>
     </relatedLists>
     <showEmailCheckbox>false</showEmailCheckbox>
     <showHighlightsPanel>false</showHighlightsPanel>

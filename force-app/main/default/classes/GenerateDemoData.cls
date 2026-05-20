@@ -137,10 +137,10 @@ public class GenerateDemoData {
             
             // Set pricing (random variation for realism)
             Decimal basePrice = 200 + Math.random() * 300;
-            f.Base_Price_Basic__c = basePrice;
-            f.Base_Price_Choice__c = basePrice * 1.3;
-            f.Base_Price_Choice_Preferred__c = basePrice * 1.8;
-            f.Base_Price_Choice_Extra__c = basePrice * 2.5;
+            f.Base_Price_Economy__c = basePrice;
+            f.Base_Price_Premium_Economy__c = basePrice * 1.9;
+            f.Base_Price_Business__c = basePrice * 4.3;
+            f.Base_Price_First__c = basePrice * 7.0;
             
             flights.add(f);
         }
@@ -149,67 +149,67 @@ public class GenerateDemoData {
     }
     
     /**
-     * Creates sample reservations with segments for testing
+     * Creates sample bookings with segments for testing
      */
-    public static List<Reservation__c> createReservations(List<Contact> contacts, List<Flight__c> flights, Integer reservationsPerContact) {
-        List<Reservation__c> reservations = new List<Reservation__c>();
-        List<String> fareClasses = new List<String>{'Basic', 'Choice', 'Choice Preferred', 'Choice Extra'};
-        
-        Integer reservationCount = 0;
+    public static List<Booking__c> createBookings(List<Contact> contacts, List<Flight__c> flights, Integer bookingsPerContact) {
+        List<Booking__c> bookings = new List<Booking__c>();
+        List<String> fareClasses = new List<String>{'Economy', 'Premium Economy', 'Business', 'First'};
+
+        Integer bookingCount = 0;
         for (Contact c : contacts) {
-            for (Integer i = 0; i < reservationsPerContact; i++) {
-                Reservation__c r = new Reservation__c();
-                r.Contact__c = c.Id;
-                r.Confirmation_Code__c = generateConfirmationCode(reservationCount);
-                r.Status__c = 'Confirmed';
-                r.Fare_Class__c = fareClasses[Math.mod(i, fareClasses.size())];
-                r.Checked_Bags__c = Math.mod(i, 3);
-                r.Booking_Date__c = Date.today().addDays(-30 + Math.mod(reservationCount, 60));
-                
+            for (Integer i = 0; i < bookingsPerContact; i++) {
+                Booking__c b = new Booking__c();
+                b.Contact__c = c.Id;
+                b.Confirmation_Code__c = generateConfirmationCode(bookingCount);
+                b.Status__c = 'Confirmed';
+                b.Fare_Class__c = fareClasses[Math.mod(i, fareClasses.size())];
+                b.Checked_Bags__c = Math.mod(i, 3);
+                b.Booking_Date__c = Date.today().addDays(-30 + Math.mod(bookingCount, 60));
+
                 // Calculate price based on fare class
-                Flight__c flight = flights[Math.mod(reservationCount, flights.size())];
-                if (r.Fare_Class__c == 'Basic') {
-                    r.Total_Amount__c = flight.Base_Price_Basic__c;
-                } else if (r.Fare_Class__c == 'Choice') {
-                    r.Total_Amount__c = flight.Base_Price_Choice__c;
-                } else if (r.Fare_Class__c == 'Choice Preferred') {
-                    r.Total_Amount__c = flight.Base_Price_Choice_Preferred__c;
+                Flight__c flight = flights[Math.mod(bookingCount, flights.size())];
+                if (b.Fare_Class__c == 'Economy') {
+                    b.Total_Amount__c = flight.Base_Price_Economy__c;
+                } else if (b.Fare_Class__c == 'Premium Economy') {
+                    b.Total_Amount__c = flight.Base_Price_Premium_Economy__c;
+                } else if (b.Fare_Class__c == 'Business') {
+                    b.Total_Amount__c = flight.Base_Price_Business__c;
                 } else {
-                    r.Total_Amount__c = flight.Base_Price_Choice_Extra__c;
+                    b.Total_Amount__c = flight.Base_Price_First__c;
                 }
-                
-                reservations.add(r);
-                reservationCount++;
+
+                bookings.add(b);
+                bookingCount++;
             }
         }
-        
-        return reservations;
+
+        return bookings;
     }
-    
+
     /**
-     * Creates reservation segments for existing reservations
+     * Creates booking segments for existing bookings
      */
-    public static List<Reservation_Segment__c> createReservationSegments(List<Reservation__c> reservations, List<Flight__c> flights) {
-        List<Reservation_Segment__c> segments = new List<Reservation_Segment__c>();
-        
-        for (Integer i = 0; i < reservations.size(); i++) {
-            Reservation__c reservation = reservations[i];
+    public static List<Booking_Segment__c> createBookingSegments(List<Booking__c> bookings, List<Flight__c> flights) {
+        List<Booking_Segment__c> segments = new List<Booking_Segment__c>();
+
+        for (Integer i = 0; i < bookings.size(); i++) {
+            Booking__c booking = bookings[i];
             Flight__c flight = flights[Math.mod(i, flights.size())];
-            
+
             // Create travel date within the next 72 hours (1-3 days from now)
             Date travelDate = Date.today().addDays(1 + Math.mod(i, 3));
-            
+
             // Calculate departure and arrival DateTimes
             DateTime departureDateTime = DateTime.newInstance(travelDate, flight.Scheduled_Departure_Time__c);
             DateTime arrivalDateTime = DateTime.newInstance(travelDate, flight.Scheduled_Arrival_Time__c);
-            
+
             // Handle overnight flights
             if (flight.Scheduled_Arrival_Time__c < flight.Scheduled_Departure_Time__c) {
                 arrivalDateTime = arrivalDateTime.addDays(1);
             }
-            
-            Reservation_Segment__c seg = new Reservation_Segment__c();
-            seg.Reservation__c = reservation.Id;
+
+            Booking_Segment__c seg = new Booking_Segment__c();
+            seg.Booking__c = booking.Id;
             seg.Flight__c = flight.Id;
             seg.Travel_Date__c = travelDate;
             seg.Departure_DateTime__c = departureDateTime;
@@ -217,10 +217,10 @@ public class GenerateDemoData {
             seg.Segment_Order__c = 1;
             seg.Segment_Status__c = 'Scheduled';
             seg.Seat_Number__c = generateSeatNumber(i);
-            
+
             segments.add(seg);
         }
-        
+
         return segments;
     }
     

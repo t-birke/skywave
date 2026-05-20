@@ -98,21 +98,21 @@
         <layoutColumns>
             <layoutItems>
                 <behavior>Edit</behavior>
-                <field>Base_Price_Basic__c</field>
+                <field>Base_Price_Economy__c</field>
             </layoutItems>
             <layoutItems>
                 <behavior>Edit</behavior>
-                <field>Base_Price_Choice__c</field>
+                <field>Base_Price_Premium_Economy__c</field>
             </layoutItems>
         </layoutColumns>
         <layoutColumns>
             <layoutItems>
                 <behavior>Edit</behavior>
-                <field>Base_Price_Choice_Preferred__c</field>
+                <field>Base_Price_Business__c</field>
             </layoutItems>
             <layoutItems>
                 <behavior>Edit</behavior>
-                <field>Base_Price_Choice_Extra__c</field>
+                <field>Base_Price_First__c</field>
             </layoutItems>
         </layoutColumns>
         <style>TwoColumnsLeftToRight</style>

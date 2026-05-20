@@ -19,29 +19,29 @@ public class Skywave_GetUpcomingFlights {
             DateTime now = DateTime.now();
             DateTime cutoff = now.addHours(72);
             
-            // Query for confirmed reservations with segments departing within 72 hours
-            List<Reservation__c> upcomingReservations = [
+            // Query for confirmed bookings with segments departing within 72 hours
+            List<Booking__c> upcomingBookings = [
                 SELECT Id, Name, Confirmation_Code__c,
                        (SELECT Id, Departure_DateTime__c
-                        FROM Reservation_Segments__r
+                        FROM Booking_Segments__r
                         WHERE Segment_Status__c = 'Scheduled'
                           AND Departure_DateTime__c >= :now
                           AND Departure_DateTime__c <= :cutoff
                         ORDER BY Departure_DateTime__c)
-                FROM Reservation__c
+                FROM Booking__c
                 WHERE Contact__c = :contactId
                   AND Status__c = 'Confirmed'
-                  AND Id IN (SELECT Reservation__c
-                            FROM Reservation_Segment__c
+                  AND Id IN (SELECT Booking__c
+                            FROM Booking_Segment__c
                             WHERE Segment_Status__c = 'Scheduled'
                               AND Departure_DateTime__c >= :now
                               AND Departure_DateTime__c <= :cutoff)
             ];
-            
+
             // Count total segments (flights) within the window
             Integer flightCount = 0;
-            for (Reservation__c reservation : upcomingReservations) {
-                flightCount += reservation.Reservation_Segments__r.size();
+            for (Booking__c booking : upcomingBookings) {
+                flightCount += booking.Booking_Segments__r.size();
             }
             
             r.success = true;

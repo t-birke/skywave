@@ -2,7 +2,7 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Confirmation_Code__c</fullName>
     <label>Confirmation Code</label>
-    <description>Unique confirmation code for the customer's reservation</description>
+    <description>Unique confirmation code for the customer's booking</description>
     <inlineHelpText>Enter the 6-character confirmation code (e.g., SW8K2M). This is what customers use to reference their booking.</inlineHelpText>
     <type>Text</type>
     <length>6</length>

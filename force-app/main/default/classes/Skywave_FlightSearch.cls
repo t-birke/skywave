@@ -10,7 +10,7 @@ public with sharing class Skywave_FlightSearch {
         @InvocableVariable(label='Departure Date (YYYY-MM-DD)' required=true)
         public String departureDate;
         
-        @InvocableVariable(label='Fare Class (Basic/Choice/Choice Preferred/Choice Extra)')
+        @InvocableVariable(label='Fare Class (Economy/Premium Economy/Business/First)')
         public String fareClass;
     }
 
@@ -75,8 +75,8 @@ public with sharing class Skywave_FlightSearch {
         String query = 'SELECT Id, Name, Flight_Number__c, Origin__c, Destination__c, ' +
                       'Scheduled_Departure_Time__c, Scheduled_Arrival_Time__c, ' +
                       'Duration_Minutes__c, Aircraft_Type__c, ' +
-                      'Base_Price_Basic__c, Base_Price_Choice__c, ' +
-                      'Base_Price_Choice_Preferred__c, Base_Price_Choice_Extra__c ' +
+                      'Base_Price_Economy__c, Base_Price_Premium_Economy__c, ' +
+                      'Base_Price_Business__c, Base_Price_First__c ' +
                       'FROM Flight__c ' +
                       'WHERE Active__c = true ' +
                       'AND Origin__c = :origin ' +
@@ -150,21 +150,24 @@ public with sharing class Skywave_FlightSearch {
      * Returns the formatted price string based on fare class
      */
     private static String getPriceForFareClass(Flight__c flight, String fareClass) {
+        // Normalise loose names ("business", "economy") onto the
+        // canonical Choice/Choice Extra/Basic the org understands.
+        // Falls back to Choice when the agent didn't specify a class.
+        String canonical = Skywave_FareClass.normalizeOrDefault(fareClass);
         Decimal price = 0;
-        
-        if (fareClass == 'Basic' && flight.Base_Price_Basic__c != null) {
-            price = flight.Base_Price_Basic__c;
-        } else if (fareClass == 'Choice' && flight.Base_Price_Choice__c != null) {
-            price = flight.Base_Price_Choice__c;
-        } else if (fareClass == 'Choice Preferred' && flight.Base_Price_Choice_Preferred__c != null) {
-            price = flight.Base_Price_Choice_Preferred__c;
-        } else if (fareClass == 'Choice Extra' && flight.Base_Price_Choice_Extra__c != null) {
-            price = flight.Base_Price_Choice_Extra__c;
-        } else if (flight.Base_Price_Choice__c != null) {
-            // Default to Choice pricing
-            price = flight.Base_Price_Choice__c;
+
+        if (canonical == Skywave_FareClass.ECONOMY && flight.Base_Price_Economy__c != null) {
+            price = flight.Base_Price_Economy__c;
+        } else if (canonical == Skywave_FareClass.PREMIUM_ECONOMY && flight.Base_Price_Premium_Economy__c != null) {
+            price = flight.Base_Price_Premium_Economy__c;
+        } else if (canonical == Skywave_FareClass.BUSINESS && flight.Base_Price_Business__c != null) {
+            price = flight.Base_Price_Business__c;
+        } else if (canonical == Skywave_FareClass.FIRST && flight.Base_Price_First__c != null) {
+            price = flight.Base_Price_First__c;
+        } else if (flight.Base_Price_Economy__c != null) {
+            price = flight.Base_Price_Economy__c;
         }
-        
+
         return '$' + price.setScale(2).toPlainString();
     }
 }

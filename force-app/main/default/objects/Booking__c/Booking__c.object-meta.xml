@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
-    <label>Reservation</label>
-    <pluralLabel>Reservations</pluralLabel>
-    <description>Customer flight reservations and bookings for tracking confirmed travel arrangements</description>
+    <label>Booking</label>
+    <pluralLabel>Bookings</pluralLabel>
+    <description>Customer flight bookings (one per booking reference / confirmation code).</description>
     <nameField>
-        <label>Reservation Number</label>
+        <label>Booking Number</label>
         <type>AutoNumber</type>
-        <displayFormat>R-{00000}</displayFormat>
+        <displayFormat>B-{00000}</displayFormat>
         <startingNumber>1</startingNumber>
     </nameField>
     <deploymentStatus>Deployed</deploymentStatus>
