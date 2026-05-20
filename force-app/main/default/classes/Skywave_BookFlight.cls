@@ -63,7 +63,10 @@ public class Skywave_BookFlight {
             Reservation__c reservation = new Reservation__c();
             reservation.Contact__c = req.contactId;
             reservation.Confirmation_Code__c = generateConfirmationCode();
-            reservation.Status__c = 'Confirmed';
+            // Pending until Phase 4 profile creation flips it to Confirmed.
+            // The booking is "made" but needs the visitor's real name/email
+            // to actually be issued. See Phase 3.5/Phase 4 in the design doc.
+            reservation.Status__c = 'Pending Confirmation';
             reservation.Fare_Class__c = req.fareClass;
             reservation.Total_Amount__c = totalAmount;
             reservation.Checked_Bags__c = req.checkedBags != null ? req.checkedBags : 0;

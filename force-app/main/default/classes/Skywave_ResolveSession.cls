@@ -31,6 +31,9 @@ public with sharing class Skywave_ResolveSession {
 
         @InvocableVariable(label='Natural-language summary for agent reasoning')
         public String summary;
+
+        @InvocableVariable(label='Resolved Contact Id (for booking actions)')
+        public String contactId;
     }
 
     @InvocableMethod(
@@ -66,6 +69,7 @@ public with sharing class Skywave_ResolveSession {
             return out;
         }
         Contact c = contacts[0];
+        out.contactId = c.Id;
 
         if (String.isNotBlank(c.Skywave_Survey_Json__c)) {
             out.responsesJson = c.Skywave_Survey_Json__c;

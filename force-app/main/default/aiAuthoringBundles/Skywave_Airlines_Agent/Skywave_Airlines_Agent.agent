@@ -227,6 +227,7 @@ subagent flight_management:
                     with conversationId = @variables.Conversation_Id
                     set @variables.survey_summary = @outputs.summary
                     set @variables.survey_responses_json = @outputs.responsesJson
+                    set @variables.resolved_contact_id = @outputs.contactId
                     set @variables.survey_resolved = True
 
             if @variables.retrieve_active_booking_done is False and @variables.resolved_contact_id != "003000000000000" and @variables.resolved_contact_id != "":
@@ -339,6 +340,12 @@ subagent flight_management:
                 "summary": string
                     description: "One-line natural-language summary of the visitor's declared preferences. Intended for direct use in agent reasoning."
                     label: "Summary"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "contactId": string
+                    description: "Salesforce Id of the anonymous Contact for this conversation. Use as input to subsequent booking/lookup actions."
+                    label: "Contact Id"
                     is_displayable: False
                     is_used_by_planner: True
                     complex_data_type_name: "lightning__textType"
