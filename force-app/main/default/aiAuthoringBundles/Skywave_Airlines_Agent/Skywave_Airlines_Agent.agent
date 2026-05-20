@@ -493,22 +493,22 @@ subagent flight_management:
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
                 "firstName": string
-                    description: "The visitor's first name (>= 2 chars)."
+                    description: "The visitor's first name as extracted from the user's message (>= 2 chars)."
                     label: "First Name"
                     is_required: True
-                    is_user_input: False
+                    is_user_input: True
                     complex_data_type_name: "lightning__textType"
                 "lastName": string
-                    description: "The visitor's last name (>= 2 chars)."
+                    description: "The visitor's last name as extracted from the user's message (>= 2 chars)."
                     label: "Last Name"
                     is_required: True
-                    is_user_input: False
+                    is_user_input: True
                     complex_data_type_name: "lightning__textType"
                 "email": string
-                    description: "The visitor's email address (must contain @)."
+                    description: "The visitor's email address as extracted from the user's message (must contain @)."
                     label: "Email"
                     is_required: True
-                    is_user_input: False
+                    is_user_input: True
                     complex_data_type_name: "lightning__textType"
 
             outputs:
@@ -544,10 +544,10 @@ subagent flight_management:
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
                 "paymentMethod": string
-                    description: "Apple Pay, Saved card, or Demo card. Use one of these exact strings."
+                    description: "The payment method the visitor chose, extracted from their message. Must be exactly one of: Apple Pay, Saved card, Demo card."
                     label: "Payment Method"
                     is_required: True
-                    is_user_input: False
+                    is_user_input: True
                     complex_data_type_name: "lightning__textType"
 
             outputs:
