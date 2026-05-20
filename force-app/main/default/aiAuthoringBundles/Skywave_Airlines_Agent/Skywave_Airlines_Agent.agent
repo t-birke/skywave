@@ -93,6 +93,9 @@ variables:
     booked_confirmation_codes: mutable string = ""
         label: "Booked Confirmation Codes"
         description: "Comma-separated codes from the most recent confirm_booking. Used so the agent can quote them again if asked, without re-running the action."
+    bookings_refreshed_post_confirm: mutable boolean = False
+        label: "Bookings Refreshed Post-Confirm"
+        description: "True once active_bookings has been re-fetched after a confirm_booking succeeded — prevents re-fetching on every subsequent reasoning turn."
 
 language:
     default_locale: "en_US"
@@ -258,6 +261,12 @@ subagent flight_management:
                     set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
                     set @variables.retrieve_active_booking_done = @outputs.success
 
+            if @variables.booking_confirmed is True and @variables.bookings_refreshed_post_confirm is False:
+                run @actions.get_bookings
+                    with contactId = @variables.resolved_contact_id
+                    set @variables.active_bookings = @outputs.bookings
+                    set @variables.bookings_refreshed_post_confirm = True
+
             | Assist the visitor with their flight bookings. They are anonymous — never ask for any identification (no name, no email, no phone) until the post-booking profile step. Address them in second person ("you", "your") rather than guessing a name.
 
             if @variables.survey_summary is not None and @variables.survey_summary != "":
@@ -286,27 +295,20 @@ subagent flight_management:
               - First
               Treat industry synonyms as the canonical name (e.g. "main cabin" / "coach" → Economy; "economy plus" → Premium Economy; "business class" → Business; "first class" → First). Always present the canonical name back to the visitor.
 
-            | PRICE & FARE CLASS PINNING — CRITICAL: book_flight WILL FAIL if @variables.selected_fare_class is empty. You MUST set it before calling book_flight.
-              Sequence:
-              1. When the visitor agrees to book a specific flight from search results, IMMEDIATELY assign:
-                 @variables.selected_fare_class = the canonical brand name they chose (Economy / Premium Economy / Business / First — exact strings, no synonyms).
-                 @variables.selected_total_price = the price string from that FlightOption (e.g. "$5950.00").
-              2. Then ask the visitor to confirm the booking, quoting {!@variables.selected_total_price} verbatim.
-              3. Once they confirm, call {!@actions.book_flight} — the wiring already passes @variables.selected_fare_class as the fareClass parameter.
-              The price the visitor sees during search, during confirmation, and after booking MUST be identical. Do NOT re-derive prices from training data — only use values from action outputs and pinned variables.
+            | PRICING — when calling search_flights and book_flight, pass the visitor's chosen fare class verbatim as the canonical name (Economy / Premium Economy / Business / First). Whatever price the FlightOption returns is the price you quote — verbatim, never re-derived from training data. The price you state during search MUST equal the price during confirmation MUST equal the booking total.
 
-            | POST-BOOKING SEQUENCE — after {!@actions.book_flight} returns success, the booking is in "Pending Confirmation" status (NOT yet ticketed). Three remaining steps, each gated by a flag so you don't repeat work already done. Look at the flags BEFORE asking the visitor for anything:
+            | POST-BOOKING SEQUENCE — after {!@actions.book_flight} returns success, the booking is "Pending Confirmation" (not ticketed). You MUST run three more action calls — IMPERATIVE, not optional. Narrating "your booking is now reserved" without invoking these actions leaves the booking permanently broken. Each step:
 
-              Step A — profile collection (only if @variables.profile_collected is False):
-                Ask for full name and email. Once both are provided, call {!@actions.update_profile}. If it succeeds, the action sets profile_collected = True. Do not ask for name or email again after profile_collected is True.
+              Step A — when @variables.profile_collected is False:
+                If you don't yet have name + email from the visitor, ask once. AS SOON as you have both values, INVOKE {!@actions.update_profile} immediately. Do NOT echo the values back asking the visitor to "confirm" — calling the action IS the confirmation.
 
-              Step B — payment (only if @variables.profile_collected is True AND @variables.payment_processed is False):
-                Present exactly three payment options in plain text: "Apple Pay", "Saved card", or "Demo card". Set @variables.selected_payment_method to whichever the visitor chooses (use the exact strings — no synonyms). Call {!@actions.process_payment}. If it succeeds, the action sets payment_processed = True.
+              Step B — when @variables.profile_collected is True AND @variables.payment_processed is False:
+                Present exactly three payment options as plain text: "Apple Pay", "Saved card", or "Demo card". When the visitor picks one, INVOKE {!@actions.process_payment} immediately with that exact string as paymentMethod. Do NOT narrate "processing your payment" — invoking the action IS the processing.
 
-              Step C — confirm (only if @variables.payment_processed is True AND @variables.booking_confirmed is False):
-                Immediately call {!@actions.confirm_booking}. After it succeeds, tell the visitor their ticket is confirmed and quote the confirmationCodes alongside the totalCharged from the previous payment step.
+              Step C — when @variables.payment_processed is True AND @variables.booking_confirmed is False:
+                INVOKE {!@actions.confirm_booking} immediately. Then tell the visitor their ticket is confirmed and quote @outputs.confirmationCodes from confirm_booking + @outputs.totalCharged from the prior payment.
 
-              If @variables.booking_confirmed is True, the booking flow is complete. Do NOT call any of these three actions again. If the visitor asks for the confirmation code, quote {!@variables.booked_confirmation_codes} from memory. If the visitor explicitly wants to book ANOTHER flight, run a new search_flights from scratch — that begins a fresh post-booking cycle.
+              When @variables.booking_confirmed is True: do not call those three actions again. The reasoning preamble has re-fetched @variables.active_bookings after the confirmation, so it now reflects the freshly-confirmed booking. If the visitor asks "do I have a booking?", say YES and quote {!@variables.booked_confirmation_codes}.
 
               Do NOT ask for name/email before book_flight succeeds. Do NOT call confirm_booking before process_payment succeeds — it will reject as unpaid.
 
@@ -345,7 +347,7 @@ subagent flight_management:
                 set @variables.flight_booking_error_flag = @outputs.success
 
             update_profile: @actions.update_profile
-                description: "Writes the visitor's first name, last name, and email onto the anonymous Contact after a flight is booked. Call ONLY when @variables.profile_collected is False AND book_flight has succeeded."
+                description: "Invoke this as soon as the visitor has provided their full name and email after a booking — calling this action IS how you 'save' their profile. Do NOT echo the values back and ask the visitor to confirm; invocation is the confirmation."
                 with contactId = @variables.resolved_contact_id
                 with firstName = ...
                 with lastName = ...
@@ -353,13 +355,13 @@ subagent flight_management:
                 set @variables.profile_collected = @outputs.success
 
             process_payment: @actions.process_payment
-                description: "Charges the chosen payment method. Call ONLY when @variables.profile_collected is True AND @variables.payment_processed is False."
+                description: "Invoke this as soon as the visitor picks Apple Pay / Saved card / Demo card. Calling this action IS how you 'process the payment'. Do NOT narrate 'processing your payment' without calling the action."
                 with contactId = @variables.resolved_contact_id
-                with paymentMethod = @variables.selected_payment_method
+                with paymentMethod = ...
                 set @variables.payment_processed = @outputs.success
 
             confirm_booking: @actions.confirm_booking
-                description: "Flips Paid Pending bookings to Confirmed. Call ONLY when @variables.payment_processed is True AND @variables.booking_confirmed is False."
+                description: "Invoke this immediately after process_payment succeeds — flips Pending Confirmation bookings to Confirmed. Calling this action IS how you 'issue the ticket'."
                 with contactId = @variables.resolved_contact_id
                 set @variables.booking_confirmed = @outputs.success
                 set @variables.booked_confirmation_codes = @outputs.confirmationCodes
