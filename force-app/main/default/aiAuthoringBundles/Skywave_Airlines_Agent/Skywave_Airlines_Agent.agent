@@ -302,7 +302,7 @@ subagent flight_management:
               Step C — confirm (only if @variables.payment_processed is True AND @variables.booking_confirmed is False):
                 Immediately call {!@actions.confirm_booking}. After it succeeds, tell the visitor their ticket is confirmed and quote the confirmationCodes alongside the totalCharged from the previous payment step.
 
-              If @variables.booking_confirmed is True, the booking flow is complete. Do NOT call any of these three actions again. If the visitor asks for the confirmation code, quote {!@variables.booked_confirmation_codes} from memory. If they want a NEW booking, the variables will reset when they pick a new flight.
+              If @variables.booking_confirmed is True, the booking flow is complete. Do NOT call any of these three actions again. If the visitor asks for the confirmation code, quote {!@variables.booked_confirmation_codes} from memory. If the visitor explicitly wants to book ANOTHER flight, run a new search_flights from scratch — that begins a fresh post-booking cycle.
 
               Do NOT ask for name/email before book_flight succeeds. Do NOT call confirm_booking before process_payment succeeds — it will reject as unpaid.
 
@@ -339,9 +339,6 @@ subagent flight_management:
                 set @variables.flight_booking_detail = @outputs.booking
                 set @variables.flight_booking_error_detail = @outputs.errorMessage
                 set @variables.flight_booking_error_flag = @outputs.success
-                set @variables.profile_collected = False
-                set @variables.payment_processed = False
-                set @variables.booking_confirmed = False
 
             update_profile: @actions.update_profile
                 description: "Writes the visitor's first name, last name, and email onto the anonymous Contact after a flight is booked. Call ONLY when @variables.profile_collected is False AND book_flight has succeeded."
