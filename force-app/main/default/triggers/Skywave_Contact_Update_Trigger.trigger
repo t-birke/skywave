@@ -53,6 +53,29 @@ trigger Skywave_Contact_Update_Trigger on Skywave_Contact_Update__e (after inser
     }
     if (eventsByDeviceId.isEmpty()) return;
 
+    // The snippet sends its own UUID as conversationId, but the agent's
+    // @MessagingSession.ConversationId linked variable gives a Salesforce
+    // 0dwg... Id. Resolve the UUIDs to SF Ids via Conversation.ConversationIdentifier
+    // so the resolver can match by the natural agent-side key.
+    Set<String> snippetUuids = new Set<String>();
+    for (List<Skywave_Contact_Update__e> evs : eventsByDeviceId.values()) {
+        for (Skywave_Contact_Update__e ev : evs) {
+            if (ev.Update_Type__c == 'chat_start' && String.isNotBlank(ev.Conversation_Id__c)) {
+                snippetUuids.add(ev.Conversation_Id__c);
+            }
+        }
+    }
+    Map<String, Id> conversationIdByUuid = new Map<String, Id>();
+    if (!snippetUuids.isEmpty()) {
+        for (Conversation c : [
+            SELECT Id, ConversationIdentifier
+            FROM Conversation
+            WHERE ConversationIdentifier IN :snippetUuids
+        ]) {
+            conversationIdByUuid.put(c.ConversationIdentifier, c.Id);
+        }
+    }
+
     // Find existing Contacts for these deviceIds.
     Map<String, Contact> existingByDeviceId = new Map<String, Contact>();
     for (Contact c : [
@@ -99,7 +122,16 @@ trigger Skywave_Contact_Update_Trigger on Skywave_Contact_Update__e (after inser
                 ));
             } else if (ev.Update_Type__c == 'chat_start') {
                 if (String.isNotBlank(ev.Conversation_Id__c)) {
-                    c.Skywave_Conversation_Id__c = ev.Conversation_Id__c;
+                    Id sfConvId = conversationIdByUuid.get(ev.Conversation_Id__c);
+                    if (sfConvId != null) {
+                        c.Skywave_Conversation_Id__c = sfConvId;
+                    } else {
+                        // Fall back to the UUID — Conversation row may not yet
+                        // be visible (read-after-write race). The resolver
+                        // can be retried; better to store something than to
+                        // drop the value.
+                        c.Skywave_Conversation_Id__c = ev.Conversation_Id__c;
+                    }
                 }
             }
         }
