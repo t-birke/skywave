@@ -636,10 +636,15 @@ async function handleAnswer(event) {
     setTimeout(() => {
         state.surveyIndex += 1;
         // Survey just ended — visitor's earned stage moves up to
-        // `thanks`. Past this, the moderator drives.
+        // `thanks`. Past this, the moderator drives. Fire the
+        // upsert here regardless of which screen is about to render
+        // so a late-arriving visitor (moderator already past thanks)
+        // still has their survey answers attached to the Contact
+        // before the agent runs Skywave_ResolveSession.
         const total = state.survey?.questions?.length ?? 0;
         if (state.surveyIndex >= total) {
             advanceVisitorStage('thanks');
+            postSurveyComplete();
         }
         render();
     }, 350);
@@ -690,34 +695,47 @@ function renderHolding() {
     );
 }
 
-function renderThanks() {
-    // First time the thanks screen renders, POST the survey summary +
-    // structured JSON to the public Skywave_ContactUpsert endpoint. The
-    // Platform Event trigger upserts the anonymous Contact in System
-    // Mode. Idempotent: surveyComplete guards against double-fire on
-    // stage re-broadcast.
-    if (!state.surveyComplete && Object.keys(state.answers).length > 0) {
-        state.surveyComplete = true;
-        const phrases = [];
-        for (const key of Object.keys(state.answers)) {
-            const a = state.answers[key];
-            phrases.push(`${a.questionText} -> ${a.answerText}`);
-        }
-        const summary = 'The visitor previously answered: ' + phrases.join('; ') + '.';
-        const sdkId = (() => {
-            try { return window.SalesforceInteractions?.getAnonymousId?.() || null; }
-            catch (_) { return null; }
-        })();
-        if (sdkId) {
-            postContactUpsert({
-                type: 'survey_complete',
-                deviceId: sdkId,
-                demoSessionId: state.demoSessionId,
-                responsesJson: JSON.stringify(state.answers),
-                summary
-            });
-        }
+// POST the survey summary + structured JSON to the public
+// Skywave_ContactUpsert endpoint. The Platform Event trigger upserts
+// the anonymous Contact in System Mode, which is what the agent
+// reads via Skywave_ResolveSession.
+//
+// Decoupled from any specific render path: a late-arriving visitor
+// whose effectiveStage skips straight from `survey` to `agent_book`
+// (because the moderator is already past `thanks`) wouldn't otherwise
+// land in renderThanks, and the agent would have no survey context.
+// Always called once when the visitor finishes their last question.
+function postSurveyComplete() {
+    if (state.surveyComplete) return;
+    if (Object.keys(state.answers).length === 0) return;
+    state.surveyComplete = true;
+
+    const phrases = [];
+    for (const key of Object.keys(state.answers)) {
+        const a = state.answers[key];
+        phrases.push(`${a.questionText} -> ${a.answerText}`);
     }
+    const summary = 'The visitor previously answered: ' + phrases.join('; ') + '.';
+    const sdkId = (() => {
+        try { return window.SalesforceInteractions?.getAnonymousId?.() || null; }
+        catch (_) { return null; }
+    })();
+    if (!sdkId) return;
+    postContactUpsert({
+        type: 'survey_complete',
+        deviceId: sdkId,
+        demoSessionId: state.demoSessionId,
+        responsesJson: JSON.stringify(state.answers),
+        summary
+    });
+}
+
+function renderThanks() {
+    // Belt-and-suspenders: also fire from here in case the visitor
+    // somehow lands on `thanks` without having gone through
+    // handleAnswer (e.g. moderator force-rebroadcast). postSurveyComplete
+    // is idempotent.
+    postSurveyComplete();
 
     root.append(
         el('div', { class: 'center' },
