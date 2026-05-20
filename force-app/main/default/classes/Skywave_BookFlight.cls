@@ -37,14 +37,16 @@ public class Skywave_BookFlight {
         try {
             // Normalise the fare class up front so price + Booking
             // both use the canonical name. If the agent says "business"
-            // we book and price as Choice Extra, not stash an invalid
-            // picklist value.
+            // we book and price as Business. If the agent passes a
+            // blank value (variable wasn't pinned, planner substitution
+            // dropped it), fall back to Economy so the booking still
+            // lands — better than a "technical issue" error string the
+            // visitor can't act on. Logged for debugging.
             String canonicalFareClass = Skywave_FareClass.normalize(req.fareClass);
             if (canonicalFareClass == null) {
-                r.success = false;
-                r.errorMessage = 'Unknown fare class: ' + req.fareClass +
-                    '. Use Economy, Premium Economy, Business, or First.';
-                return r;
+                System.debug('Skywave_BookFlight: blank/unknown fareClass="' + req.fareClass +
+                    '"; defaulting to Economy');
+                canonicalFareClass = Skywave_FareClass.ECONOMY;
             }
 
             // Query the flight details

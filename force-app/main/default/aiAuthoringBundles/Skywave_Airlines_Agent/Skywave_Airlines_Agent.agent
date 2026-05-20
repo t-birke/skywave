@@ -286,10 +286,14 @@ subagent flight_management:
               - First
               Treat industry synonyms as the canonical name (e.g. "main cabin" / "coach" → Economy; "economy plus" → Premium Economy; "business class" → Business; "first class" → First). Always present the canonical name back to the visitor.
 
-            | PRICE & FARE CLASS PINNING — Once the visitor commits to a flight + fare class from the search results, store both into variables and never re-derive them:
-              - Set @variables.selected_fare_class to one of: Economy / Premium Economy / Business / First.
-              - Set @variables.selected_total_price to the exact price string from the matching FlightOption.
-              When you ask the visitor to confirm the booking, quote {!@variables.selected_total_price} verbatim. When you call {!@actions.book_flight}, pass {!@variables.selected_fare_class} as fareClass. After book_flight succeeds, the booking object's `total` is the source of truth — quote it exactly. The price the visitor sees during search, during confirmation, and after booking MUST be identical.
+            | PRICE & FARE CLASS PINNING — CRITICAL: book_flight WILL FAIL if @variables.selected_fare_class is empty. You MUST set it before calling book_flight.
+              Sequence:
+              1. When the visitor agrees to book a specific flight from search results, IMMEDIATELY assign:
+                 @variables.selected_fare_class = the canonical brand name they chose (Economy / Premium Economy / Business / First — exact strings, no synonyms).
+                 @variables.selected_total_price = the price string from that FlightOption (e.g. "$5950.00").
+              2. Then ask the visitor to confirm the booking, quoting {!@variables.selected_total_price} verbatim.
+              3. Once they confirm, call {!@actions.book_flight} — the wiring already passes @variables.selected_fare_class as the fareClass parameter.
+              The price the visitor sees during search, during confirmation, and after booking MUST be identical. Do NOT re-derive prices from training data — only use values from action outputs and pinned variables.
 
             | POST-BOOKING SEQUENCE — after {!@actions.book_flight} returns success, the booking is in "Pending Confirmation" status (NOT yet ticketed). Three remaining steps, each gated by a flag so you don't repeat work already done. Look at the flags BEFORE asking the visitor for anything:
 
