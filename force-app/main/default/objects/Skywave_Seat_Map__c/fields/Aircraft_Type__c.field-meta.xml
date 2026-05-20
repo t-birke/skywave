@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Aircraft_Type__c</fullName>
+    <label>Aircraft Type</label>
+    <description>Master-detail to the Product2 (aircraft type) this seat map describes.</description>
+    <type>Lookup</type>
+    <referenceTo>Product2</referenceTo>
+    <relationshipName>Skywave_Seat_Maps</relationshipName>
+    <relationshipLabel>Skywave Seat Maps</relationshipLabel>
+    <required>false</required>
+    <deleteConstraint>SetNull</deleteConstraint>
+</CustomField>

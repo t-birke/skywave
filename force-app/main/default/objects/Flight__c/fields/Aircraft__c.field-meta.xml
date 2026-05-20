@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Aircraft__c</fullName>
+    <label>Aircraft</label>
+    <description>Specific physical aircraft (Asset, identified by tail number) assigned to this scheduled flight. The Asset's Product2 carries the aircraft type and seat-map definition. Coexists with the legacy Aircraft_Type__c text field for backward compatibility with existing agent actions.</description>
+    <type>Lookup</type>
+    <referenceTo>Asset</referenceTo>
+    <relationshipName>Skywave_Flights</relationshipName>
+    <relationshipLabel>Skywave Flights</relationshipLabel>
+    <required>false</required>
+    <deleteConstraint>SetNull</deleteConstraint>
+</CustomField>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description>Seat layout for an aircraft type (Product2). One Skywave_Seat_Map__c per Product2 row. Layout_Json__c describes class zones, rows, and seats; the Chapter-8 seat-picker LWC renders directly off this JSON.</description>
+    <label>Skywave Seat Map</label>
+    <pluralLabel>Skywave Seat Maps</pluralLabel>
+    <nameField>
+        <label>Seat Map Name</label>
+        <type>Text</type>
+    </nameField>
+    <sharingModel>ReadWrite</sharingModel>
+    <enableActivities>false</enableActivities>
+    <enableHistory>false</enableHistory>
+    <enableReports>true</enableReports>
+    <enableSearch>true</enableSearch>
+</CustomObject>
