@@ -99,6 +99,9 @@
                     <template for:each={sessions} for:item="s">
                         <div key={s.sessionId} class="session-row">
                             <span class="slds-badge bubble" title={s.sessionId}>{s.shortId}</span>
+                            <template lwc:if={s.surveyComplete}>
+                                <span class="survey-complete-dot" title="Survey complete">●</span>
+                            </template>
                             <template lwc:if={s.answers.length}>
                                 <div class="answer-strip">
                                     <template for:each={s.answers} for:item="a">

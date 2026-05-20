@@ -188,7 +188,7 @@ export default class SkywaveDemoMonitor extends LightningElement {
         if (!existing) {
             this.sessions = [
                 ...this.sessions.filter(s => now - s.lastSeen < SESSION_TTL_MS),
-                { sessionId, shortId: sessionId.slice(-8), lastSeen: now, answers: [] }
+                { sessionId, shortId: sessionId.slice(-8), lastSeen: now, answers: [], surveyComplete: false }
             ];
             return;
         }
@@ -197,6 +197,8 @@ export default class SkywaveDemoMonitor extends LightningElement {
 
         if (payload.Type__c === 'survey_answer') {
             this.appendSurveyAnswer(existing, payload);
+        } else if (payload.Type__c === 'survey_complete') {
+            existing.surveyComplete = true;
         }
 
         // Force tracked-array refresh

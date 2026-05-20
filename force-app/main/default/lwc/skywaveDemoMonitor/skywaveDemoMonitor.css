@@ -111,3 +111,15 @@
 .qrcodecontainer { display: grid; place-items: center; width: 100%; height: 100%; }
 .qrcodecontainer img,
 .qrcodecontainer canvas { width: 100% !important; height: 100% !important; }
+
+/* Green dot next to a session bubble once the visitor finishes the
+ * survey (Skywave_Contact_Update_Trigger publishes Demo_Event__e of
+ * type=survey_complete after the consumer site's "thanks" screen
+ * triggers Skywave_ContactUpsert). */
+.survey-complete-dot {
+    color: #04844b;
+    font-size: 1rem;
+    line-height: 1;
+    margin-left: 0.4rem;
+    vertical-align: middle;
+}

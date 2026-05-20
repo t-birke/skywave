@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Skywave_Survey_Summary__c</fullName>
+    <label>Skywave Survey Summary</label>
+    <description>Natural-language summary of the visitor's survey answers (e.g. "Where would you fly? -&gt; Tokyo; How do you like to travel? -&gt; Business; ..."). Written together with Skywave_Survey_Json__c. Consumed directly by the agent's reasoning instructions.</description>
+    <type>LongTextArea</type>
+    <length>4096</length>
+    <visibleLines>3</visibleLines>
+    <required>false</required>
+</CustomField>

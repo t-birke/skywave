@@ -1,31 +1,29 @@
 /**
- * Resolves Skywave's anonymous deviceId (Session_ID, captured by the
- * Skywave_Channel hidden prechat parameter and persisted to
- * MessagingSession.Session_ID__c) into the survey-answer history the
- * agent can use to personalise its first turn.
+ * Resolves the visitor's declared survey context for the
+ * Skywave_Airlines_Agent. Input: MessagingSession.ConversationId
+ * (provided by the agent's @MessagingSession.ConversationId linked
+ * variable). Output: structured JSON + natural-language summary the
+ * agent uses for personalised reasoning.
  *
- * Wired as an action on the Skywave_Airlines_Agent flight-booking topic.
- * The agent reads `summary` for natural-language reasoning and
- * `responsesJson` for structured access if it needs to.
+ * Implementation:
+ *   - Looks up the anonymous Contact created by Skywave_ContactUpsert
+ *     (keyed on Skywave_Conversation_Id__c).
+ *   - Returns the cached survey JSON + summary that was written when
+ *     the consumer site's "thanks" screen rendered.
  *
- * Implementation notes:
- *   - Queries Survey_Response__dlm via ConnectApi.CdpQuery.queryAnsiSqlV2
- *     (no callout, no Named Credential — runs in the agent's session
- *     context).
- *   - Multiple answers per question (re-takes) are deduped to MOST RECENT
- *     by EventDateTime__c.
- *   - Returns silently with empty results if the deviceId has no answers
- *     (anonymous sessions, demo without survey, etc.).
+ * Returns silently with empty results if no Contact is found (anonymous
+ * sessions, demo without survey, race between the chat-start POST and
+ * the agent's first reasoning turn).
  */
 public with sharing class Skywave_ResolveSession {
 
     public class Input {
-        @InvocableVariable(label='Session ID (deviceId)' required=true)
-        public String sessionId;
+        @InvocableVariable(label='Conversation Id' required=true)
+        public String conversationId;
     }
 
     public class Output {
-        @InvocableVariable(label='Number of answers found')
+        @InvocableVariable(label='Number of survey answers found')
         public Integer answerCount;
 
         @InvocableVariable(label='Question/answer pairs as JSON')
@@ -37,87 +35,50 @@ public with sharing class Skywave_ResolveSession {
 
     @InvocableMethod(
         label='Skywave: Resolve session context'
-        description='Look up the visitor\'s declared survey answers from Data Cloud using the deviceId. Returns a JSON map of question→answer pairs and a one-line natural-language summary.'
+        description='Look up the visitor\'s declared survey answers from the anonymous Contact created at survey-complete time, keyed on the chat ConversationId. Returns structured JSON and a one-line natural-language summary.'
         category='Skywave'
     )
     public static List<Output> resolve(List<Input> inputs) {
         List<Output> outs = new List<Output>();
         for (Input request : inputs) {
-            outs.add(resolveOne(request.sessionId));
+            outs.add(resolveOne(request.conversationId));
         }
         return outs;
     }
 
-    private static Output resolveOne(String sessionId) {
+    private static Output resolveOne(String conversationId) {
         Output out = new Output();
         out.answerCount = 0;
         out.responsesJson = '{}';
         out.summary = '';
 
-        if (String.isBlank(sessionId)) {
+        if (String.isBlank(conversationId)) {
             return out;
         }
 
-        // Get the latest answer per QuestionKey for this deviceId. SQL on the
-        // DLM directly — Survey_Response is not part of the data graph yet
-        // (Phase 4 task to add it). The DMO has multiple rows per question
-        // when the user re-took the survey; we keep only the most recent.
-        String escapedId = sessionId.replace('\'', '\'\'');
-        String sql =
-            'SELECT QuestionKey__c, QuestionText__c, AnswerText__c, AnswerKey__c, EventDateTime__c ' +
-            'FROM Survey_Response__dlm ' +
-            'WHERE DeviceId__c = \'' + escapedId + '\' ' +
-            'ORDER BY EventDateTime__c DESC';
-
-        ConnectApi.CdpQueryOutputV2 resp;
-        try {
-            ConnectApi.CdpQueryInput req = new ConnectApi.CdpQueryInput();
-            req.sql = sql;
-            resp = ConnectApi.CdpQuery.queryAnsiSqlV2(req);
-        } catch (Exception e) {
-            // Don't fail the agent action; return empty so the agent
-            // falls back to asking the user.
-            System.debug(LoggingLevel.WARN, 'Skywave_ResolveSession: query failed: ' + e.getMessage());
+        List<Contact> contacts = [
+            SELECT Id, Skywave_Survey_Json__c, Skywave_Survey_Summary__c
+            FROM Contact
+            WHERE Skywave_Conversation_Id__c = :conversationId
+            LIMIT 1
+        ];
+        if (contacts.isEmpty()) {
             return out;
         }
+        Contact c = contacts[0];
 
-        if (resp == null || resp.data == null || resp.data.isEmpty()) {
-            return out;
-        }
-
-        // Each row is a CdpQueryV2Row whose JSON form is a positional array
-        // ["QuestionKey__c","QuestionText__c","AnswerText__c","AnswerKey__c","EventDateTime__c"]
-        // matching the SELECT column order above.
-        Map<String, Map<String, String>> latestByKey = new Map<String, Map<String, String>>();
-        for (ConnectApi.CdpQueryV2Row row : resp.data) {
-            List<Object> cols = (List<Object>) JSON.deserializeUntyped(JSON.serialize(row));
-            if (cols == null || cols.size() < 4) continue;
-            String qKey = (String) cols.get(0);
-            if (String.isBlank(qKey) || latestByKey.containsKey(qKey)) {
-                continue;   // first row wins — already sorted DESC by EventDateTime
+        if (String.isNotBlank(c.Skywave_Survey_Json__c)) {
+            out.responsesJson = c.Skywave_Survey_Json__c;
+            try {
+                Map<String, Object> parsed = (Map<String, Object>) JSON.deserializeUntyped(c.Skywave_Survey_Json__c);
+                out.answerCount = parsed != null ? parsed.size() : 0;
+            } catch (Exception e) {
+                out.answerCount = 0;
             }
-            latestByKey.put(qKey, new Map<String, String>{
-                'questionText' => (String) cols.get(1),
-                'answerText'   => (String) cols.get(2),
-                'answerKey'    => (String) cols.get(3)
-            });
         }
-
-        if (latestByKey.isEmpty()) {
-            return out;
+        if (String.isNotBlank(c.Skywave_Survey_Summary__c)) {
+            out.summary = c.Skywave_Survey_Summary__c;
         }
-
-        out.answerCount = latestByKey.size();
-        out.responsesJson = JSON.serialize(latestByKey);
-
-        // Natural-language summary. The agent uses this directly for
-        // reasoning — phrased as an observation, not a directive.
-        List<String> phrases = new List<String>();
-        for (String qKey : latestByKey.keySet()) {
-            Map<String, String> r = latestByKey.get(qKey);
-            phrases.add(r.get('questionText') + ' → ' + r.get('answerText'));
-        }
-        out.summary = 'The visitor previously answered: ' + String.join(phrases, '; ') + '.';
 
         return out;
     }

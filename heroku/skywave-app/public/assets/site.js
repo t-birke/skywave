@@ -37,6 +37,27 @@ async function loadConfig() {
 // parameter (`Session_ID`) and immediately hides the chat button until a
 // later stage flip reveals it.
 //
+// POST to the public Skywave_ContactUpsert endpoint (anonymous, exposed
+// via the skywave_api Force.com Site). Routed through the team's CORS
+// proxy because Salesforce Sites' CORS handling for guest-callable
+// Apex is unreliable. Fire-and-forget; a Platform Event trigger handles
+// the actual Contact upsert in System Mode.
+const CONTACT_UPSERT_URL =
+    'https://abc-proxy-2552551e6d2c.herokuapp.com/' +
+    'https://trailsignup-fb3f5426f87c5d.my.salesforce-sites.com/skywave/services/apexrest/skywave/contact/upsert';
+
+function postContactUpsert(payload) {
+    fetch(CONTACT_UPSERT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).then((r) => {
+        console.log(`[skywave] /skywave/contact/upsert (${payload.type}) ${r.status}`);
+    }).catch((err) => {
+        console.warn(`[skywave] /skywave/contact/upsert (${payload.type}) failed`, err);
+    });
+}
+
 // Requires the four ESW values from /api/config (driven by Heroku Config Vars
 // SF_ESW_*). If any is missing we silently skip — the consumer site still
 // works, just without chat.
@@ -106,23 +127,11 @@ async function loadEswSnippet(deviceId) {
                 { conversationId, deviceId });
             return;
         }
-        // POST to the skywave_api Force.com Site (anonymous, no Heroku
-        // JWT relay). The endpoint publishes a Platform Event; a trigger
-        // handles the MessagingSession update in System Mode.
-        //
-        // Routed via the team's CORS proxy because Salesforce Sites'
-        // CORS handling for guest-callable Apex is unreliable (same
-        // proxy electra uses, see SKYWAVE_INTERACTIVE_DESIGN.md).
-        const SITES_URL = 'https://trailsignup-fb3f5426f87c5d.my.salesforce-sites.com/skywave/services/apexrest/skywave/session/identify';
-        const CORS_PROXY = 'https://abc-proxy-2552551e6d2c.herokuapp.com/';
-        fetch(CORS_PROXY + SITES_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ conversationId, sessionId: deviceId })
-        }).then((r) => {
-            console.log(`[esw] /skywave/session/identify ${r.status}`);
-        }).catch((err) => {
-            console.warn('[esw] /skywave/session/identify failed', err);
+        postContactUpsert({
+            type: 'chat_start',
+            deviceId,
+            demoSessionId: state.demoSessionId,
+            conversationId
         });
     }, { once: true });
     const ready = Promise.resolve();
@@ -204,7 +213,9 @@ let state = {
     wsConnected: false,
     survey: null,        // { questions: [...] } — fetched once on Accept
     surveyIndex: 0,      // which question we're showing
-    answeredKeys: new Set() // questionKeys we've already answered (idempotency)
+    answeredKeys: new Set(), // questionKeys we've already answered (idempotency)
+    answers: {},         // questionKey → { questionText, answerText, answerKey }
+    surveyComplete: false // true once we've POSTed the survey summary upstream
 };
 
 function el(tag, attrs = {}, ...children) {
@@ -464,6 +475,10 @@ async function handleAnswer(event) {
     if (state.answeredKeys.has(dedupeKey)) return;
     state.answeredKeys.add(dedupeKey);
 
+    // Track the latest answer per question for the survey-complete upsert
+    // POST that fires when the user finishes the last question.
+    state.answers[questionKey] = { questionText, answerText, answerKey };
+
     // Visual: lock the row in.
     Array.from(root.querySelectorAll('.survey-option')).forEach((b) => {
         b.disabled = true;
@@ -539,6 +554,34 @@ function renderWaiting() {
 }
 
 function renderThanks() {
+    // First time the thanks screen renders, POST the survey summary +
+    // structured JSON to the public Skywave_ContactUpsert endpoint. The
+    // Platform Event trigger upserts the anonymous Contact in System
+    // Mode. Idempotent: surveyComplete guards against double-fire on
+    // stage re-broadcast.
+    if (!state.surveyComplete && Object.keys(state.answers).length > 0) {
+        state.surveyComplete = true;
+        const phrases = [];
+        for (const key of Object.keys(state.answers)) {
+            const a = state.answers[key];
+            phrases.push(`${a.questionText} -> ${a.answerText}`);
+        }
+        const summary = 'The visitor previously answered: ' + phrases.join('; ') + '.';
+        const sdkId = (() => {
+            try { return window.SalesforceInteractions?.getAnonymousId?.() || null; }
+            catch (_) { return null; }
+        })();
+        if (sdkId) {
+            postContactUpsert({
+                type: 'survey_complete',
+                deviceId: sdkId,
+                demoSessionId: state.demoSessionId,
+                responsesJson: JSON.stringify(state.answers),
+                summary
+            });
+        }
+    }
+
     root.append(
         el('div', { class: 'center' },
             el('div', { class: 'brand' }, 'Skywave'),

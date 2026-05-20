@@ -1167,32 +1167,35 @@ Add items as they come up. Don't pre-prioritize.
   Reference: `~/dev/claude-skills/sf-interactions-sdk/recipes/consent.md`
   § "The Consent DMO Chain".
 
-- **Replace Session_ID JS-side write with the standard ECv2 prechat path.**
-  v1 uses a workaround: `site.js` calls a public Apex REST endpoint
-  (`/services/apexrest/skywave/session/identify`) on
-  `onEmbeddedMessagingConversationStarted` to stamp the deviceId onto
-  `MessagingSession.Session_ID__c`. The standard, documented path is:
-  setHiddenPrechatFields → channel customParameters → routing-flow input
-  variable → Update Records on MessagingSession. We did all of that
-  (verified via metadata retrieve + Setup screenshots + scrt2 config
-  endpoint + sentinel test proving the flow runs), but the prechat value
-  never reaches the routing flow's input variable in ECv2 (May 2026).
-  Salesforce engineering acknowledged this gap: ECv2 hidden prechat
-  GA'd in Release 260 but only standard parameters propagate to flow
-  inputs reliably; custom parameters with `messagingChannelParameterType=Custom`
-  silently drop. Internal channel: #technical-digital-engagement; engineer
-  @Nikhil Pachpande tracks this. **When the platform ships full ECv2
-  custom prechat → flow input support**, remove the JS endpoint, restore
-  the routing flow's `Set_Session_ID` Update Records element to use
-  `{!Session_ID}` (already in source), and verify with a fresh chat
-  session that `MessagingSession.Session_ID__c` is populated by the
-  routing flow alone.
+- **Migrate Contact-based session context to MessagingSession-based
+  when Salesforce ships ECv2 prechat propagation.** v1 carries the
+  visitor's survey context on an anonymous Contact (LastName=deviceId,
+  Skywave_Conversation_Id__c=conversationId), upserted by the public
+  Skywave_ContactUpsert endpoint on `survey-complete` and `chat-start`.
+  The agent's Skywave_ResolveSession Apex action queries that Contact
+  by ConversationId and returns the survey JSON.
+  Why we did this: the architecturally cleaner path
+  (setHiddenPrechatFields → channel customParameters → routing-flow
+  input variable → Update Records on MessagingSession.Session_ID__c)
+  is **engineering-acknowledged broken** in ECv2 as of May 2026 —
+  custom parameters with `messagingChannelParameterType=Custom`
+  silently drop between scrt2 and the routing flow. Internal channel:
+  `#technical-digital-engagement`; engineer @Nikhil Pachpande tracks
+  this; release-260 GA only covers standard parameters reliably.
+  When that gap closes, the prefer'd path becomes:
+    - drop Skywave_ContactUpsert + Skywave_Contact_Update__e PE +
+      trigger + Skywave_Site_Guest permset + skywave_api Site
+    - drop the per-Demo_Session Account creation in Demo_Session_Trigger
+    - delete the Contact custom fields (Skywave_Conversation_Id__c,
+      Skywave_Survey_Json__c, Skywave_Survey_Summary__c)
+    - rewire Skywave_ResolveSession to query MessagingSession.Session_ID__c
+      and Survey_Response__dlm by deviceId (or have the routing flow
+      stamp survey JSON onto MessagingSession directly)
   All the standard-path scaffolding stays in source for that day:
   `MessagingChannel.customParameters[Session_ID]` with
   `actionParameterMappings`, ESD `embeddedServiceForms` with hidden
-  field, routing flow input variable + Update Records, FLS edit on
-  `Skywave_Demo_Admin`/`Skywave_Agent_User` permsets, and Setup UI
-  Parameter Mapping row. The JS-side write is purely additive.
+  field, MessagingSession.Session_ID__c custom field, FLS edit on
+  Skywave_Demo_Admin permset, and Setup UI Parameter Mapping row.
 
 - **Verify IR cross-DMO match end-to-end after Contact creation.** The
   `Skywave Unified Individual` IR ruleset is published on `si` with two

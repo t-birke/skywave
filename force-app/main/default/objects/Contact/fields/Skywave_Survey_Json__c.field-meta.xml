@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Skywave_Survey_Json__c</fullName>
+    <label>Skywave Survey JSON</label>
+    <description>Structured JSON of the visitor's survey answers, written when the consumer site's "thanks" screen renders. Map of question_key to {questionText, answerText, answerKey}. Read by Skywave_ResolveSession to seed the Skywave_Airlines_Agent's reasoning context.</description>
+    <type>LongTextArea</type>
+    <length>32768</length>
+    <visibleLines>10</visibleLines>
+    <required>false</required>
+</CustomField>

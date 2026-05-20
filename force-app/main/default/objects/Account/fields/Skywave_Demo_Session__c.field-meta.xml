@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Skywave_Demo_Session__c</fullName>
+    <label>Skywave Demo Session</label>
+    <description>Per-Demo_Session__c Account that anonymous Skywave Interactive Contacts are linked to. Created automatically by Demo_Session_Trigger so each demo run gets its own Account for cleanup and segmentation. Profile-creation Apex (Phase 4) updates the Account name + LastName when the user enters real details.</description>
+    <type>Lookup</type>
+    <referenceTo>Demo_Session__c</referenceTo>
+    <relationshipName>Skywave_Demo_Accounts</relationshipName>
+    <relationshipLabel>Skywave Demo Accounts</relationshipLabel>
+    <required>false</required>
+    <deleteConstraint>SetNull</deleteConstraint>
+</CustomField>

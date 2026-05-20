@@ -1,8 +1,9 @@
 system:
-  instructions: "You are a support agent for Skywave Airlines. The customer you are speaking with is Lauren — already authenticated for this demo. Greet her by name and assist with her flight bookings and related inquiries. Do not ask for identification or email; treat the customer as verified."
+  instructions: "You are a support agent for Skywave Airlines. Greet the visitor and assist with their flight bookings and related inquiries."
 
   messages:
-    welcome: "Hi Lauren, thank you for calling. I am an AI Agent, how can I be of service today?"
+    welcome: |
+        Hi! I'm the Skywave Airlines AI agent. Your conversation id is: {!@variables.Conversation_Id}. How can I help?
     error: "Something went wrong, please try again."
 
 config:
@@ -25,9 +26,9 @@ variables:
     EndUserLanguage: linked string
         source: @MessagingSession.EndUserLanguage
         description: "MessagingSession EndUserLanguage"
-    Session_ID: linked string
-        source: @MessagingSession.Session_ID__c
-        description: "Skywave anonymous deviceId — populated by the Session_ID hidden prechat parameter on Skywave_Channel. Used by the Skywave_ResolveSession action to look up declared survey preferences from the Real-Time Data Graph."
+    Conversation_Id: linked string
+        source: @MessagingSession.ConversationId
+        description: "Join key for Skywave_ResolveSession to look up the visitor's anonymous Contact (with survey answers)."
     survey_summary: mutable string
         label: "Survey Summary"
         description: "Natural-language summary of the visitor's survey answers (favourite destination, cabin class, etc.) keyed off Session_ID."
@@ -221,19 +222,19 @@ subagent flight_management:
 
     reasoning:
         instructions: ->
-            if @variables.retrieve_active_booking_done is False:
+            if @variables.survey_resolved is False:
+                run @actions.resolve_session
+                    with conversationId = @variables.Conversation_Id
+                    set @variables.survey_summary = @outputs.summary
+                    set @variables.survey_responses_json = @outputs.responsesJson
+                    set @variables.survey_resolved = True
+
+            if @variables.retrieve_active_booking_done is False and @variables.resolved_contact_id != "003000000000000" and @variables.resolved_contact_id != "":
                 run @actions.get_bookings
                     with contactId = @variables.resolved_contact_id
                     set @variables.active_bookings = @outputs.bookings
                     set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
                     set @variables.retrieve_active_booking_done = @outputs.success
-
-            if @variables.survey_resolved is False:
-                run @actions.resolve_session
-                    with sessionId = @variables.Session_ID
-                    set @variables.survey_summary = @outputs.summary
-                    set @variables.survey_responses_json = @outputs.responsesJson
-                    set @variables.survey_resolved = True
 
             | Assist Lauren with her flight bookings. The customer is already authenticated — never ask for email or identification.
 
@@ -258,8 +259,8 @@ subagent flight_management:
 
         actions:
             resolve_session: @actions.resolve_session
-                description: "Look up the visitor's declared survey answers from Data Cloud using the deviceId. Runs once at the start of flight management; outputs are cached in @variables.survey_summary and @variables.survey_responses_json."
-                with sessionId = ...
+                description: "Look up the visitor's declared survey answers from the anonymous Contact created at survey-complete time, keyed by the chat conversationId. Runs once at the start of flight management; outputs are cached in @variables.survey_summary and @variables.survey_responses_json."
+                with conversationId = ...
 
             identify_customer: @actions.resolve_contact
                 description: "Look up a customer by their email address to identify them"
@@ -308,16 +309,16 @@ subagent flight_management:
 
     actions:
         resolve_session:
-            description: "Resolves the visitor's anonymous deviceId (Session_ID) to their declared survey answers from Data Cloud. Returns a natural-language summary plus a JSON map of question_key → {questionText, answerText, answerKey}."
+            description: "Resolves the visitor's MessagingSession.ConversationId to their declared survey answers, by querying the anonymous Contact created at survey-complete time. Returns a natural-language summary plus a JSON map of question_key → {questionText, answerText, answerKey}."
             label: "Resolve Session Context"
             require_user_confirmation: False
             include_in_progress_indicator: False
             target: "apex://Skywave_ResolveSession"
 
             inputs:
-                "sessionId": string
-                    description: "The Skywave anonymous deviceId, sourced from MessagingSession.Session_ID__c via the Session_ID linked variable."
-                    label: "Session ID"
+                "conversationId": string
+                    description: "The MessagingSession.ConversationId, sourced from the @MessagingSession.ConversationId linked variable."
+                    label: "Conversation Id"
                     is_required: True
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
