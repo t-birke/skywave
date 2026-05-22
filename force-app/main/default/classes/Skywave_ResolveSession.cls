@@ -18,8 +18,17 @@
 public with sharing class Skywave_ResolveSession {
 
     public class Input {
-        @InvocableVariable(label='Conversation Id' required=true)
+        @InvocableVariable(label='Conversation Id' required=false)
         public String conversationId;
+
+        // Studio-preview escape hatch. The @MessagingSession.ConversationId
+        // linked variable's Override Value picker is platform-broken
+        // (Salesforce-confirmed May 2026), so live-test mode can't seed
+        // ConversationId. Instead the agent passes @variables.testingSession
+        // here; if conversationId is blank we fall back to this value.
+        // Real chat ignores this — conversationId is always populated.
+        @InvocableVariable(label='Testing Session (studio fallback)' required=false)
+        public String testingSession;
     }
 
     public class Output {
@@ -44,7 +53,10 @@ public with sharing class Skywave_ResolveSession {
     public static List<Output> resolve(List<Input> inputs) {
         List<Output> outs = new List<Output>();
         for (Input request : inputs) {
-            outs.add(resolveOne(request.conversationId));
+            String key = String.isNotBlank(request.conversationId)
+                ? request.conversationId
+                : request.testingSession;
+            outs.add(resolveOne(key));
         }
         return outs;
     }
