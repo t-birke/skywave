@@ -118,6 +118,15 @@ start_agent agent_router:
     
     reasoning:
         instructions: ->
+            if @variables.booking_confirmed is True:
+                set @variables.booking_step = "done"
+            if @variables.payment_processed is True and @variables.booking_confirmed is False:
+                set @variables.booking_step = "confirm"
+            if @variables.profile_collected is True and @variables.payment_processed is False:
+                set @variables.booking_step = "payment"
+            if @variables.flight_booking_error_flag is True and @variables.profile_collected is False:
+                set @variables.booking_step = "profile"
+
             if @variables.ContactId is not None and @variables.resolved_contact_id == "":
                 run @actions.resolve_contact
                     with contactId = @variables.ContactId
@@ -130,22 +139,20 @@ start_agent agent_router:
                     set @variables.flights_within_72hrs = @outputs.imminentFlights
                     set @variables.check_imminent_flights_success = @outputs.success
 
-            | You are a router only. Do NOT answer questions or provide help directly. Always use a transition action.
-
             if @variables.booking_step == "profile" or @variables.booking_step == "payment" or @variables.booking_step == "confirm":
-                | A booking is in progress (booking_step={!@variables.booking_step}). The visitor's input belongs to that booking — even if it looks like a name correction, payment question, or off-topic chatter. ALWAYS use go_to_flight_management. Do NOT use any other transition.
+                transition to @subagent.flight_management
 
-            if @variables.booking_step == "" or @variables.booking_step == "done":
-                | No booking is in progress. Route by intent:
-                  - Flight bookings, upcoming flights, flight status, booking a flight, changing or canceling flights -> use go_to_flight_management
-                  - Seat selection or seat changes for a flight within 72 hours -> use go_to_seat_selection
-                  - Correcting or updating the traveler's first or last name on a booking -> use go_to_name_change
-                  - Questions about mileage balance, tier points, loyalty points, or frequent flyer miles -> use go_to_mileage_account
-                  - Support cases, complaints, case status, creating a case -> use go_to_case_management
-                  - Request to speak to a human agent or live agent -> use go_to_escalation
-                  - Ambiguous or unclear requests -> use go_to_ambiguous_question
-                  - Off-topic or unrelated questions -> use go_to_off_topic
-                  Never attempt to help the customer yourself. Always route.
+            | You are a router only. Do NOT answer questions or provide help directly. Always use a transition action.
+              Route by intent:
+              - Flight bookings, upcoming flights, flight status, booking a flight, changing or canceling flights -> use go_to_flight_management
+              - Seat selection or seat changes for a flight within 72 hours -> use go_to_seat_selection
+              - Correcting or updating the traveler's first or last name on a booking -> use go_to_name_change
+              - Questions about mileage balance, tier points, loyalty points, or frequent flyer miles -> use go_to_mileage_account
+              - Support cases, complaints, case status, creating a case -> use go_to_case_management
+              - Request to speak to a human agent or live agent -> use go_to_escalation
+              - Ambiguous or unclear requests -> use go_to_ambiguous_question
+              - Off-topic or unrelated questions -> use go_to_off_topic
+              Never attempt to help the customer yourself. Always route.
 
         actions:
             go_to_flight_management: @utils.transition to @subagent.flight_management
@@ -153,31 +160,25 @@ start_agent agent_router:
 
             go_to_escalation: @utils.transition to @subagent.escalation
                 description: "Transfer to a live human agent"
-                available when @variables.booking_step == "" or @variables.booking_step == "done"
 
             go_to_off_topic: @utils.transition to @subagent.off_topic
                 description: "Handle off-topic or unrelated questions"
-                available when @variables.booking_step == "" or @variables.booking_step == "done"
 
             go_to_ambiguous_question: @utils.transition to @subagent.ambiguous_question
                 description: "Handle unclear or ambiguous requests that need clarification"
-                available when @variables.booking_step == "" or @variables.booking_step == "done"
 
             go_to_seat_selection: @utils.transition to @subagent.seat_selection
                 description: "Select or change seats for a flight departing within 72 hours"
-                available when @variables.flights_within_72hrs > 0 and (@variables.booking_step == "" or @variables.booking_step == "done")
+                available when @variables.flights_within_72hrs > 0
 
             go_to_case_management: @utils.transition to @subagent.case_management
                 description: "Create, view, or update support cases"
-                available when @variables.booking_step == "" or @variables.booking_step == "done"
 
             go_to_name_change: @utils.transition to @subagent.name_change
                 description: "Correct or update the traveler's first or last name on a booking"
-                available when @variables.booking_step == "" or @variables.booking_step == "done"
 
             go_to_mileage_account: @utils.transition to @subagent.mileage_account
                 description: "Check mileage balance, tier points, loyalty points, or frequent flyer miles"
-                available when @variables.booking_step == "" or @variables.booking_step == "done"
 
     actions:
         resolve_contact:
@@ -263,6 +264,15 @@ subagent flight_management:
 
     reasoning:
         instructions: ->
+            if @variables.booking_confirmed is True:
+                set @variables.booking_step = "done"
+            if @variables.payment_processed is True and @variables.booking_confirmed is False:
+                set @variables.booking_step = "confirm"
+            if @variables.profile_collected is True and @variables.payment_processed is False:
+                set @variables.booking_step = "payment"
+            if @variables.flight_booking_error_flag is True and @variables.profile_collected is False:
+                set @variables.booking_step = "profile"
+
             if @variables.survey_resolved is False:
                 run @actions.resolve_session
                     with conversationId = @variables.Conversation_Id
@@ -351,7 +361,6 @@ subagent flight_management:
                 set @variables.flight_booking_detail = @outputs.booking
                 set @variables.flight_booking_error_detail = @outputs.errorMessage
                 set @variables.flight_booking_error_flag = @outputs.success
-                set @variables.booking_step = "profile"
 
             update_profile: @actions.update_profile
                 description: "Invoke this as soon as the visitor has provided their full name and email after a booking — calling this action IS how you 'save' their profile. Do NOT echo the values back and ask the visitor to confirm; invocation is the confirmation."
@@ -360,21 +369,18 @@ subagent flight_management:
                 with lastName = ...
                 with email = ...
                 set @variables.profile_collected = @outputs.success
-                set @variables.booking_step = "payment"
 
             process_payment: @actions.process_payment
                 description: "Invoke this as soon as the visitor picks Apple Pay / Saved card / Demo card. Calling this action IS how you 'process the payment'. Do NOT narrate 'processing your payment' without calling the action."
                 with contactId = @variables.resolved_contact_id
                 with paymentMethod = ...
                 set @variables.payment_processed = @outputs.success
-                set @variables.booking_step = "confirm"
 
             confirm_booking: @actions.confirm_booking
                 description: "Invoke this immediately after process_payment succeeds — flips Pending Confirmation bookings to Confirmed. Calling this action IS how you 'issue the ticket'."
                 with contactId = @variables.resolved_contact_id
                 set @variables.booking_confirmed = @outputs.success
                 set @variables.booked_confirmation_codes = @outputs.confirmationCodes
-                set @variables.booking_step = "done"
 
             get_bookings: @actions.get_bookings
                 with contactId = ...
