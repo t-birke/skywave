@@ -29,9 +29,9 @@ variables:
     Conversation_Id: linked string
         source: @MessagingSession.ConversationId
         description: "Join key for Skywave_ResolveSession to look up the visitor's anonymous Contact."
-    testingSession: mutable string = ""
+    testingSession: mutable string = "0dwg8000000Csz7AAC"
         label: "Testing Session (studio override)"
-        description: "Studio-preview override for Conversation_Id. Paste a real 0dw* ConversationId here; Apex falls back to it when Conversation_Id is blank."
+        description: "Studio-preview override for Conversation_Id. Default points at a Contact with valid survey data (Tokyo, Business, window-seat) so the preview hydrates immediately. Real chat ignores this — Conversation_Id wins when populated."
     survey_summary: mutable string
         label: "Survey Summary"
         description: "Natural-language summary of the visitor's survey answers (favourite destination, cabin class, etc.) keyed off Session_ID."
