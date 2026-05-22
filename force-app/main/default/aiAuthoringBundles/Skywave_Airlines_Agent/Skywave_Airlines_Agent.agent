@@ -28,7 +28,10 @@ variables:
         description: "MessagingSession EndUserLanguage"
     Conversation_Id: linked string
         source: @MessagingSession.ConversationId
-        description: "Join key for Skywave_ResolveSession to look up the visitor's anonymous Contact (with survey answers)."
+        description: "Join key for Skywave_ResolveSession to look up the visitor's anonymous Contact."
+    testingSession: mutable string = ""
+        label: "Testing Session (studio override)"
+        description: "Studio-preview override for Conversation_Id. Paste a real 0dw* ConversationId here; Apex falls back to it when Conversation_Id is blank."
     survey_summary: mutable string
         label: "Survey Summary"
         description: "Natural-language summary of the visitor's survey answers (favourite destination, cabin class, etc.) keyed off Session_ID."
@@ -255,6 +258,7 @@ subagent flight_management:
             if @variables.survey_resolved is False:
                 run @actions.resolve_session
                     with conversationId = @variables.Conversation_Id
+                    with testingSession = @variables.testingSession
                     set @variables.survey_summary = @outputs.summary
                     set @variables.survey_responses_json = @outputs.responsesJson
                     set @variables.resolved_contact_id = @outputs.contactId
@@ -387,19 +391,25 @@ subagent flight_management:
 
             inputs:
                 "conversationId": string
-                    description: "The MessagingSession.ConversationId, sourced from the @MessagingSession.ConversationId linked variable."
+                    description: "The MessagingSession.ConversationId, sourced from the @MessagingSession.ConversationId linked variable. Optional because studio preview can't seed it; falls back to testingSession when blank."
                     label: "Conversation Id"
-                    is_required: True
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "testingSession": string
+                    description: "Studio-preview fallback. When the agent is run in studio preview the linked Conversation_Id picker is platform-broken, so this mutable variable can be set instead. Real chat ignores it (conversationId wins)."
+                    label: "Testing Session"
+                    is_required: False
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
 
             outputs:
-                "answerCount": number
+                "answerCount": object
                     description: "How many distinct survey questions the visitor has answered."
                     label: "Answer Count"
                     is_displayable: False
                     is_used_by_planner: True
-                    complex_data_type_name: "lightning__numberType"
+                    complex_data_type_name: "lightning__integerType"
                 "responsesJson": string
                     description: "JSON map of question_key → {questionText, answerText, answerKey} for fine-grained reasoning."
                     label: "Survey Responses (JSON)"
@@ -567,12 +577,12 @@ subagent flight_management:
                     label: "error message"
                     is_displayable: False
                     is_used_by_planner: True
-                "paidCount": number
+                "paidCount": object
                     description: "How many bookings were marked Paid."
                     label: "Paid Count"
                     is_displayable: True
                     is_used_by_planner: True
-                    complex_data_type_name: "lightning__numberType"
+                    complex_data_type_name: "lightning__integerType"
                 "totalCharged": string
                     description: "Total amount charged across the paid bookings (e.g. $1430.00)."
                     label: "Total Charged"
@@ -613,12 +623,12 @@ subagent flight_management:
                     label: "error message"
                     is_displayable: False
                     is_used_by_planner: True
-                "confirmedCount": number
+                "confirmedCount": object
                     description: "How many bookings were flipped to Confirmed."
                     label: "Confirmed Count"
                     is_displayable: True
                     is_used_by_planner: True
-                    complex_data_type_name: "lightning__numberType"
+                    complex_data_type_name: "lightning__integerType"
                 "confirmationCodes": string
                     description: "Comma-separated list of confirmation codes that were just confirmed."
                     label: "Confirmation Codes"
