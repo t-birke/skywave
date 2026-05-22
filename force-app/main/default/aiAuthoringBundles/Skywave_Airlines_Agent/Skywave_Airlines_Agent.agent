@@ -99,6 +99,9 @@ variables:
     bookings_refreshed_post_confirm: mutable boolean = False
         label: "Bookings Refreshed Post-Confirm"
         description: "True once active_bookings has been re-fetched after a confirm_booking succeeded — prevents re-fetching on every subsequent reasoning turn."
+    booking_step: mutable string = ""
+        label: "Booking Step"
+        description: "Booking pipeline state: '' / profile / payment / confirm / done. Used by router to lock to flight_management mid-booking."
 
 language:
     default_locale: "en_US"
@@ -127,14 +130,13 @@ start_agent agent_router:
                     set @variables.flights_within_72hrs = @outputs.imminentFlights
                     set @variables.check_imminent_flights_success = @outputs.success
 
-            | You are a router only. Do NOT answer questions or provide help directly.
-              Always use a transition action to route to the correct topic immediately.
+            | You are a router only. Do NOT answer questions or provide help directly. Always use a transition action.
 
-            if @variables.flight_booking_error_flag is True and @variables.booking_confirmed is False:
-                | A booking is currently mid-flight (book_flight succeeded, not yet confirmed). The visitor is in the middle of providing profile / payment details. Route to go_to_flight_management UNCONDITIONALLY — even if their message looks like a name correction or off-topic question, it belongs to the in-flight booking. Do NOT route to name_change, seat_selection, case_management, or any other topic until the booking is confirmed.
+            if @variables.booking_step == "profile" or @variables.booking_step == "payment" or @variables.booking_step == "confirm":
+                | A booking is in progress (booking_step={!@variables.booking_step}). The visitor's input belongs to that booking — even if it looks like a name correction, payment question, or off-topic chatter. ALWAYS use go_to_flight_management. Do NOT use any other transition.
 
-            if @variables.flight_booking_error_flag is False or @variables.booking_confirmed is True:
-                | No booking is mid-flight. Route normally:
+            if @variables.booking_step == "" or @variables.booking_step == "done":
+                | No booking is in progress. Route by intent:
                   - Flight bookings, upcoming flights, flight status, booking a flight, changing or canceling flights -> use go_to_flight_management
                   - Seat selection or seat changes for a flight within 72 hours -> use go_to_seat_selection
                   - Correcting or updating the traveler's first or last name on a booking -> use go_to_name_change
@@ -151,25 +153,31 @@ start_agent agent_router:
 
             go_to_escalation: @utils.transition to @subagent.escalation
                 description: "Transfer to a live human agent"
+                available when @variables.booking_step == "" or @variables.booking_step == "done"
 
             go_to_off_topic: @utils.transition to @subagent.off_topic
                 description: "Handle off-topic or unrelated questions"
+                available when @variables.booking_step == "" or @variables.booking_step == "done"
 
             go_to_ambiguous_question: @utils.transition to @subagent.ambiguous_question
                 description: "Handle unclear or ambiguous requests that need clarification"
+                available when @variables.booking_step == "" or @variables.booking_step == "done"
 
             go_to_seat_selection: @utils.transition to @subagent.seat_selection
                 description: "Select or change seats for a flight departing within 72 hours"
-                available when @variables.flights_within_72hrs > 0
+                available when @variables.flights_within_72hrs > 0 and (@variables.booking_step == "" or @variables.booking_step == "done")
 
             go_to_case_management: @utils.transition to @subagent.case_management
                 description: "Create, view, or update support cases"
+                available when @variables.booking_step == "" or @variables.booking_step == "done"
 
             go_to_name_change: @utils.transition to @subagent.name_change
                 description: "Correct or update the traveler's first or last name on a booking"
+                available when @variables.booking_step == "" or @variables.booking_step == "done"
 
             go_to_mileage_account: @utils.transition to @subagent.mileage_account
                 description: "Check mileage balance, tier points, loyalty points, or frequent flyer miles"
+                available when @variables.booking_step == "" or @variables.booking_step == "done"
 
     actions:
         resolve_contact:
@@ -271,7 +279,7 @@ subagent flight_management:
                     set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
                     set @variables.retrieve_active_booking_done = @outputs.success
 
-            if @variables.booking_confirmed is True and @variables.bookings_refreshed_post_confirm is False:
+            if @variables.booking_step == "done" and @variables.bookings_refreshed_post_confirm is False:
                 run @actions.get_bookings
                     with contactId = @variables.resolved_contact_id
                     set @variables.active_bookings = @outputs.bookings
@@ -282,31 +290,33 @@ subagent flight_management:
             if @variables.survey_summary is not None and @variables.survey_summary != "":
                 | The visitor previously answered a short travel-preferences survey. {!@variables.survey_summary}
                   Use these preferences naturally — lean toward their stated favourite destination when suggesting flights, propose their preferred cabin class without asking, respect their seat preference. Do NOT enumerate the survey answers; weave them in.
-            if @variables.flight_booking_error_flag is False and @variables.booking_confirmed is False:
-                | The visitor has no booking in progress.
-                  - If they want to see existing bookings, use {!@variables.active_bookings} (already loaded). Give a SHORT one-line summary per booking, then ask which one they mean. Use exact values from the variable; do NOT paraphrase numbers.
-                  - To CANCEL an existing booking, state its cancellationConditions, ask them to confirm, then call {!@actions.cancel_booking} with the bookingReference.
-                  - To CHANGE A SEAT on an existing booking, use {!@actions.change_seat}.
-                  - To SEARCH for flights, call {!@actions.search_flights} with origin (IATA), destination (IATA), departure date (YYYY-MM-DD), and fare class. Use the canonical fare class names: Economy, Premium Economy, Business, First. Treat synonyms (economy plus → Premium Economy, business class → Business, etc.) as the canonical name. Quote prices verbatim from the FlightOption — never invent or re-derive.
-                  - When the visitor agrees to a specific flight from search results, call {!@actions.book_flight} with the contactId, flightId from the result, travelDate, fareClass (canonical name), checkedBags, and seatPreference. After success, the next phase begins automatically — do not narrate "your booking is reserved", just call the action.
-            if @variables.flight_booking_error_flag is True and @variables.profile_collected is False:
-                | A booking was just placed and is in "Pending Confirmation" status. It will NOT be ticketed until you complete THREE actions in order: update_profile, process_payment, confirm_booking.
+            if @variables.booking_step == "":
+                | No booking is in progress. The visitor can:
+                  - View existing bookings: use {!@variables.active_bookings} (already loaded). Give a SHORT one-line summary per booking, then ask which one they mean. Use exact values; do NOT paraphrase numbers.
+                  - Cancel a booking: state its cancellationConditions, ask them to confirm, then call {!@actions.cancel_booking} with the bookingReference.
+                  - Change a seat: use {!@actions.change_seat}.
+                  - Search for flights: call {!@actions.search_flights} with origin (IATA), destination (IATA), departure date (YYYY-MM-DD), and fare class. Use canonical fare class names: Economy, Premium Economy, Business, First. Treat synonyms (economy plus → Premium Economy, business class → Business, etc.) as the canonical name. Quote prices verbatim from the FlightOption.
+                  - Book a flight: when the visitor agrees to a specific flight from search results, call {!@actions.book_flight} with contactId, flightId, travelDate, fareClass, checkedBags, seatPreference. Do NOT narrate "your booking is reserved" — calling the action IS the booking.
 
-                  RIGHT NOW, you need the visitor's full name and email.
-                  - If you do not have both, ask once: "To complete your booking, please share your full name and email." Wait for their reply.
-                  - When their reply contains a name and email (e.g. "tom birke, tom@example.com"): IMMEDIATELY call {!@actions.update_profile} with firstName, lastName, email. Do NOT echo the values back. Do NOT ask them to confirm. Calling the action IS the confirmation.
-            if @variables.profile_collected is True and @variables.payment_processed is False:
-                | Profile is saved. Now collect payment.
-                  - If the visitor has not yet picked a method, present exactly: "How would you like to pay? Apple Pay, Saved card, or Demo card."
-                  - When they pick one of those three exact strings: IMMEDIATELY call {!@actions.process_payment} with paymentMethod = the visitor's choice (exact string, no synonyms). Do NOT say "processing your payment"; calling the action IS the processing.
-            if @variables.payment_processed is True and @variables.booking_confirmed is False:
+            if @variables.booking_step == "profile":
+                | Booking is pending. Collect the visitor's full name and email.
+                  - If you don't have both yet, ask ONCE: "To complete your booking, please share your full name and email." Then wait.
+                  - When their reply contains a name and email (e.g. "tom birke, tom@example.com"): IMMEDIATELY call {!@actions.update_profile} with firstName, lastName, email. Do NOT echo the values back, do NOT ask them to confirm — invocation IS the confirmation.
+
+            if @variables.booking_step == "payment":
+                | Profile is saved. Collect payment.
+                  - If the visitor hasn't picked a method, present exactly: "How would you like to pay? Apple Pay, Saved card, or Demo card."
+                  - When they pick one of those three exact strings: IMMEDIATELY call {!@actions.process_payment} with paymentMethod = their choice (exact string). Do NOT say "processing your payment" — invocation IS the processing.
+
+            if @variables.booking_step == "confirm":
                 | Payment succeeded. Issue the ticket NOW.
-                  IMMEDIATELY call {!@actions.confirm_booking} with no further dialog. After it returns, tell the visitor their ticket is confirmed and quote @outputs.confirmationCodes from confirm_booking. Do NOT delay.
-            if @variables.booking_confirmed is True:
-                | The booking is fully confirmed. Confirmation code(s): {!@variables.booked_confirmation_codes}.
-                  - If the visitor asks "do I have a booking?", answer YES and quote the confirmation code(s).
+                  IMMEDIATELY call {!@actions.confirm_booking} with no further dialog. Then tell the visitor their ticket is confirmed and quote @outputs.confirmationCodes.
+
+            if @variables.booking_step == "done":
+                | Booking is fully confirmed. Code(s): {!@variables.booked_confirmation_codes}.
+                  - "Do I have a booking?" → YES, quote the code(s).
                   - Do NOT call update_profile, process_payment, or confirm_booking again.
-                  - If the visitor wants ANOTHER flight, run {!@actions.search_flights} from scratch — that begins a new booking cycle.
+                  - If the visitor wants ANOTHER flight, run {!@actions.search_flights} — that begins a new cycle.
 
         actions:
             resolve_session: @actions.resolve_session
@@ -341,6 +351,7 @@ subagent flight_management:
                 set @variables.flight_booking_detail = @outputs.booking
                 set @variables.flight_booking_error_detail = @outputs.errorMessage
                 set @variables.flight_booking_error_flag = @outputs.success
+                set @variables.booking_step = "profile"
 
             update_profile: @actions.update_profile
                 description: "Invoke this as soon as the visitor has provided their full name and email after a booking — calling this action IS how you 'save' their profile. Do NOT echo the values back and ask the visitor to confirm; invocation is the confirmation."
@@ -349,18 +360,21 @@ subagent flight_management:
                 with lastName = ...
                 with email = ...
                 set @variables.profile_collected = @outputs.success
+                set @variables.booking_step = "payment"
 
             process_payment: @actions.process_payment
                 description: "Invoke this as soon as the visitor picks Apple Pay / Saved card / Demo card. Calling this action IS how you 'process the payment'. Do NOT narrate 'processing your payment' without calling the action."
                 with contactId = @variables.resolved_contact_id
                 with paymentMethod = ...
                 set @variables.payment_processed = @outputs.success
+                set @variables.booking_step = "confirm"
 
             confirm_booking: @actions.confirm_booking
                 description: "Invoke this immediately after process_payment succeeds — flips Pending Confirmation bookings to Confirmed. Calling this action IS how you 'issue the ticket'."
                 with contactId = @variables.resolved_contact_id
                 set @variables.booking_confirmed = @outputs.success
                 set @variables.booked_confirmation_codes = @outputs.confirmationCodes
+                set @variables.booking_step = "done"
 
             get_bookings: @actions.get_bookings
                 with contactId = ...
