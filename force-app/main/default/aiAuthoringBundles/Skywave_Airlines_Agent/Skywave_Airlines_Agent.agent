@@ -507,7 +507,7 @@ subagent flight_management:
 
             outputs:
                 "options": list[object]
-                    description: "A list of available flight options and details"
+                    description: "A list of available flight options. Each renders as a Skywave Flight Option card via the SkywaveFlightOptionView Custom Lightning Type."
                     label: "Flight Options"
                     is_displayable: True
                     is_used_by_planner: True

@@ -1,0 +1,19 @@
+<template>
+    <article class="slds-box slds-m-bottom_x-small slds-p-around_small">
+        <div class="slds-grid slds-grid_align-spread">
+            <div class="slds-text-heading_small">
+                <strong>{flightNumber}</strong> &nbsp;
+                {startingAirport} → {arrivingAirport}
+            </div>
+            <div class="slds-text-heading_small slds-text-color_success">
+                {price}
+            </div>
+        </div>
+        <p class="slds-text-body_regular slds-m-top_x-small">
+            Departs {departureTime} · Arrives {arrivalTime} · {durationLabel}
+        </p>
+        <p class="slds-text-body_small slds-text-color_weak">
+            {stopovers} · {aircraft}
+        </p>
+    </article>
+</template>
