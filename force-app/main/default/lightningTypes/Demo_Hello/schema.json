@@ -1,5 +1,0 @@
-{
-    "title": "Demo Hello",
-    "description": "Demo greeting card payload.",
-    "lightning:type": "@apexClassType/Demo_HelloData"
-}

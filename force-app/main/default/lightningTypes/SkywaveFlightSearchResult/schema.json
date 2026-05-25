@@ -1,5 +1,0 @@
-{
-    "title": "Skywave Flight Search Result",
-    "description": "Output from Skywave_FlightSearch — JSON envelope rendered as tappable flight cards.",
-    "lightning:type": "@apexClassType/Skywave_FlightSearchResultData"
-}
