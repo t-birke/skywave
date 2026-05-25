@@ -4,14 +4,6 @@
     <hasActivationRequired>false</hasActivationRequired>
     <label>Skywave Agent User</label>
     <classAccesses>
-        <apexClass>Demo_HelloData</apexClass>
-        <enabled>true</enabled>
-    </classAccesses>
-    <classAccesses>
-        <apexClass>Demo_HelloService</apexClass>
-        <enabled>true</enabled>
-    </classAccesses>
-    <classAccesses>
         <apexClass>Skywave_ResolveContact</apexClass>
         <enabled>true</enabled>
     </classAccesses>
@@ -41,6 +33,18 @@
     </classAccesses>
     <classAccesses>
         <apexClass>Skywave_UpdateContact</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_PresentProfileForm</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_AckProfileForm</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_ProfileFormData</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>

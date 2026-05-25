@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>66.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>Skywave Profile Form Preview</masterLabel>
+    <description>Local-dev harness for the SkywaveProfileFormRenderer card. Fills the form with sample state and lets you visualize it at chat-iframe widths.</description>
+    <targets>
+        <target>lightning__AppPage</target>
+    </targets>
+</LightningComponentBundle>

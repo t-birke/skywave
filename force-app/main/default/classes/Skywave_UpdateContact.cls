@@ -26,6 +26,9 @@ public with sharing class Skywave_UpdateContact {
 
         @InvocableVariable(label='Email' required=true)
         public String email;
+
+        @InvocableVariable(label='Phone' required=false)
+        public String phone;
     }
 
     public class Output {
@@ -59,6 +62,7 @@ public with sharing class Skywave_UpdateContact {
         String firstName = req.firstName == null ? '' : req.firstName.trim();
         String lastName  = req.lastName  == null ? '' : req.lastName.trim();
         String email     = req.email     == null ? '' : req.email.trim();
+        String phone     = req.phone     == null ? '' : req.phone.trim();
 
         if (String.isBlank(req.contactId)) {
             out.errorMessage = 'Contact Id is required.';
@@ -84,6 +88,10 @@ public with sharing class Skywave_UpdateContact {
                 LastName = lastName,
                 Email = email
             );
+            // Phone is optional in the text-fallback path; only set when supplied.
+            if (String.isNotBlank(phone)) {
+                c.Phone = phone;
+            }
             update c;
             out.success = true;
             out.contactId = req.contactId;

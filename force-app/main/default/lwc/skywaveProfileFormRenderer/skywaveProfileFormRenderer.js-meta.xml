@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>66.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>Skywave Profile Form Renderer</masterLabel>
+    <description>Inline profile form (avatar + first/last name + email + phone + consent) shown in chat after a flight booking. Submits via Apex imperative; cues the agent with "Profile created" on success.</description>
+    <targets>
+        <target>lightning__AgentforceOutput</target>
+        <target>lightning__AgentforceInput</target>
+        <target>lightningSnapin__ChatMessage</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__AgentforceOutput">
+            <sourceType name="c__SkywaveProfileForm"/>
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>

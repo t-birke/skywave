@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Permission set for the Messaging End User that backs ECv2 chat sessions
+  on the Skywave embedded service deployment.
+
+  Why this exists:
+    Custom Lightning Type renderers (e.g. SkywaveProfileFormRenderer) make
+    @AuraEnabled imperative calls (e.g. Skywave_SaveProfile.saveProfile)
+    from inside the chat iframe. The Messaging End User runs those calls
+    and has no Apex perms by default.
+
+  This permset MUST be granted to the messaging end user. The recommended
+  path is to assign it via PermissionSetAssignment to the messaging end
+  user record(s) backing the chat — they're created on demand by ECv2,
+  so a script in /scripts/ should sweep newly-created users and assign.
+
+  Class-access only — no object/field perms needed because Skywave_SaveProfile
+  runs `without sharing` and does not explicitly enforce FLS/CRUD.
+  Defense-in-depth: anonymous traffic can only invoke the two whitelisted
+  classes; they validate and gate every write.
+-->
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Apex class access the Messaging End User needs to run imperative LWC calls inside the Skywave embedded chat iframe (profile form save).</description>
+    <hasActivationRequired>false</hasActivationRequired>
+    <label>Skywave Embedded Messaging</label>
+    <classAccesses>
+        <apexClass>Skywave_SaveProfile</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_ProfileFormData</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+</PermissionSet>

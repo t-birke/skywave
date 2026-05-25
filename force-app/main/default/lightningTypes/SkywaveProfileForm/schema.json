@@ -1,0 +1,5 @@
+{
+    "title": "Skywave Profile Form",
+    "description": "Output from Skywave_PresentProfileForm — JSON envelope rendered as an inline profile form (avatar + name + email + phone + consent).",
+    "lightning:type": "@apexClassType/c__Skywave_ProfileFormData"
+}

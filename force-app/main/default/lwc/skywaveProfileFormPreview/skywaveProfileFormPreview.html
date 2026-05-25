@@ -1,0 +1,37 @@
+<template>
+    <div class="harness">
+        <div class="controls">
+            <h2>Profile Form Preview</h2>
+            <div class="row">
+                <button onclick={handleSampleEmpty}>Empty</button>
+                <button onclick={handleSamplePartial}>Partial</button>
+                <button onclick={handleSamplePrefilled}>Prefilled</button>
+                <button onclick={handleClear}>Clear</button>
+            </div>
+            <div class="row">
+                <label for="width-select">Width:</label>
+                <select id="width-select" onchange={handleWidthChange}>
+                    <template for:each={widthOptions} for:item="opt">
+                        <option key={opt.value} value={opt.value} selected={opt.selected}>{opt.label}</option>
+                    </template>
+                </select>
+            </div>
+            <lightning-textarea
+                label="formStateJSON"
+                value={jsonInput}
+                onchange={handleJsonChange}
+                class="json-input">
+            </lightning-textarea>
+            <button class="render-button" onclick={handleRender}>Render</button>
+            <template lwc:if={parseError}>
+                <p class="error">JSON parse error: {parseError}</p>
+            </template>
+        </div>
+        <div class="preview">
+            <h2>Card</h2>
+            <div class="chat-frame" style={frameStyle}>
+                <c-skywave-profile-form-renderer value={currentValue}></c-skywave-profile-form-renderer>
+            </div>
+        </div>
+    </div>
+</template>

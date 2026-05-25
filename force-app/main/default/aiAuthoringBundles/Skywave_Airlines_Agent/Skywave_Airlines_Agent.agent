@@ -330,9 +330,11 @@ subagent flight_management:
                   - Book a flight: when the visitor agrees to a specific flight from search results, call {!@actions.book_flight} with contactId, flightId, travelDate, fareClass, checkedBags, seatPreference. Do NOT narrate "your booking is reserved" — calling the action IS the booking.
 
             if @variables.booking_step == "profile":
-                | Booking is pending. Collect the visitor's full name and email.
-                  - If you don't have both yet, ask ONCE: "To complete your booking, please share your full name and email." Then wait.
-                  - When their reply contains a name and email (e.g. "tom birke, tom@example.com"): IMMEDIATELY call {!@actions.update_profile} with firstName, lastName, email. Do NOT echo the values back, do NOT ask them to confirm — invocation IS the confirmation.
+                | Booking is pending. Show the visitor the inline profile form so they can complete their details (name, email, phone, photo).
+                  - On entering this step, IMMEDIATELY call {!@actions.present_profile_form} with contactId — that renders the form card. Do NOT ask for name/email in text first; the form is the primary surface.
+                  - In your text reply alongside the form card, keep it short (1 sentence) — e.g. "A few details to wrap up your booking." Do NOT enumerate the fields.
+                  - When the visitor sends the exact phrase "Profile created" (the cue from the form on successful submit): IMMEDIATELY call {!@actions.ack_profile_form} with contactId. That advances the booking to payment.
+                  - Text fallback: if instead of using the form the visitor types name + email in chat (e.g. "tom birke, tom@example.com, +1 415 555 0101"): call {!@actions.update_profile} with firstName, lastName, email, and phone if provided. Do NOT echo back — invocation IS the confirmation.
 
             if @variables.booking_step == "payment":
                 | Profile is saved. Collect payment.
@@ -384,11 +386,21 @@ subagent flight_management:
                 set @variables.flight_booking_error_flag = @outputs.success
 
             update_profile: @actions.update_profile
-                description: "Invoke this as soon as the visitor has provided their full name and email after a booking — calling this action IS how you 'save' their profile. Do NOT echo the values back and ask the visitor to confirm; invocation is the confirmation."
+                description: "Text-fallback path: invoke when the visitor typed their name + email (and optionally phone) directly in chat instead of using the profile form card. Do NOT echo the values back; invocation IS the confirmation."
                 with contactId = @variables.resolved_contact_id
                 with firstName = ...
                 with lastName = ...
                 with email = ...
+                with phone = ...
+                set @variables.profile_collected = @outputs.success
+
+            present_profile_form: @actions.present_profile_form
+                description: "Display the inline profile form card. Invoke ONCE when booking_step transitions to 'profile' — the form is the primary collection surface. Do NOT call this repeatedly; once displayed, wait for the 'Profile created' cue from the form on submit."
+                with contactId = @variables.resolved_contact_id
+
+            ack_profile_form: @actions.ack_profile_form
+                description: "Invoke immediately when the visitor sends the exact phrase 'Profile created' — that text is the cue from the profile form LWC that the form has been submitted. Calling this action IS how the agent advances out of booking_step=profile."
+                with contactId = @variables.resolved_contact_id
                 set @variables.profile_collected = @outputs.success
 
             process_payment: @actions.process_payment
@@ -585,6 +597,12 @@ subagent flight_management:
                     is_required: True
                     is_user_input: True
                     complex_data_type_name: "lightning__textType"
+                "phone": string
+                    description: "The visitor's phone number as extracted from the user's message. Optional — pass blank if the visitor didn't provide one."
+                    label: "Phone"
+                    is_required: False
+                    is_user_input: True
+                    complex_data_type_name: "lightning__textType"
 
             outputs:
                 "success": boolean
@@ -600,6 +618,68 @@ subagent flight_management:
                 "contactId": string
                     description: "The Contact Id that was updated."
                     label: "Updated Contact Id"
+                    is_displayable: False
+                    is_used_by_planner: True
+
+        present_profile_form:
+            description: "Renders the Skywave Profile Form card so the visitor can complete name, email, phone, and avatar inline in chat. The form posts back via @AuraEnabled imperative; on submit the visitor's chat sends 'Profile created' which the agent treats as the cue."
+            label: "Present Profile Form"
+            require_user_confirmation: False
+            include_in_progress_indicator: False
+            target: "apex://Skywave_PresentProfileForm"
+
+            inputs:
+                "contactId": string
+                    description: "The anonymous Contact Id to pre-fill the form with."
+                    label: "Contact Id"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "formData": object
+                    description: "Structured payload rendered as the Skywave Profile Form chat card."
+                    label: "Form Data"
+                    complex_data_type_name: "c__SkywaveProfileForm"
+                    filter_from_agent: True
+                    is_displayable: True
+                "success": boolean
+                    description: "True if the form payload was prepared."
+                    label: "success"
+                    complex_data_type_name: "lightning__booleanType"
+                    filter_from_agent: False
+                    is_displayable: False
+                "message": string
+                    description: "Status detail."
+                    label: "Message"
+                    complex_data_type_name: "lightning__textType"
+                    filter_from_agent: False
+                    is_displayable: False
+
+        ack_profile_form:
+            description: "Acknowledges the 'Profile created' cue sent by the profile form LWC after a successful submit. Returns success so the booking_step state machine advances to payment."
+            label: "Acknowledge Profile Form"
+            require_user_confirmation: False
+            include_in_progress_indicator: False
+            target: "apex://Skywave_AckProfileForm"
+
+            inputs:
+                "contactId": string
+                    description: "The Contact Id whose profile was just saved."
+                    label: "Contact Id"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "success": boolean
+                    description: "True — the form was acknowledged."
+                    label: "success"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "message": string
+                    description: "Acknowledgement detail."
+                    label: "message"
                     is_displayable: False
                     is_used_by_planner: True
 

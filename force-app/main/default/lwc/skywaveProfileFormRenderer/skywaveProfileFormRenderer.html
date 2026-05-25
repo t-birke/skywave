@@ -1,0 +1,107 @@
+<template>
+    <template lwc:if={placeholderMessage}>
+        <p class="sw-placeholder">{placeholderMessage}</p>
+    </template>
+    <template lwc:elseif={submitted}>
+        <div class="sw-form-success">
+            <span class="sw-form-success__icon">✓</span>
+            <span>Profile saved.</span>
+        </div>
+    </template>
+    <template lwc:else>
+        <article class="sw-form-card">
+            <header class="sw-form-card__header">
+                <h3 class="sw-form-card__title">Almost there — your details</h3>
+                <p class="sw-form-card__sub">Skywave needs a few details to confirm your booking.</p>
+            </header>
+
+            <div class="sw-form-row sw-form-row_avatar">
+                <label class="sw-avatar" style={avatarStyle}>
+                    <template lwc:if={avatarPreview}>
+                        <span class="sw-avatar__hint">Tap to retake</span>
+                    </template>
+                    <template lwc:else>
+                        <span class="sw-avatar__icon">📷</span>
+                        <span class="sw-avatar__hint">Add a photo</span>
+                    </template>
+                    <input
+                        type="file"
+                        accept="image/*"
+                        capture="user"
+                        class="sw-avatar__file"
+                        onchange={handleAvatarChange} />
+                </label>
+            </div>
+
+            <div class="sw-form-row">
+                <label class="sw-form-label" for="sw-firstname">First name</label>
+                <input
+                    id="sw-firstname"
+                    class="sw-form-input"
+                    type="text"
+                    value={firstName}
+                    data-field="firstName"
+                    oninput={handleField}
+                    autocomplete="given-name" />
+            </div>
+
+            <div class="sw-form-row">
+                <label class="sw-form-label" for="sw-lastname">Last name</label>
+                <input
+                    id="sw-lastname"
+                    class="sw-form-input"
+                    type="text"
+                    value={lastName}
+                    data-field="lastName"
+                    oninput={handleField}
+                    autocomplete="family-name" />
+            </div>
+
+            <div class="sw-form-row">
+                <label class="sw-form-label" for="sw-email">Email</label>
+                <input
+                    id="sw-email"
+                    class="sw-form-input"
+                    type="email"
+                    value={email}
+                    data-field="email"
+                    oninput={handleField}
+                    autocomplete="email" />
+            </div>
+
+            <div class="sw-form-row">
+                <label class="sw-form-label" for="sw-phone">Phone</label>
+                <input
+                    id="sw-phone"
+                    class="sw-form-input"
+                    type="tel"
+                    value={phone}
+                    data-field="phone"
+                    oninput={handleField}
+                    autocomplete="tel" />
+            </div>
+
+            <label class="sw-form-consent">
+                <input
+                    type="checkbox"
+                    checked={consent}
+                    data-field="consent"
+                    onchange={handleField} />
+                <span>I consent to receive booking-related communication via email.</span>
+            </label>
+
+            <template lwc:if={errorMessage}>
+                <p class="sw-form-error">{errorMessage}</p>
+            </template>
+
+            <button
+                type="button"
+                class="sw-form-submit"
+                onclick={handleSubmit}
+                disabled={submitDisabled}>
+                <template lwc:if={submitting}>Saving…</template>
+                <template lwc:else>Save and continue</template>
+            </button>
+        </article>
+    </template>
+</template>
