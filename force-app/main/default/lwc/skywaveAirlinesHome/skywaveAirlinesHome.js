@@ -8,12 +8,12 @@ import { LightningElement } from 'lwc';
 // Before finalize.sh runs these stay as placeholder tokens and the widget
 // bootstrap is skipped gracefully.
 const EMBEDDED_MESSAGING_CONFIG = {
-    orgId: '__ESW_ORG_ID__',
+    orgId: '00DSB00000yuEde',
     // Developer name of the EmbeddedServiceConfig deployment (NOT the
     // MessagingChannel). This is the esConfigName scrt2 expects.
-    esConfigName: '__ESW_ESC_NAME__',
-    siteUrl: '__ESW_SITE_URL__',
-    scrt2Url: '__ESW_SCRT2_URL__'
+    esConfigName: 'Demo_Renderer_Channel',
+    siteUrl: 'https://orgfarm-3401a0edd4.test1.my.pc-rnd.site.com/ESWDemoRendererChannel1779541813087',
+    scrt2Url: 'https://orgfarm-3401a0edd4.test1.my.pc-rnd.salesforce-scrt.com'
 };
 
 export default class SkywaveAirlinesHome extends LightningElement {

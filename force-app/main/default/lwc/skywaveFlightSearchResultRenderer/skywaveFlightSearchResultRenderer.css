@@ -1,0 +1,202 @@
+:host {
+    /* Skywave site design tokens (heroku/skywave-app/public/assets/site.css) */
+    --sw-navy: #0b1d3a;
+    --sw-navy-deep: #06122a;
+    --sw-blue-soft: #12305f;
+    --sw-mute: #a8bcd8;
+
+    /* Teal accent palette */
+    --sw-teal: #14b8a6;
+    --sw-teal-hover: #0d9488;
+    --sw-teal-active: #0f766e;
+
+    --sw-card-bg: #1f2836; /* desaturated dark slate */
+    --sw-card-border: rgba(168, 188, 216, 0.18);
+    --sw-card-divider: rgba(168, 188, 216, 0.15);
+    --sw-radius: 0.75rem;
+    --sw-text: #ffffff;
+    --sw-text-mute: #a8bcd8;
+    --sw-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+    display: block;
+    margin: 0.5rem 0;
+    font-family: var(--sw-font);
+}
+
+.sw-error {
+    color: #ffd9d4;
+    background-color: rgba(186, 5, 23, 0.4);
+    border: 1px solid rgba(186, 5, 23, 0.5);
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.8125rem;
+    margin: 0;
+}
+
+.sw-placeholder {
+    color: var(--sw-text-mute);
+    background-color: var(--sw-card-bg);
+    border: 1px solid var(--sw-card-border);
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.8125rem;
+    font-style: italic;
+    margin: 0;
+}
+
+/* Vertical list of flight cards */
+.sw-flight-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+
+/* Flight card — dark navy surface */
+.sw-flight-card {
+    background-color: var(--sw-card-bg);
+    border: 1px solid var(--sw-card-border);
+    border-radius: var(--sw-radius);
+    padding: 0.875rem 1rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    color: var(--sw-text);
+}
+
+/* Route */
+.sw-flight-route {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: start;
+    gap: 0.75rem;
+}
+
+.sw-flight-endpoint {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.sw-flight-endpoint_arrival {
+    text-align: right;
+    align-items: flex-end;
+}
+
+.sw-flight-time {
+    font-weight: 700;
+    font-size: 1.0625rem;
+    color: var(--sw-text);
+    letter-spacing: -0.02em;
+}
+
+.sw-flight-airport {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--sw-text-mute);
+    margin-top: 0.125rem;
+    letter-spacing: 0.04em;
+}
+
+/* Connector line with stops indicator */
+.sw-flight-connector {
+    position: relative;
+    align-self: center;
+    height: 1px;
+    background-color: rgba(168, 188, 216, 0.3);
+    margin: 0 0.25rem;
+    margin-top: 0.5rem;
+}
+
+.sw-flight-connector__label {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background-color: var(--sw-card-bg);
+    padding: 0 0.5rem;
+    font-size: 0.6875rem;
+    color: var(--sw-text-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+/* Meta row */
+.sw-flight-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    font-size: 0.75rem;
+    color: var(--sw-text-mute);
+}
+
+.sw-flight-meta__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.sw-flight-meta__icon {
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+
+/* Footer */
+.sw-flight-card__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-top: 1px solid var(--sw-card-divider);
+    padding-top: 0.625rem;
+}
+
+.sw-flight-card__pricing {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    line-height: 1.1;
+}
+
+.sw-fare-chip {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--sw-text-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.sw-flight-price {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--sw-text);
+    letter-spacing: -0.01em;
+}
+
+.sw-book-button {
+    background-color: var(--sw-teal);
+    color: #052024;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.55rem 1.25rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.15s ease, transform 0.1s ease;
+    white-space: nowrap;
+    font-family: inherit;
+    letter-spacing: 0.01em;
+}
+
+.sw-book-button:hover,
+.sw-book-button:focus {
+    background-color: var(--sw-teal-hover);
+    outline: none;
+}
+
+.sw-book-button:active {
+    background-color: var(--sw-teal-active);
+    transform: scale(0.98);
+}

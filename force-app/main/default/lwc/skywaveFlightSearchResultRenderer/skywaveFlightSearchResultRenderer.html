@@ -1,0 +1,54 @@
+<template>
+    <template lwc:if={errorMessage}>
+        <p class="sw-error">{errorMessage}</p>
+    </template>
+    <template lwc:elseif={placeholderMessage}>
+        <p class="sw-placeholder">{placeholderMessage}</p>
+    </template>
+    <template lwc:else>
+        <div class="sw-flight-list">
+            <template for:each={flights} for:item="flight">
+                <article key={flight.key} class="sw-flight-card">
+                    <div class="sw-flight-route">
+                        <div class="sw-flight-endpoint">
+                            <span class="sw-flight-time">{flight.departureTime}</span>
+                            <span class="sw-flight-airport">{flight.startingAirport}</span>
+                        </div>
+                        <div class="sw-flight-connector">
+                            <span class="sw-flight-connector__label">{flight.stopovers}</span>
+                        </div>
+                        <div class="sw-flight-endpoint sw-flight-endpoint_arrival">
+                            <span class="sw-flight-time">{flight.arrivalTime}</span>
+                            <span class="sw-flight-airport">{flight.arrivingAirport}</span>
+                        </div>
+                    </div>
+
+                    <div class="sw-flight-meta">
+                        <span class="sw-flight-meta__item">
+                            <span class="sw-flight-meta__icon">⏱</span>
+                            {flight.durationLabel}
+                        </span>
+                        <span class="sw-flight-meta__item">
+                            <span class="sw-flight-meta__icon">✈</span>
+                            {flight.flightNumber} · {flight.aircraft}
+                        </span>
+                    </div>
+
+                    <footer class="sw-flight-card__footer">
+                        <div class="sw-flight-card__pricing">
+                            <span class="sw-fare-chip">{flight.fareClass}</span>
+                            <span class="sw-flight-price">{flight.price}</span>
+                        </div>
+                        <button
+                            type="button"
+                            class="sw-book-button"
+                            data-flightnumber={flight.flightNumber}
+                            onclick={handleBook}>
+                            Book
+                        </button>
+                    </footer>
+                </article>
+            </template>
+        </div>
+    </template>
+</template>

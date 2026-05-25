@@ -11,7 +11,8 @@ config:
     agent_label: "Skywave Airlines Agent"
     description: "A support agent for Skywave Airlines that assists customers with their flight bookings and related inquiries."
     agent_type: "AgentforceServiceAgent"
-    default_agent_user: "skywaveserviceagent@example.com"
+    default_agent_user: "einsteinagent@00dg8000006i9hjeas.ext"
+    additional_parameter__enable_graph_runtime: True
 
 variables:
     EndUserId: linked string
@@ -45,34 +46,49 @@ variables:
         description: "Verified customer contact ID"
     Latest_Flight_Search_Results: mutable object
         label: "Latest Flight Search Results"
+        description: ""
     flight_booking_detail: mutable object
         label: "Flight Booking Detail"
+        description: ""
     flight_booking_error_detail: mutable string
         label: "Flight Booking Error Detail"
+        description: ""
     flight_booking_error_flag: mutable boolean
         label: "Flight Booking Error Flag"
+        description: ""
     check_imminent_flights_success: mutable boolean = False
         label: "Check Imminent Flights Success"
+        description: ""
     check_imminent_flight_error_message: mutable string
         label: "Check Imminent Flight Error Message"
+        description: ""
     flights_within_72hrs: mutable number = 0
         label: "Flights Within 72hrs"
+        description: ""
     active_bookings: mutable object
         label: "Active Bookings"
+        description: ""
     retrieve_active_booking_error_message: mutable string
         label: "Retrieve Active Booking Error Message"
+        description: ""
     retrieve_active_booking_done: mutable boolean = False
         label: "Retrieve Active Booking Done"
+        description: ""
     Tier_Status: mutable string
         label: "Tier Status"
+        description: ""
     mileage_balance: mutable number
         label: "Mileage Balance"
+        description: ""
     mileage_balance_message: mutable string
         label: "Mileage Balance Message"
+        description: ""
     booking: mutable string
         label: "Booking"
+        description: ""
     Booking_Outcome: mutable boolean
         label: "Booking Outcome"
+        description: ""
     resolved_contact_id: mutable string = "003000000000000"
         description: "Resolved contact ID for the current user (demo: pre-authenticated as Lauren)"
     selected_fare_class: mutable string = ""
@@ -102,6 +118,9 @@ variables:
     booking_step: mutable string = ""
         label: "Booking Step"
         description: "Booking pipeline state: '' / profile / payment / confirm / done. Used by router to lock to flight_management mid-booking."
+    VoiceCallId: linked string
+        description: "This variable may also be referred to as Voice Call Id"
+        source: @VoiceCall.Id
 
 language:
     default_locale: "en_US"
@@ -115,7 +134,7 @@ start_agent agent_router:
     label: "Agent Router"
 
     description: "Welcome the user and determine the appropriate subagent based on user input"
-    
+
     reasoning:
         instructions: ->
             if @variables.booking_confirmed is True:
@@ -305,7 +324,9 @@ subagent flight_management:
                   - View existing bookings: use {!@variables.active_bookings} (already loaded). Give a SHORT one-line summary per booking, then ask which one they mean. Use exact values; do NOT paraphrase numbers.
                   - Cancel a booking: state its cancellationConditions, ask them to confirm, then call {!@actions.cancel_booking} with the bookingReference.
                   - Change a seat: use {!@actions.change_seat}.
-                  - Search for flights: call {!@actions.search_flights} with origin (IATA), destination (IATA), departure date (YYYY-MM-DD), and fare class. Use canonical fare class names: Economy, Premium Economy, Business, First. Treat synonyms (economy plus → Premium Economy, business class → Business, etc.) as the canonical name. Quote prices verbatim from the FlightOption.
+                  - Search for flights: call {!@actions.search_flights} with origin (IATA), destination (IATA), departure date (YYYY-MM-DD), and fare class. Use canonical fare class names: Economy, Premium Economy, Business, First. Treat synonyms (economy plus → Premium Economy, business class → Business, etc.) as the canonical name.
+
+                    The output of this action is always renderable. Always use show_command to display the result to the user. After search_flights completes, you MUST present the flightResult output to the visitor. ALWAYS show the structured action output (the Flight Search Result card). Do NOT rewrite, restate, or summarize the flight options as plain text or bullet lists — the interactive flight cards are contained in the flightResult output and must be displayed as-is. In your text reply alongside the cards, keep it short (1-2 sentences) for color only — e.g. confirm route + date and ask which flight they prefer. Do NOT enumerate flight numbers, times, or prices in prose; the cards already show them.
                   - Book a flight: when the visitor agrees to a specific flight from search results, call {!@actions.book_flight} with contactId, flightId, travelDate, fareClass, checkedBags, seatPreference. Do NOT narrate "your booking is reserved" — calling the action IS the booking.
 
             if @variables.booking_step == "profile":
@@ -348,7 +369,7 @@ subagent flight_management:
                 with destination = ...
                 with origin = ...
                 with fareClass = ...
-                set @variables.Latest_Flight_Search_Results = @outputs.options
+                set @variables.Latest_Flight_Search_Results = @outputs.flightSummary
 
             book_flight: @actions.book_flight
                 description: "Books the flight the visitor has confirmed. Pass the fare class the visitor agreed to (Economy / Premium Economy / Business / First — exact string). After this succeeds, the post-booking sequence (profile, payment, confirm) begins."
@@ -506,12 +527,30 @@ subagent flight_management:
                     complex_data_type_name: "lightning__textType"
 
             outputs:
-                "options": list[object]
-                    description: "A list of available flight options. Each renders as a Skywave Flight Option card via the SkywaveFlightOptionView Custom Lightning Type."
-                    label: "Flight Options"
+                "flightResult": object
+                    description: "Structured payload rendered as the Skywave Flight Search Result chat card."
+                    label: "Flight Search Result"
+                    complex_data_type_name: "c__SkywaveFlightOptions"
+                    filter_from_agent: True
                     is_displayable: True
-                    is_used_by_planner: True
-                    complex_data_type_name: "@apexClassType/c__Skywave_FlightSearch$FlightOption"
+                "flightSummary": string
+                    description: "Plain-text narrative summarising the search outcome — used by the LLM for one-line color alongside the card."
+                    label: "Flight Summary"
+                    complex_data_type_name: "lightning__textType"
+                    filter_from_agent: False
+                    is_displayable: False
+                "success": boolean
+                    description: "True if the search completed without error."
+                    label: "Success"
+                    complex_data_type_name: "lightning__booleanType"
+                    filter_from_agent: False
+                    is_displayable: False
+                "message": string
+                    description: "Status detail (count returned, or error message)."
+                    label: "Message"
+                    complex_data_type_name: "lightning__textType"
+                    filter_from_agent: False
+                    is_displayable: False
 
         update_profile:
             description: "Writes the visitor's first name, last name, and email onto the anonymous Contact created at survey time. Used by Phase 4 once a booking has been placed and the visitor provides their real identity."
@@ -1374,3 +1413,15 @@ subagent case_management:
                     label: "Outcome message"
                     is_displayable: True
                     filter_from_agent: False
+
+connection customer_web_client:
+    adaptive_response_allowed: True
+    outbound_route_name: "flow://Route_from_ASA"
+    outbound_route_type: "OmniChannelFlow"
+    escalation_message: "escalating"
+
+modality voice:
+    voice_id: "UgBBYS2sOqTuMpoF3BR0"
+    outbound_speed: 1.0
+    outbound_stability: 0.65
+    outbound_similarity: 0.75

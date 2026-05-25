@@ -1,0 +1,52 @@
+<template>
+    <div class="harness">
+        <div class="harness__editor">
+            <div class="harness__toolbar">
+                <button type="button" class="harness__sample-btn" onclick={handleSampleSingle}>Single</button>
+                <button type="button" class="harness__sample-btn" onclick={handleSampleMultiple}>Multiple (3)</button>
+                <button type="button" class="harness__sample-btn" onclick={handleSampleEmpty}>Empty</button>
+                <button type="button" class="harness__sample-btn" onclick={handleSampleError}>Error</button>
+                <button type="button" class="harness__sample-btn" onclick={handleClear}>Clear</button>
+                <span class="harness__spacer"></span>
+                <label class="harness__width-label">
+                    Width:
+                    <select onchange={handleWidthChange} class="harness__width-select">
+                        <template for:each={widthOptions} for:item="opt">
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        </template>
+                    </select>
+                </label>
+            </div>
+
+            <lightning-textarea
+                class="harness__textarea"
+                label="flightsJSON payload"
+                variant="label-hidden"
+                value={jsonInput}
+                onchange={handleJsonChange}
+                placeholder="Paste flightsJSON payload here, then click Render">
+            </lightning-textarea>
+
+            <div class="harness__render-row">
+                <button type="button" class="harness__render-btn" onclick={handleRender}>Render</button>
+                <template lwc:if={parseError}>
+                    <span class="harness__error">JSON parse error: {parseError}</span>
+                </template>
+            </div>
+        </div>
+
+        <div class="harness__preview">
+            <div class="harness__chat-mock" style={frameStyle}>
+                <div class="harness__chat-bubble harness__chat-bubble_agent">
+                    Here are your flight options.
+                </div>
+                <c-skywave-flight-search-result-renderer
+                    value={currentValue}>
+                </c-skywave-flight-search-result-renderer>
+                <div class="harness__chat-bubble harness__chat-bubble_user">
+                    Book flight SW1200
+                </div>
+            </div>
+        </div>
+    </div>
+</template>

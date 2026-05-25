@@ -4,6 +4,14 @@
     <hasActivationRequired>false</hasActivationRequired>
     <label>Skywave Agent User</label>
     <classAccesses>
+        <apexClass>Demo_HelloData</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Demo_HelloService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
         <apexClass>Skywave_ResolveContact</apexClass>
         <enabled>true</enabled>
     </classAccesses>
@@ -21,6 +29,10 @@
     </classAccesses>
     <classAccesses>
         <apexClass>Skywave_FlightSearch</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_FlightSearchResultData</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>

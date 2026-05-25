@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Apex access for Demo_Renderer_Agent.</description>
+    <hasActivationRequired>false</hasActivationRequired>
+    <label>Demo Renderer Access</label>
+    <classAccesses>
+        <apexClass>Demo_HelloData</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Demo_HelloService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+</PermissionSet>

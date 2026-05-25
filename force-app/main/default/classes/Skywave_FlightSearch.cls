@@ -9,48 +9,36 @@ public with sharing class Skywave_FlightSearch {
 
         @InvocableVariable(label='Departure Date (YYYY-MM-DD)' required=true)
         public String departureDate;
-        
+
         @InvocableVariable(label='Fare Class (Economy/Premium Economy/Business/First)')
         public String fareClass;
     }
 
     public class FlightResponse {
-        @InvocableVariable(label='Flight Options')
-        public List<FlightOption> options;
+        @InvocableVariable(label='Flight Search Result Card' description='Structured payload for the Skywave Flight Search Result LWC renderer.')
+        public Skywave_FlightSearchResultData flightResult;
+
+        @InvocableVariable(label='Flight Options Narrative' description='Plain-text narrative the LLM uses to comment on the search results alongside the card.')
+        public String flightSummary;
+
+        @InvocableVariable(label='Success')
+        public Boolean success;
+
+        @InvocableVariable(label='Message')
+        public String message;
     }
 
     public class FlightOption {
-        @InvocableVariable(label='Starting Airport')
         public String startingAirport;
-
-        @InvocableVariable(label='Arriving Airport')
         public String arrivingAirport;
-
-        @InvocableVariable(label='Total Duration (min)')
         public Integer duration;
-
-        @InvocableVariable(label='Number of Legs')
         public Integer numberOfFlights;
-
-        @InvocableVariable(label='Stopover Locations')
         public String stopovers;
-
-        @InvocableVariable(label='Aircraft Type')
         public String aircraft;
-
-        @InvocableVariable(label='Flight Number(s)')
         public String flightNumber;
-
-        @InvocableVariable(label='Price')
         public String price;
-        
-        @InvocableVariable(label='Flight Record ID')
         public String flightId;
-        
-        @InvocableVariable(label='Departure Time')
         public String departureTime;
-        
-        @InvocableVariable(label='Arrival Time')
         public String arrivalTime;
     }
 
@@ -65,13 +53,30 @@ public with sharing class Skywave_FlightSearch {
 
     private static FlightResponse executeSearch(FlightRequest req) {
         FlightResponse res = new FlightResponse();
-        res.options = new List<FlightOption>();
-        
-        // Parse the departure date to determine day of week
+        try {
+            List<FlightOption> options = queryFlights(req);
+            res.flightResult = new Skywave_FlightSearchResultData(buildFlightsJSON(options, req.fareClass));
+            res.flightSummary = buildNarrative(req, options);
+            res.success = true;
+            res.message = options.isEmpty()
+                ? 'No flights matched.'
+                : options.size() + ' flight options returned.';
+        } catch (Exception e) {
+            System.debug('Error querying Flight__c: ' + e.getMessage());
+            res.flightResult = new Skywave_FlightSearchResultData(
+                '{"error":"' + e.getMessage().replace('"','\\"') + '"}'
+            );
+            res.flightSummary = 'I could not load flights right now.';
+            res.success = false;
+            res.message = 'Error: ' + e.getMessage();
+        }
+        return res;
+    }
+
+    private static List<FlightOption> queryFlights(FlightRequest req) {
         Date travelDate = Date.valueOf(req.departureDate);
         String dayOfWeek = getDayOfWeekField(travelDate);
-        
-        // Build dynamic SOQL query based on day of week
+
         String query = 'SELECT Id, Name, Flight_Number__c, Origin__c, Destination__c, ' +
                       'Scheduled_Departure_Time__c, Scheduled_Arrival_Time__c, ' +
                       'Duration_Minutes__c, Aircraft_Type__c, ' +
@@ -84,75 +89,83 @@ public with sharing class Skywave_FlightSearch {
                       'AND ' + dayOfWeek + ' = true ' +
                       'ORDER BY Scheduled_Departure_Time__c ' +
                       'LIMIT 10';
-        
+
         String origin = req.origin;
         String destination = req.destination;
-        
-        try {
-            List<Flight__c> flights = Database.query(query);
-            
-            for (Flight__c flight : flights) {
-                FlightOption opt = new FlightOption();
-                opt.flightId = flight.Id;
-                opt.startingAirport = flight.Origin__c;
-                opt.arrivingAirport = flight.Destination__c;
-                opt.duration = flight.Duration_Minutes__c != null ? Integer.valueOf(flight.Duration_Minutes__c) : 0;
-                opt.numberOfFlights = 1;
-                opt.stopovers = 'Non-stop';
-                opt.aircraft = flight.Aircraft_Type__c;
-                opt.flightNumber = flight.Flight_Number__c;
-                
-                // Calculate departure and arrival times for the specific travel date
-                DateTime departureDateTime = calculateDateTime(travelDate, flight.Scheduled_Departure_Time__c);
-                DateTime arrivalDateTime = calculateDateTime(travelDate, flight.Scheduled_Arrival_Time__c);
-                
-                // Handle flights that arrive next day
-                if (flight.Scheduled_Arrival_Time__c < flight.Scheduled_Departure_Time__c) {
-                    arrivalDateTime = arrivalDateTime.addDays(1);
-                }
-                
-                opt.departureTime = departureDateTime.format('h:mm a');
-                opt.arrivalTime = arrivalDateTime.format('h:mm a');
-                
-                // Set price based on fare class
-                opt.price = getPriceForFareClass(flight, req.fareClass);
-                
-                res.options.add(opt);
+
+        List<Flight__c> flights = Database.query(query);
+        List<FlightOption> options = new List<FlightOption>();
+
+        for (Flight__c flight : flights) {
+            FlightOption opt = new FlightOption();
+            opt.flightId = flight.Id;
+            opt.startingAirport = flight.Origin__c;
+            opt.arrivingAirport = flight.Destination__c;
+            opt.duration = flight.Duration_Minutes__c != null ? Integer.valueOf(flight.Duration_Minutes__c) : 0;
+            opt.numberOfFlights = 1;
+            opt.stopovers = 'Non-stop';
+            opt.aircraft = flight.Aircraft_Type__c;
+            opt.flightNumber = flight.Flight_Number__c;
+
+            DateTime departureDateTime = calculateDateTime(travelDate, flight.Scheduled_Departure_Time__c);
+            DateTime arrivalDateTime = calculateDateTime(travelDate, flight.Scheduled_Arrival_Time__c);
+            if (flight.Scheduled_Arrival_Time__c < flight.Scheduled_Departure_Time__c) {
+                arrivalDateTime = arrivalDateTime.addDays(1);
             }
-        } catch (Exception e) {
-            System.debug('Error querying Flight__c: ' + e.getMessage());
+            opt.departureTime = departureDateTime.format('h:mm a');
+            opt.arrivalTime = arrivalDateTime.format('h:mm a');
+
+            opt.price = getPriceForFareClass(flight, req.fareClass);
+            options.add(opt);
         }
-        
-        return res;
+        return options;
     }
-    
-    /**
-     * Returns the API field name for the day of week checkbox field
-     */
+
+    private static String buildFlightsJSON(List<FlightOption> options, String fareClass) {
+        String canonical = Skywave_FareClass.normalizeOrDefault(fareClass);
+        List<Map<String, Object>> items = new List<Map<String, Object>>();
+        for (FlightOption opt : options) {
+            items.add(new Map<String, Object>{
+                'flightId' => opt.flightId,
+                'flightNumber' => opt.flightNumber,
+                'startingAirport' => opt.startingAirport,
+                'arrivingAirport' => opt.arrivingAirport,
+                'departureTime' => opt.departureTime,
+                'arrivalTime' => opt.arrivalTime,
+                'duration' => opt.duration,
+                'stopovers' => opt.stopovers,
+                'aircraft' => opt.aircraft,
+                'price' => opt.price,
+                'fareClass' => canonical
+            });
+        }
+        return JSON.serialize(new Map<String, Object>{
+            'flights' => items,
+            'fareClass' => canonical
+        });
+    }
+
+    private static String buildNarrative(FlightRequest req, List<FlightOption> options) {
+        if (options.isEmpty()) {
+            return 'No flights match ' + req.origin + ' to ' + req.destination + ' on ' + req.departureDate + '.';
+        }
+        return 'Found ' + options.size() + ' flight option(s) from ' + req.origin + ' to ' + req.destination + ' on ' + req.departureDate + '.';
+    }
+
     private static String getDayOfWeekField(Date travelDate) {
         DateTime dt = DateTime.newInstance(travelDate, Time.newInstance(0, 0, 0, 0));
-        String dayName = dt.format('EEEE'); // Returns full day name like "Monday"
-        
+        String dayName = dt.format('EEEE');
         return 'Operates_' + dayName + '__c';
     }
-    
-    /**
-     * Combines a date with a time-only value to create a DateTime
-     */
+
     private static DateTime calculateDateTime(Date travelDate, Time scheduleTime) {
         if (scheduleTime == null) {
             return DateTime.newInstance(travelDate, Time.newInstance(0, 0, 0, 0));
         }
         return DateTime.newInstance(travelDate, scheduleTime);
     }
-    
-    /**
-     * Returns the formatted price string based on fare class
-     */
+
     private static String getPriceForFareClass(Flight__c flight, String fareClass) {
-        // Normalise loose names ("business", "economy") onto the
-        // canonical Choice/Choice Extra/Basic the org understands.
-        // Falls back to Choice when the agent didn't specify a class.
         String canonical = Skywave_FareClass.normalizeOrDefault(fareClass);
         Decimal price = 0;
 

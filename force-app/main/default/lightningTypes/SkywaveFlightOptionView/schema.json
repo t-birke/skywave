@@ -1,5 +1,0 @@
-{
-    "title": "Skywave Flight Option",
-    "description": "One flight option from Skywave_FlightSearch — rendered as a tappable card.",
-    "lightning:type": "@apexClassType/c__Skywave_FlightSearch$FlightOption"
-}

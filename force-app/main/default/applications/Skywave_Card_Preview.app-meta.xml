@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomApplication xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Local-dev harness for iterating on Skywave chat-card LWCs without redeploying to ESD.</description>
+    <formFactors>Large</formFactors>
+    <isNavAutoTempTabsDisabled>false</isNavAutoTempTabsDisabled>
+    <isNavPersonalizationDisabled>false</isNavPersonalizationDisabled>
+    <isNavTabPersistenceDisabled>false</isNavTabPersistenceDisabled>
+    <label>Skywave Card Preview</label>
+    <navType>Standard</navType>
+    <tabs>Skywave_Card_Preview</tabs>
+    <uiType>Lightning</uiType>
+</CustomApplication>
