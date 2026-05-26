@@ -68,6 +68,12 @@ variables:
     selected_seat_preference: mutable string = ""
         label: "Selected Seat Preference"
         description: "Seat preference (Window/Aisle/blank) pinned at flight-pick."
+    selected_booking_code: mutable string = ""
+        label: "Selected Booking Code"
+        description: "Confirmation code returned by ack_profile_form once the Booking__c is inserted (Pending/Unpaid). The agent passes this to present_payment_form so the payment widget can flip the right row to Paid."
+    selected_total_charged: mutable string = ""
+        label: "Selected Total Charged"
+        description: "Total amount string (e.g. '$1430.00') returned by ack_profile_form. Displayed in the payment-picker card."
     check_imminent_flights_success: mutable boolean = False
         label: "Check Imminent Flights Success"
         description: ""
@@ -350,13 +356,16 @@ subagent flight_management:
                   - Text fallback: if instead of using the form the visitor types name + email in chat (e.g. "tom birke, tom@example.com, +1 415 555 0101"): call {!@actions.update_profile} with firstName, lastName, email, and phone if provided. Do NOT echo back — invocation IS the confirmation.
 
             if @variables.booking_step == "payment":
-                | Profile is saved. Collect payment.
-                  - If the visitor hasn't picked a method, present exactly: "How would you like to pay? Apple Pay, Saved card, or Demo card."
-                  - When they pick one of those three exact strings: IMMEDIATELY call {!@actions.process_payment} with paymentMethod = their choice (exact string). Do NOT say "processing your payment" — invocation IS the processing.
+                | Profile saved and a Pending/Unpaid Booking__c is held under {!@variables.selected_booking_code} for {!@variables.selected_total_charged}. Show the inline payment-picker card so the visitor can complete payment.
+                  - On entering this step, IMMEDIATELY call {!@actions.present_payment_form} with contactId, bookingCode, and totalCharged — that renders the payment card.
+
+                    The output of this action is always renderable. Always use show_command to display the result to the user. After present_payment_form completes, you MUST present the formData output to the visitor. ALWAYS show the structured action output (the Skywave Payment Picker card). Do NOT ask "how would you like to pay" in text — the card collects the choice. Do NOT rewrite, restate, or summarize the payment options as plain text — the interactive card is contained in the formData output and must be displayed as-is. In your text reply alongside the card, keep it short (1 sentence) — e.g. "Almost done — choose how you'd like to pay." Do NOT enumerate the buttons.
+                  - Do NOT call any process_payment action — there is no such agent action anymore. The card invokes Apex directly to flip the booking from Unpaid to Paid.
+                  - When the visitor sends the exact phrase "Payment completed" (the cue from the payment LWC): IMMEDIATELY call {!@actions.confirm_booking} with contactId and bookingCode. That re-reads the booking from the DB to verify the payment actually flipped through.
 
             if @variables.booking_step == "confirm":
-                | Payment succeeded. Issue the ticket NOW.
-                  IMMEDIATELY call {!@actions.confirm_booking} with no further dialog. Then tell the visitor their ticket is confirmed and quote @outputs.confirmationCodes.
+                | Payment cue received. Verify the booking actually flipped to Paid before declaring success.
+                  IMMEDIATELY call {!@actions.confirm_booking} with contactId and bookingCode. When @outputs.success indicates the booking is verified, tell the visitor their ticket is confirmed and quote @outputs.confirmationCodes. Otherwise, share @outputs.errorMessage and offer to retry payment.
 
             if @variables.booking_step == "done":
                 | Booking is fully confirmed. Code(s): {!@variables.booked_confirmation_codes}.
@@ -417,26 +426,27 @@ subagent flight_management:
                 with contactId = @variables.resolved_contact_id
 
             ack_profile_form: @actions.ack_profile_form
-                description: "Invoke immediately when the visitor sends the exact phrase 'Profile created' — that text is the cue from the profile form LWC that the form has been submitted. Calling this action IS how the agent advances out of booking_step=profile."
-                with contactId = @variables.resolved_contact_id
-                set @variables.profile_collected = @outputs.success
-
-            process_payment: @actions.process_payment
-                description: "Validates the visitor's payment-method choice and pins it for confirm_booking to use. Invoke as soon as the visitor picks Apple Pay / Saved card / Demo card."
-                with contactId = @variables.resolved_contact_id
-                with paymentMethod = ...
-                set @variables.payment_processed = @outputs.success
-                set @variables.selected_payment_method = @outputs.paymentMethod
-
-            confirm_booking: @actions.confirm_booking
-                description: "Issues the ticket — this is the single DB write in the booking flow. Invoke immediately after process_payment succeeds. Pulls all pinned selection variables (flight/date/fare/payment) and inserts a Confirmed/Paid Booking__c plus segment."
+                description: "Invoke as soon as the visitor's profile is saved — either after the 'Profile created' cue from the form LWC, or after update_profile (text-fallback path) succeeds. This action does TWO things: marks profile_collected and inserts the Booking__c (Pending/Unpaid) using the pinned selection variables. Returns bookingCode + totalCharged for the agent to pin into selected_booking_code + selected_total_charged for the payment widget."
                 with contactId = @variables.resolved_contact_id
                 with flightId = @variables.selected_flight_id
                 with travelDate = @variables.selected_travel_date
                 with fareClass = @variables.selected_fare_class
-                with paymentMethod = @variables.selected_payment_method
                 with checkedBags = @variables.selected_checked_bags
                 with seatPreference = @variables.selected_seat_preference
+                set @variables.profile_collected = @outputs.success
+                set @variables.selected_booking_code = @outputs.bookingCode
+                set @variables.selected_total_charged = @outputs.totalCharged
+
+            present_payment_form: @actions.present_payment_form
+                description: "Display the inline payment-picker card (Apple Pay / Credit Card / Demo Pay). Invoke ONCE when booking_step transitions to 'payment'. The card calls Apex imperatively for the demo charge, so the agent does NOT call any 'process_payment' action — the LWC handles payment end-to-end. Once the visitor pays, the LWC posts 'Payment completed' to chat as the cue."
+                with contactId = @variables.resolved_contact_id
+                with bookingCode = @variables.selected_booking_code
+                with totalCharged = @variables.selected_total_charged
+
+            confirm_booking: @actions.confirm_booking
+                description: "Verify-only — re-reads the booking from the DB to confirm the payment widget actually ran and Status/Payment_Status flipped. Invoke when the visitor sends 'Payment completed' (cue from the payment LWC). If the booking is still Unpaid, surface that to the visitor instead of declaring success."
+                with contactId = @variables.resolved_contact_id
+                with bookingCode = @variables.selected_booking_code
                 set @variables.booking_confirmed = @outputs.success
                 set @variables.booked_confirmation_codes = @outputs.confirmationCodes
 
@@ -682,83 +692,16 @@ subagent flight_management:
                     is_displayable: False
 
         ack_profile_form:
-            description: "Acknowledges the 'Profile created' cue sent by the profile form LWC after a successful submit. Returns success so the booking_step state machine advances to payment."
-            label: "Acknowledge Profile Form"
+            description: "Acknowledges that the visitor profile is saved AND inserts the Booking__c (Pending/Unpaid) using pinned selection variables. Returns the bookingCode + totalCharged for the agent to pin and pass to the payment widget."
+            label: "Acknowledge Profile + Create Booking"
             require_user_confirmation: False
-            include_in_progress_indicator: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Reserving your booking"
             target: "apex://Skywave_AckProfileForm"
 
             inputs:
                 "contactId": string
                     description: "The Contact Id whose profile was just saved."
-                    label: "Contact Id"
-                    is_required: False
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-
-            outputs:
-                "success": boolean
-                    description: "True — the form was acknowledged."
-                    label: "success"
-                    is_displayable: False
-                    is_used_by_planner: True
-                "message": string
-                    description: "Acknowledgement detail."
-                    label: "message"
-                    is_displayable: False
-                    is_used_by_planner: True
-
-        process_payment:
-            description: "Charges the chosen payment method against every Pending Confirmation booking for the Contact. Demo only — no real charge. Three accepted methods: Apple Pay, Saved card, Demo card."
-            label: "Process Payment"
-            require_user_confirmation: False
-            include_in_progress_indicator: True
-            progress_indicator_message: "Processing payment"
-            target: "apex://Skywave_ProcessPayment"
-
-            inputs:
-                "contactId": string
-                    description: "The Contact whose Pending Confirmation bookings should be charged."
-                    label: "Contact Id"
-                    is_required: True
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-                "paymentMethod": string
-                    description: "The payment method the visitor chose, extracted from their message. Must be exactly one of: Apple Pay, Saved card, Demo card."
-                    label: "Payment Method"
-                    is_required: True
-                    is_user_input: True
-                    complex_data_type_name: "lightning__textType"
-
-            outputs:
-                "success": boolean
-                    description: "True if the payment-method choice validated."
-                    label: "success"
-                    is_displayable: True
-                    is_used_by_planner: True
-                "errorMessage": string
-                    description: "Reason payment failed (e.g. unknown method)."
-                    label: "error message"
-                    is_displayable: False
-                    is_used_by_planner: True
-                "paymentMethod": string
-                    description: "Echoed payment method — pin into selected_payment_method."
-                    label: "Payment Method"
-                    is_displayable: True
-                    is_used_by_planner: True
-                    complex_data_type_name: "lightning__textType"
-
-        confirm_booking:
-            description: "Issues the ticket — the single DB write in the booking flow. Inserts a Confirmed/Paid Booking__c plus its segment using the visitor's pinned selection variables. Call once at the end after process_payment."
-            label: "Confirm Booking"
-            require_user_confirmation: False
-            include_in_progress_indicator: True
-            progress_indicator_message: "Issuing your ticket"
-            target: "apex://Skywave_ConfirmBooking"
-
-            inputs:
-                "contactId": string
-                    description: "The Contact whose booking is being issued."
                     label: "Contact Id"
                     is_required: True
                     is_user_input: False
@@ -770,7 +713,7 @@ subagent flight_management:
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
                 "travelDate": string
-                    description: "Travel date YYYY-MM-DD pinned at flight-pick (selected_travel_date)."
+                    description: "Travel date pinned at flight-pick (selected_travel_date)."
                     label: "Travel Date"
                     is_required: True
                     is_user_input: False
@@ -781,12 +724,6 @@ subagent flight_management:
                     is_required: True
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
-                "paymentMethod": string
-                    description: "Payment method pinned at payment step (selected_payment_method)."
-                    label: "Payment Method"
-                    is_required: True
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
                 "checkedBags": object
                     description: "Number of checked bags (selected_checked_bags)."
                     label: "Checked Bags"
@@ -794,7 +731,7 @@ subagent flight_management:
                     is_user_input: False
                     complex_data_type_name: "lightning__integerType"
                 "seatPreference": string
-                    description: "Seat preference pinned at flight-pick (selected_seat_preference)."
+                    description: "Seat preference (selected_seat_preference)."
                     label: "Seat Preference"
                     is_required: False
                     is_user_input: False
@@ -802,29 +739,122 @@ subagent flight_management:
 
             outputs:
                 "success": boolean
-                    description: "True if the booking was issued."
+                    description: "True if the booking was created."
+                    label: "success"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "message": string
+                    description: "Status detail."
+                    label: "message"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "bookingCode": string
+                    description: "Confirmation code of the just-created booking — pin into selected_booking_code."
+                    label: "Booking Code"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "totalCharged": string
+                    description: "Total amount string (e.g. $1430.00) — pin into selected_total_charged."
+                    label: "Total Charged"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+
+        present_payment_form:
+            description: "Renders the Skywave Payment Picker card so the visitor can pay (Apple Pay / Credit card / Demo Pay). The card calls Apex imperatively to flip the booking to Paid; the agent does NOT charge anything."
+            label: "Present Payment Picker"
+            require_user_confirmation: False
+            include_in_progress_indicator: False
+            target: "apex://Skywave_PresentPaymentForm"
+
+            inputs:
+                "contactId": string
+                    description: "The Contact Id (resolved at session start)."
+                    label: "Contact Id"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "bookingCode": string
+                    description: "Confirmation code of the Pending/Unpaid booking that the payment widget should flip (selected_booking_code)."
+                    label: "Booking Code"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "totalCharged": string
+                    description: "Total amount string to display in the payment widget (selected_total_charged)."
+                    label: "Total Charged"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "formData": object
+                    description: "Structured payload rendered as the Skywave Payment Picker chat card."
+                    label: "Form Data"
+                    complex_data_type_name: "c__SkywavePaymentForm"
+                    filter_from_agent: True
+                    is_displayable: True
+                "success": boolean
+                    description: "True if the payment payload was prepared."
+                    label: "success"
+                    complex_data_type_name: "lightning__booleanType"
+                    filter_from_agent: False
+                    is_displayable: False
+                "message": string
+                    description: "Status detail."
+                    label: "Message"
+                    complex_data_type_name: "lightning__textType"
+                    filter_from_agent: False
+                    is_displayable: False
+
+        confirm_booking:
+            description: "Verify-only — re-reads the booking from the DB to confirm the payment widget actually flipped Status/Payment_Status. Invoke when the visitor sends 'Payment completed'. No DML; defence against forged client cues."
+            label: "Verify Booking"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Issuing your ticket"
+            target: "apex://Skywave_ConfirmBooking"
+
+            inputs:
+                "contactId": string
+                    description: "The Contact whose booking is being verified."
+                    label: "Contact Id"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "bookingCode": string
+                    description: "Confirmation code of the booking the payment widget just paid (selected_booking_code)."
+                    label: "Booking Code"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "success": boolean
+                    description: "True if the booking is Confirmed and Paid."
                     label: "success"
                     is_displayable: True
                     is_used_by_planner: True
                 "errorMessage": string
-                    description: "Reason the confirm failed."
+                    description: "Reason the verify failed (still Unpaid, missing booking, etc)."
                     label: "error message"
                     is_displayable: False
                     is_used_by_planner: True
                 "confirmedCount": object
-                    description: "Number of bookings issued (always 1 in the current flow)."
+                    description: "Number of bookings verified (always 1)."
                     label: "Confirmed Count"
                     is_displayable: True
                     is_used_by_planner: True
                     complex_data_type_name: "lightning__integerType"
                 "confirmationCodes": string
-                    description: "Confirmation code of the issued booking."
+                    description: "Confirmation code of the verified booking."
                     label: "Confirmation Codes"
                     is_displayable: True
                     is_used_by_planner: True
                     complex_data_type_name: "lightning__textType"
                 "totalCharged": string
-                    description: "Total amount charged (e.g. $1430.00)."
+                    description: "Total amount paid (e.g. $1430.00)."
                     label: "Total Charged"
                     is_displayable: True
                     is_used_by_planner: True

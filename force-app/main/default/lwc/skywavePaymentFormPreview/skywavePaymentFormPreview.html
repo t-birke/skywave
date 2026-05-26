@@ -1,0 +1,29 @@
+<template>
+    <div class="harness">
+        <div class="controls">
+            <h2>Payment Picker Preview</h2>
+            <div class="row">
+                <button onclick={handleRender}>Render</button>
+                <button onclick={handleClear}>Clear</button>
+            </div>
+            <div class="row">
+                <label for="width-select">Width:</label>
+                <select id="width-select" onchange={handleWidthChange}>
+                    <template for:each={widthOptions} for:item="opt">
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    </template>
+                </select>
+            </div>
+            <lightning-textarea label="paymentStateJSON" value={jsonInput} onchange={handleJsonChange} class="json-input"></lightning-textarea>
+            <template lwc:if={parseError}>
+                <p class="error">JSON parse error: {parseError}</p>
+            </template>
+        </div>
+        <div class="preview">
+            <h2>Card</h2>
+            <div class="chat-frame" style={frameStyle}>
+                <c-skywave-payment-form-renderer value={currentValue}></c-skywave-payment-form-renderer>
+            </div>
+        </div>
+    </div>
+</template>

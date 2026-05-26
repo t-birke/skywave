@@ -1,0 +1,5 @@
+{
+    "title": "Skywave Payment Form",
+    "description": "Output from Skywave_PresentPaymentForm — JSON envelope rendered as a payment-picker card (Apple Pay / Credit Card / Demo Pay).",
+    "lightning:type": "@apexClassType/c__Skywave_PaymentFormData"
+}

@@ -1,74 +1,81 @@
 /**
- * Validate payment-method choice. No DB writes.
+ * Demo payment endpoint for the Skywave Payment Picker LWC.
  *
- * Phase 3.5b moves all DB writes into Skywave_ConfirmBooking. This
- * action's only job is now to validate the visitor's chosen payment
- * method (one of three accepted strings) so the agent knows whether
- * to advance to confirm. The agent pins the method into
- * @variables.selected_payment_method; Skywave_ConfirmBooking
- * stamps the value onto the Booking__c at insert.
+ * Visitor clicks "Demo Pay" inside the chat-iframe LWC. The LWC calls
+ * this @AuraEnabled method directly (not through the agent). Single
+ * atomic transition: Status `Pending Confirmation` -> `Confirmed`,
+ * Payment_Status `Unpaid` -> `Paid`.
  *
- * Three named methods are accepted: Apple Pay, Saved card, Demo card.
- * Demo only — no real charge ever happens.
+ * No real charge — Apple Pay / Credit Card buttons in the LWC are
+ * intentionally disabled with an inline "demo only" hint, never reach
+ * this method. Demo Pay is the only call path.
+ *
+ * Returns confirmationCode for the LWC to display, then the LWC posts
+ * "Payment completed" to chat as the cue. The agent verifies via
+ * Skywave_ConfirmBooking (read-only) before declaring success to the
+ * visitor — defence against client-cue spoofing.
+ *
+ * Runs `without sharing` so the ESW site guest user can update the
+ * Booking__c regardless of OWD on Booking__c.
  */
-public with sharing class Skywave_ProcessPayment {
+public without sharing class Skywave_ProcessPayment {
 
-    private static final Set<String> ALLOWED_METHODS = new Set<String>{
-        'Apple Pay', 'Saved card', 'Demo card'
-    };
-
-    public class Input {
-        @InvocableVariable(label='Contact Id' required=true)
-        public String contactId;
-
-        @InvocableVariable(
-            label='Payment Method'
-            description='Apple Pay, Saved card, or Demo card'
-            required=true
-        )
-        public String paymentMethod;
+    public class Result {
+        @AuraEnabled public Boolean success;
+        @AuraEnabled public String message;
+        @AuraEnabled public String bookingCode;
+        @AuraEnabled public String paymentMethod;
     }
 
-    public class Output {
-        @InvocableVariable(label='success')
-        public Boolean success;
+    @AuraEnabled
+    public static Result processPayment(String bookingCode, String paymentMethod) {
+        Result r = new Result();
+        r.success = false;
 
-        @InvocableVariable(label='error message')
-        public String errorMessage;
-
-        @InvocableVariable(label='Payment method used')
-        public String paymentMethod;
-    }
-
-    @InvocableMethod(
-        label='Skywave: Process payment'
-        description='Validates the visitor payment-method choice. No DB write — Skywave_ConfirmBooking stamps the method onto the booking at insert. Demo only.'
-        category='Skywave'
-    )
-    public static List<Output> processPayments(List<Input> inputs) {
-        List<Output> outs = new List<Output>();
-        for (Input req : inputs) {
-            outs.add(processOne(req));
+        if (String.isBlank(bookingCode)) {
+            r.message = 'Booking code is required.';
+            return r;
         }
-        return outs;
-    }
+        // We accept any string here — the LWC enforces the three-method
+        // contract; this method only cares that something was passed.
+        String method = paymentMethod == null ? 'Demo card' : paymentMethod.trim();
 
-    private static Output processOne(Input req) {
-        Output out = new Output();
-        out.success = false;
+        try {
+            List<Booking__c> matches = [
+                SELECT Id, Status__c, Payment_Status__c, Confirmation_Code__c
+                FROM Booking__c
+                WHERE Confirmation_Code__c = :bookingCode
+                LIMIT 1
+            ];
+            if (matches.isEmpty()) {
+                r.message = 'Booking not found for code: ' + bookingCode;
+                return r;
+            }
+            Booking__c b = matches[0];
 
-        if (String.isBlank(req.contactId)) {
-            out.errorMessage = 'Contact Id is required.';
-            return out;
+            // Idempotent — visitor double-tapping shouldn't error.
+            if (b.Payment_Status__c == 'Paid' && b.Status__c == 'Confirmed') {
+                r.success = true;
+                r.bookingCode = b.Confirmation_Code__c;
+                r.paymentMethod = method;
+                r.message = 'Already paid.';
+                return r;
+            }
+
+            b.Payment_Status__c = 'Paid';
+            b.Payment_Method__c = method;
+            b.Status__c = 'Confirmed';
+            update b;
+
+            r.success = true;
+            r.bookingCode = b.Confirmation_Code__c;
+            r.paymentMethod = method;
+            r.message = 'Payment completed.';
+        } catch (Exception e) {
+            r.message = 'Payment failed: ' + e.getMessage();
+            System.debug('Skywave_ProcessPayment error: ' + e.getMessage() +
+                '\n' + e.getStackTraceString());
         }
-        String method = req.paymentMethod == null ? '' : req.paymentMethod.trim();
-        if (!ALLOWED_METHODS.contains(method)) {
-            out.errorMessage = 'Unknown payment method: ' + method +
-                '. Use Apple Pay, Saved card, or Demo card.';
-            return out;
-        }
-        out.paymentMethod = method;
-        out.success = true;
-        return out;
+        return r;
     }
 }

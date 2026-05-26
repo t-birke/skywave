@@ -1,0 +1,60 @@
+<template>
+    <template lwc:if={placeholderMessage}>
+        <p class="sw-placeholder">{placeholderMessage}</p>
+    </template>
+    <template lwc:elseif={completed}>
+        <div class="sw-pay-success">
+            <span class="sw-pay-success__icon">✓</span>
+            <div>
+                <div class="sw-pay-success__title">Payment completed</div>
+                <div class="sw-pay-success__sub">Booking {bookingCode} · {totalCharged}</div>
+            </div>
+        </div>
+    </template>
+    <template lwc:elseif={processing}>
+        <div class="sw-pay-anim">
+            <div class="sw-pay-anim__row">
+                <span class="sw-pay-anim__card" aria-label="credit card">💳</span>
+                <span class="sw-pay-anim__dot sw-pay-anim__dot_1"></span>
+                <span class="sw-pay-anim__dot sw-pay-anim__dot_2"></span>
+                <span class="sw-pay-anim__dot sw-pay-anim__dot_3"></span>
+                <span class="sw-pay-anim__dot sw-pay-anim__dot_4"></span>
+                <span class="sw-pay-anim__dot sw-pay-anim__dot_5"></span>
+                <span class="sw-pay-anim__plane" aria-label="airplane">✈</span>
+            </div>
+            <div class="sw-pay-anim__caption">Processing payment…</div>
+        </div>
+    </template>
+    <template lwc:else>
+        <article class="sw-pay-card">
+            <header class="sw-pay-card__header">
+                <h3 class="sw-pay-card__title">How would you like to pay?</h3>
+                <p class="sw-pay-card__sub">
+                    Booking <strong>{bookingCode}</strong> · <strong>{totalCharged}</strong>
+                </p>
+            </header>
+
+            <div class="sw-pay-options">
+                <button type="button" class="sw-pay-btn sw-pay-btn_apple" onclick={handleAppleClick}>
+                    <span class="sw-pay-btn__icon"></span>
+                    <span class="sw-pay-btn__label">Apple Pay</span>
+                </button>
+                <button type="button" class="sw-pay-btn sw-pay-btn_card" onclick={handleCardClick}>
+                    <span class="sw-pay-btn__icon">💳</span>
+                    <span class="sw-pay-btn__label">Credit card</span>
+                </button>
+                <button type="button" class="sw-pay-btn sw-pay-btn_demo" onclick={handleDemoClick}>
+                    <span class="sw-pay-btn__icon">★</span>
+                    <span class="sw-pay-btn__label">Demo Pay</span>
+                </button>
+            </div>
+
+            <template lwc:if={hasDemoNotice}>
+                <p class="sw-pay-notice">{demoNotice}</p>
+            </template>
+            <template lwc:if={errorMessage}>
+                <p class="sw-pay-error">{errorMessage}</p>
+            </template>
+        </article>
+    </template>
+</template>

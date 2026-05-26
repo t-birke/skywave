@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>66.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>Skywave Payment Form Renderer</masterLabel>
+    <description>Three-button payment picker (Apple Pay / Credit Card / Demo Pay) shown in chat. Demo Pay calls Apex imperatively; Apple Pay and Credit Card show an inline demo-only hint. Cues the agent with "Payment completed" on success.</description>
+    <targets>
+        <target>lightning__AgentforceOutput</target>
+        <target>lightning__AgentforceInput</target>
+        <target>lightningSnapin__ChatMessage</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__AgentforceOutput">
+            <sourceType name="c__SkywavePaymentForm"/>
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>
