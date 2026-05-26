@@ -112,17 +112,33 @@ public with sharing class Skywave_ConfirmBooking {
 
         String canonicalFareClass = Skywave_FareClass.normalizeOrDefault(req.fareClass);
 
+        // Resolve either a Salesforce Id (15/18) or a flight number — see
+        // Skywave_BookFlight for context on why both shapes show up.
+        String key = req.flightId.trim();
+        List<Flight__c> flights;
         try {
-            List<Flight__c> flights = [
-                SELECT Id, Scheduled_Departure_Time__c, Scheduled_Arrival_Time__c,
-                       Base_Price_Economy__c, Base_Price_Premium_Economy__c,
-                       Base_Price_Business__c, Base_Price_First__c
-                FROM Flight__c
-                WHERE Id = :req.flightId
-                LIMIT 1
-            ];
+            if (key.length() == 15 || key.length() == 18) {
+                flights = [
+                    SELECT Id, Scheduled_Departure_Time__c, Scheduled_Arrival_Time__c,
+                           Base_Price_Economy__c, Base_Price_Premium_Economy__c,
+                           Base_Price_Business__c, Base_Price_First__c
+                    FROM Flight__c
+                    WHERE Id = :key
+                    LIMIT 1
+                ];
+            }
+            if (flights == null || flights.isEmpty()) {
+                flights = [
+                    SELECT Id, Scheduled_Departure_Time__c, Scheduled_Arrival_Time__c,
+                           Base_Price_Economy__c, Base_Price_Premium_Economy__c,
+                           Base_Price_Business__c, Base_Price_First__c
+                    FROM Flight__c
+                    WHERE Flight_Number__c = :key
+                    LIMIT 1
+                ];
+            }
             if (flights.isEmpty()) {
-                out.errorMessage = 'Flight not found for id: ' + req.flightId;
+                out.errorMessage = 'Flight not found for id or number: ' + key;
                 return out;
             }
             Flight__c flight = flights[0];

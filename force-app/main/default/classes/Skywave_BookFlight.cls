@@ -85,19 +85,41 @@ public with sharing class Skywave_BookFlight {
         }
 
         try {
-            List<Flight__c> flights = [
-                SELECT Id, Name, Flight_Number__c, Origin__c, Destination__c,
-                       Scheduled_Departure_Time__c, Scheduled_Arrival_Time__c,
-                       Duration_Minutes__c, Aircraft_Type__c,
-                       Base_Price_Economy__c, Base_Price_Premium_Economy__c,
-                       Base_Price_Business__c, Base_Price_First__c
-                FROM Flight__c
-                WHERE Id = :req.flightId
-                LIMIT 1
-            ];
+            // Resolve either a Salesforce Id (15/18 chars) or a flight number
+            // (e.g. "SW1200"). The CLT card book button passes the flight
+            // number via chat ("Book flight SW1200") because the structured
+            // flightResult output is filter_from_agent=True — the planner
+            // can't see Ids. Other call paths (text-only "book flight
+            // a01000000000001") may pass a real Id, so we accept both.
+            String key = req.flightId.trim();
+            List<Flight__c> flights;
+            if (key.length() == 15 || key.length() == 18) {
+                flights = [
+                    SELECT Id, Name, Flight_Number__c, Origin__c, Destination__c,
+                           Scheduled_Departure_Time__c, Scheduled_Arrival_Time__c,
+                           Duration_Minutes__c, Aircraft_Type__c,
+                           Base_Price_Economy__c, Base_Price_Premium_Economy__c,
+                           Base_Price_Business__c, Base_Price_First__c
+                    FROM Flight__c
+                    WHERE Id = :key
+                    LIMIT 1
+                ];
+            }
+            if (flights == null || flights.isEmpty()) {
+                flights = [
+                    SELECT Id, Name, Flight_Number__c, Origin__c, Destination__c,
+                           Scheduled_Departure_Time__c, Scheduled_Arrival_Time__c,
+                           Duration_Minutes__c, Aircraft_Type__c,
+                           Base_Price_Economy__c, Base_Price_Premium_Economy__c,
+                           Base_Price_Business__c, Base_Price_First__c
+                    FROM Flight__c
+                    WHERE Flight_Number__c = :key
+                    LIMIT 1
+                ];
+            }
             if (flights.isEmpty()) {
                 r.success = false;
-                r.errorMessage = 'Flight not found for id: ' + req.flightId;
+                r.errorMessage = 'Flight not found for id or number: ' + key;
                 return r;
             }
             Flight__c flight = flights[0];
