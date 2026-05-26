@@ -1,23 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Permission set for the Messaging End User that backs ECv2 chat sessions
-  on the Skywave embedded service deployment.
+  Permission set for the Site Guest User of the ESW deployment that backs
+  ECv2 chat sessions on Skywave.
 
-  Why this exists:
-    Custom Lightning Type renderers (e.g. SkywaveProfileFormRenderer) make
-    @AuraEnabled imperative calls (e.g. Skywave_SaveProfile.saveProfile)
-    from inside the chat iframe. The Messaging End User runs those calls
-    and has no Apex perms by default.
+  Runtime context (empirically verified, internal Salesforce confirmation):
+    ECv2 iframes its own LWR embedded-service site for security/public-access
+    purposes. ALL client-side @AuraEnabled / @wire calls from CLT renderer
+    LWCs run as that site's Guest User — NOT the per-session messaging end
+    user, NOT the EinsteinAgentUser, NOT Automated Process. The deployment's
+    site is auto-provisioned with name `ESW_SDO_Messaging_for_Web_*`.
 
-  This permset MUST be granted to the messaging end user. The recommended
-  path is to assign it via PermissionSetAssignment to the messaging end
-  user record(s) backing the chat — they're created on demand by ECv2,
-  so a script in /scripts/ should sweep newly-created users and assign.
+  Backend Apex executed by the agent (e.g. Skywave_PresentProfileForm) runs
+  as the EinsteinAgentUser and is unaffected by this permset.
+
+  Manual assignment step (one-time per org):
+    1. Find the ESW site backing the Skywave deployment:
+         SELECT GuestUserId FROM Site WHERE Name LIKE 'ESW_SDO_Messaging_for_Web_%'
+    2. Assign this permset to that GuestUserId. Either:
+       a. UI: Setup -> Permission Sets -> Skywave Embedded Messaging
+          -> Manage Assignments -> Add the guest user, OR
+       b. CLI: sf data create record -o <org> -s PermissionSetAssignment \
+              -v "AssigneeId=<guestUserId> PermissionSetId=<permsetId>"
 
   Class-access only — no object/field perms needed because Skywave_SaveProfile
-  runs `without sharing` and does not explicitly enforce FLS/CRUD.
-  Defense-in-depth: anonymous traffic can only invoke the two whitelisted
-  classes; they validate and gate every write.
+  runs `without sharing` and does not enforce FLS/CRUD inline.
+  Defense in depth: anonymous traffic can only invoke the two whitelisted
+  classes; both validate and gate every write themselves.
 -->
 <PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
     <description>Apex class access the Messaging End User needs to run imperative LWC calls inside the Skywave embedded chat iframe (profile form save).</description>
