@@ -14,13 +14,37 @@
   as the EinsteinAgentUser and is unaffected by this permset.
 
   Manual assignment step (one-time per org):
-    1. Find the ESW site backing the Skywave deployment:
-         SELECT GuestUserId FROM Site WHERE Name LIKE 'ESW_SDO_Messaging_for_Web_%'
-    2. Assign this permset to that GuestUserId. Either:
+    1. Find the runtime site for Skywave's ESD. The site name is NOT
+       predictable from the deployment name. Two empirical paths:
+
+       a. Submit the form once and watch DevTools Network tab for the
+          failing /<siteUrlPath>/webruntime/api/apex/execute request.
+          The path segment is the site name.
+
+       b. Setup -> Embedded Service Deployments -> Skywave deployment
+          -> Site field shows it.
+
+       On Skywave's `si` org as of 2026-05-26, this is `ESA_Deployment`,
+       NOT the auto-provisioned `ESW_SDO_Messaging_for_Web_*` site.
+
+    2. Look up that site's GuestUserId:
+         SELECT GuestUserId FROM Site WHERE Name = '<siteName>'
+
+    3. Assign this permset to that user:
        a. UI: Setup -> Permission Sets -> Skywave Embedded Messaging
           -> Manage Assignments -> Add the guest user, OR
        b. CLI: sf data create record -o <org> -s PermissionSetAssignment \
               -v "AssigneeId=<guestUserId> PermissionSetId=<permsetId>"
+
+    4. ALSO required: enable PermissionsApiEnabled on the site's
+       Profile. This is a profile-level system permission, not
+       permset-grantable. Setup -> Profiles -> <Site> Profile -> Edit
+       -> Administrative Permissions -> check "API Enabled" -> Save.
+
+       Without this the Aura dispatcher rejects @AuraEnabled calls with
+       "The Apex request is invalid" — a 500 from the
+       /webruntime/api/apex/execute endpoint with no ApexLog, no
+       exception trace.
 
   Class-access only — no object/field perms needed because Skywave_SaveProfile
   runs `without sharing` and does not enforce FLS/CRUD inline.
