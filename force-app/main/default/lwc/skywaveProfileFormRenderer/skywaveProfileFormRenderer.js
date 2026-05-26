@@ -1,7 +1,14 @@
 import { LightningElement, api, track } from 'lwc';
 import saveProfile from '@salesforce/apex/Skywave_SaveProfile.saveProfile';
 
-const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // 2 MB raw, before base64 inflation
+// Pre-resize gate. We always crop+resize to 512x512 JPEG q=0.5 in-browser
+// before sending to Apex — that yields ~30-80kB regardless of input. The
+// gate here is just a sanity bound on the original file the user picks
+// (e.g. reject a 50MB DSLR shot before we try to decode it). Same recipe
+// as the Electra Interactive demo (script.js#resizeImage).
+const MAX_AVATAR_BYTES = 20 * 1024 * 1024;
+const AVATAR_OUTPUT_SIZE = 512;
+const AVATAR_OUTPUT_QUALITY = 0.5;
 
 export default class SkywaveProfileFormRenderer extends LightningElement {
     @api value;
@@ -56,20 +63,48 @@ export default class SkywaveProfileFormRenderer extends LightningElement {
         const file = event.target.files && event.target.files[0];
         if (!file) return;
         if (file.size > MAX_AVATAR_BYTES) {
-            this.errorMessage = 'Avatar too large (max 2 MB).';
+            this.errorMessage = 'Avatar file too large.';
             return;
         }
         const reader = new FileReader();
         reader.onload = () => {
-            // dataURL form: "data:image/png;base64,AAAA..."
-            this.avatarBase64 = reader.result;
-            this.avatarPreview = reader.result;
-            this.avatarFileName = file.name || 'avatar.png';
+            // Decode the image, then crop+resize to 512x512 JPEG before
+            // sending to Apex. The original file may be a 4MB+ photo from
+            // the camera — base64 of that exceeds Aura request limits and
+            // wastes bandwidth besides. Resize matches Electra's recipe
+            // (square-center-crop, 512x512, JPEG q=0.5).
+            const img = new Image();
+            img.onload = () => {
+                const resized = this._resizeAvatar(img);
+                this.avatarBase64 = resized;
+                this.avatarPreview = resized;
+                this.avatarFileName = (file.name || 'avatar') + '.jpg';
+            };
+            img.onerror = () => { this.errorMessage = 'Could not decode image.'; };
+            img.src = reader.result;
         };
         reader.onerror = () => {
             this.errorMessage = 'Could not read image.';
         };
         reader.readAsDataURL(file);
+    }
+
+    _resizeAvatar(img) {
+        const canvas = document.createElement('canvas');
+        canvas.width = AVATAR_OUTPUT_SIZE;
+        canvas.height = AVATAR_OUTPUT_SIZE;
+        const ctx = canvas.getContext('2d');
+
+        // Square center crop, then scale to AVATAR_OUTPUT_SIZE.
+        const shortSide = Math.min(img.width, img.height);
+        const startX = (img.width - shortSide) / 2;
+        const startY = (img.height - shortSide) / 2;
+        ctx.drawImage(
+            img,
+            startX, startY, shortSide, shortSide,
+            0, 0, AVATAR_OUTPUT_SIZE, AVATAR_OUTPUT_SIZE
+        );
+        return canvas.toDataURL('image/jpeg', AVATAR_OUTPUT_QUALITY);
     }
 
     get isValid() {
