@@ -1,15 +1,15 @@
 /**
- * Phase 4 payment step. Marks every Pending Confirmation booking
- * for a Contact as Paid with the chosen payment method. Sits between
- * Skywave_UpdateContact and Skywave_ConfirmBooking — confirm should
- * only flip Pending → Confirmed once payment has succeeded.
+ * Validate payment-method choice. No DB writes.
  *
- * For the live audience demo there is no real payment processing.
- * Three named methods are accepted: "Apple Pay", "Saved card", and
- * "Demo card". All three succeed silently — cosmetic branding only,
- * for the eventual CLT card with real buttons. The action validates
- * that the named method is one of the three so a typo in the agent
- * prompt fails loudly rather than silently writing junk.
+ * Phase 3.5b moves all DB writes into Skywave_ConfirmBooking. This
+ * action's only job is now to validate the visitor's chosen payment
+ * method (one of three accepted strings) so the agent knows whether
+ * to advance to confirm. The agent pins the method into
+ * @variables.selected_payment_method; Skywave_ConfirmBooking
+ * stamps the value onto the Booking__c at insert.
+ *
+ * Three named methods are accepted: Apple Pay, Saved card, Demo card.
+ * Demo only — no real charge ever happens.
  */
 public with sharing class Skywave_ProcessPayment {
 
@@ -36,19 +36,13 @@ public with sharing class Skywave_ProcessPayment {
         @InvocableVariable(label='error message')
         public String errorMessage;
 
-        @InvocableVariable(label='Number of bookings paid')
-        public Integer paidCount;
-
-        @InvocableVariable(label='Total amount charged (sum across bookings)')
-        public String totalCharged;
-
         @InvocableVariable(label='Payment method used')
         public String paymentMethod;
     }
 
     @InvocableMethod(
         label='Skywave: Process payment'
-        description='Marks every Pending Confirmation booking for the Contact as Paid using the named method. Demo only — no real charge.'
+        description='Validates the visitor payment-method choice. No DB write — Skywave_ConfirmBooking stamps the method onto the booking at insert. Demo only.'
         category='Skywave'
     )
     public static List<Output> processPayments(List<Input> inputs) {
@@ -62,8 +56,6 @@ public with sharing class Skywave_ProcessPayment {
     private static Output processOne(Input req) {
         Output out = new Output();
         out.success = false;
-        out.paidCount = 0;
-        out.totalCharged = '$0.00';
 
         if (String.isBlank(req.contactId)) {
             out.errorMessage = 'Contact Id is required.';
@@ -76,35 +68,7 @@ public with sharing class Skywave_ProcessPayment {
             return out;
         }
         out.paymentMethod = method;
-
-        try {
-            List<Booking__c> pending = [
-                SELECT Id, Total_Amount__c, Payment_Status__c
-                FROM Booking__c
-                WHERE Contact__c = :req.contactId
-                  AND Status__c = 'Pending Confirmation'
-                  AND Payment_Status__c != 'Paid'
-            ];
-
-            if (pending.isEmpty()) {
-                out.success = true;
-                return out;
-            }
-
-            Decimal total = 0;
-            for (Booking__c b : pending) {
-                b.Payment_Status__c = 'Paid';
-                b.Payment_Method__c = method;
-                if (b.Total_Amount__c != null) total += b.Total_Amount__c;
-            }
-            update pending;
-
-            out.success = true;
-            out.paidCount = pending.size();
-            out.totalCharged = '$' + total.setScale(2).toPlainString();
-        } catch (Exception e) {
-            out.errorMessage = 'Payment failed: ' + e.getMessage();
-        }
+        out.success = true;
         return out;
     }
 }

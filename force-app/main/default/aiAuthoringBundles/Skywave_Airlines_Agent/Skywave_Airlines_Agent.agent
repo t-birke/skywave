@@ -48,14 +48,26 @@ variables:
         label: "Latest Flight Search Results"
         description: ""
     flight_booking_detail: mutable object
-        label: "Flight Booking Detail"
-        description: ""
+        label: "Flight Selection Detail"
+        description: "Quote-shaped DTO from book_flight (which only validates and quotes — confirmation comes later)."
     flight_booking_error_detail: mutable string
         label: "Flight Booking Error Detail"
         description: ""
-    flight_booking_error_flag: mutable boolean
-        label: "Flight Booking Error Flag"
-        description: ""
+    flight_selected: mutable boolean = False
+        label: "Flight Selected"
+        description: "True once book_flight has validated the visitor's choice and pinned the selection variables. Drives the router into booking_step=profile."
+    selected_flight_id: mutable string = ""
+        label: "Selected Flight Id"
+        description: "Flight__c Id pinned at flight-pick. Re-used by confirm_booking once the visitor reaches the end of the booking flow."
+    selected_travel_date: mutable string = ""
+        label: "Selected Travel Date"
+        description: "Travel date (YYYY-MM-DD) pinned at flight-pick. Re-used by confirm_booking."
+    selected_checked_bags: mutable number = 0
+        label: "Selected Checked Bags"
+        description: "Number of checked bags pinned at flight-pick. Defaults to 0."
+    selected_seat_preference: mutable string = ""
+        label: "Selected Seat Preference"
+        description: "Seat preference (Window/Aisle/blank) pinned at flight-pick."
     check_imminent_flights_success: mutable boolean = False
         label: "Check Imminent Flights Success"
         description: ""
@@ -143,7 +155,7 @@ start_agent agent_router:
                 set @variables.booking_step = "confirm"
             if @variables.profile_collected is True and @variables.payment_processed is False:
                 set @variables.booking_step = "payment"
-            if @variables.flight_booking_error_flag is True and @variables.profile_collected is False:
+            if @variables.flight_selected is True and @variables.profile_collected is False:
                 set @variables.booking_step = "profile"
 
             if @variables.ContactId is not None and @variables.resolved_contact_id == "":
@@ -289,7 +301,7 @@ subagent flight_management:
                 set @variables.booking_step = "confirm"
             if @variables.profile_collected is True and @variables.payment_processed is False:
                 set @variables.booking_step = "payment"
-            if @variables.flight_booking_error_flag is True and @variables.profile_collected is False:
+            if @variables.flight_selected is True and @variables.profile_collected is False:
                 set @variables.booking_step = "profile"
 
             if @variables.survey_resolved is False:
@@ -327,12 +339,12 @@ subagent flight_management:
                   - Search for flights: call {!@actions.search_flights} with origin (IATA), destination (IATA), departure date (YYYY-MM-DD), and fare class. Use canonical fare class names: Economy, Premium Economy, Business, First. Treat synonyms (economy plus → Premium Economy, business class → Business, etc.) as the canonical name.
 
                     The output of this action is always renderable. Always use show_command to display the result to the user. After search_flights completes, you MUST present the flightResult output to the visitor. ALWAYS show the structured action output (the Flight Search Result card). Do NOT rewrite, restate, or summarize the flight options as plain text or bullet lists — the interactive flight cards are contained in the flightResult output and must be displayed as-is. In your text reply alongside the cards, keep it short (1-2 sentences) for color only — e.g. confirm route + date and ask which flight they prefer. Do NOT enumerate flight numbers, times, or prices in prose; the cards already show them.
-                  - Book a flight: when the visitor agrees to a specific flight from search results, call {!@actions.book_flight} with contactId, flightId, travelDate, fareClass, checkedBags, seatPreference. Do NOT narrate "your booking is reserved" — calling the action IS the booking.
+                  - Select a flight: when the visitor agrees to a specific flight from search results, call {!@actions.book_flight} with contactId, flightId, travelDate, fareClass, checkedBags, seatPreference. This action does NOT create a booking yet — it just validates the choice and pins the selection. The booking is issued later by confirm_booking, after profile + payment. Do NOT narrate "your booking is reserved" — the booking does not exist yet.
 
             if @variables.booking_step == "profile":
-                | Booking is pending. Show the visitor the inline profile form so they can complete their details (name, email, phone, photo).
+                | A flight selection is held. Now collect the visitor's profile so the ticket can be issued. Show the inline profile form (name, email, phone, photo).
                   - On entering this step, IMMEDIATELY call {!@actions.present_profile_form} with contactId — that renders the form card. Do NOT ask for name/email in text first; the form is the primary surface.
-                  - In your text reply alongside the form card, keep it short (1 sentence) — e.g. "A few details to wrap up your booking." Do NOT enumerate the fields.
+                  - In your text reply alongside the form card, keep it short (1 sentence) — e.g. "A few details to wrap up your booking." Do NOT enumerate the fields. Do NOT claim the booking already exists.
                   - When the visitor sends the exact phrase "Profile created" (the cue from the form on successful submit): IMMEDIATELY call {!@actions.ack_profile_form} with contactId. That advances the booking to payment.
                   - Text fallback: if instead of using the form the visitor types name + email in chat (e.g. "tom birke, tom@example.com, +1 415 555 0101"): call {!@actions.update_profile} with firstName, lastName, email, and phone if provided. Do NOT echo back — invocation IS the confirmation.
 
@@ -374,7 +386,7 @@ subagent flight_management:
                 set @variables.Latest_Flight_Search_Results = @outputs.flightSummary
 
             book_flight: @actions.book_flight
-                description: "Books the flight the visitor has confirmed. Pass the fare class the visitor agreed to (Economy / Premium Economy / Business / First — exact string). After this succeeds, the post-booking sequence (profile, payment, confirm) begins."
+                description: "Selects the flight the visitor agreed to and pins the choice into mutable variables. This action does NOT create a booking — confirmation is deferred to confirm_booking. Pass the canonical fare class (Economy / Premium Economy / Business / First). After this succeeds, the agent moves to profile collection."
                 with contactId = @variables.resolved_contact_id
                 with flightId = ...
                 with travelDate = ...
@@ -383,7 +395,12 @@ subagent flight_management:
                 with seatPreference = ...
                 set @variables.flight_booking_detail = @outputs.booking
                 set @variables.flight_booking_error_detail = @outputs.errorMessage
-                set @variables.flight_booking_error_flag = @outputs.success
+                set @variables.flight_selected = @outputs.success
+                set @variables.selected_flight_id = @outputs.selectedFlightId
+                set @variables.selected_travel_date = @outputs.selectedTravelDate
+                set @variables.selected_fare_class = @outputs.selectedFareClass
+                set @variables.selected_checked_bags = @outputs.selectedCheckedBags
+                set @variables.selected_seat_preference = @outputs.selectedSeatPreference
 
             update_profile: @actions.update_profile
                 description: "Text-fallback path: invoke when the visitor typed their name + email (and optionally phone) directly in chat instead of using the profile form card. Do NOT echo the values back; invocation IS the confirmation."
@@ -404,14 +421,21 @@ subagent flight_management:
                 set @variables.profile_collected = @outputs.success
 
             process_payment: @actions.process_payment
-                description: "Invoke this as soon as the visitor picks Apple Pay / Saved card / Demo card. Calling this action IS how you 'process the payment'. Do NOT narrate 'processing your payment' without calling the action."
+                description: "Validates the visitor's payment-method choice and pins it for confirm_booking to use. Invoke as soon as the visitor picks Apple Pay / Saved card / Demo card."
                 with contactId = @variables.resolved_contact_id
                 with paymentMethod = ...
                 set @variables.payment_processed = @outputs.success
+                set @variables.selected_payment_method = @outputs.paymentMethod
 
             confirm_booking: @actions.confirm_booking
-                description: "Invoke this immediately after process_payment succeeds — flips Pending Confirmation bookings to Confirmed. Calling this action IS how you 'issue the ticket'."
+                description: "Issues the ticket — this is the single DB write in the booking flow. Invoke immediately after process_payment succeeds. Pulls all pinned selection variables (flight/date/fare/payment) and inserts a Confirmed/Paid Booking__c plus segment."
                 with contactId = @variables.resolved_contact_id
+                with flightId = @variables.selected_flight_id
+                with travelDate = @variables.selected_travel_date
+                with fareClass = @variables.selected_fare_class
+                with paymentMethod = @variables.selected_payment_method
+                with checkedBags = @variables.selected_checked_bags
+                with seatPreference = @variables.selected_seat_preference
                 set @variables.booking_confirmed = @outputs.success
                 set @variables.booked_confirmation_codes = @outputs.confirmationCodes
 
@@ -707,7 +731,7 @@ subagent flight_management:
 
             outputs:
                 "success": boolean
-                    description: "True if the payment completed."
+                    description: "True if the payment-method choice validated."
                     label: "success"
                     is_displayable: True
                     is_used_by_planner: True
@@ -716,28 +740,16 @@ subagent flight_management:
                     label: "error message"
                     is_displayable: False
                     is_used_by_planner: True
-                "paidCount": object
-                    description: "How many bookings were marked Paid."
-                    label: "Paid Count"
-                    is_displayable: True
-                    is_used_by_planner: True
-                    complex_data_type_name: "lightning__integerType"
-                "totalCharged": string
-                    description: "Total amount charged across the paid bookings (e.g. $1430.00)."
-                    label: "Total Charged"
-                    is_displayable: True
-                    is_used_by_planner: True
-                    complex_data_type_name: "lightning__textType"
                 "paymentMethod": string
-                    description: "The method that was used."
+                    description: "Echoed payment method — pin into selected_payment_method."
                     label: "Payment Method"
                     is_displayable: True
                     is_used_by_planner: True
                     complex_data_type_name: "lightning__textType"
 
         confirm_booking:
-            description: "Flips Paid Pending Confirmation bookings to Confirmed. Refuses to confirm any booking still Unpaid. Call after process_payment."
-            label: "Confirm Pending Bookings"
+            description: "Issues the ticket — the single DB write in the booking flow. Inserts a Confirmed/Paid Booking__c plus its segment using the visitor's pinned selection variables. Call once at the end after process_payment."
+            label: "Confirm Booking"
             require_user_confirmation: False
             include_in_progress_indicator: True
             progress_indicator_message: "Issuing your ticket"
@@ -745,15 +757,51 @@ subagent flight_management:
 
             inputs:
                 "contactId": string
-                    description: "The Contact whose Pending Confirmation bookings should be flipped to Confirmed."
+                    description: "The Contact whose booking is being issued."
                     label: "Contact Id"
                     is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "flightId": string
+                    description: "Flight__c Id pinned at flight-pick (selected_flight_id)."
+                    label: "Flight Id"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "travelDate": string
+                    description: "Travel date YYYY-MM-DD pinned at flight-pick (selected_travel_date)."
+                    label: "Travel Date"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "fareClass": string
+                    description: "Canonical fare class pinned at flight-pick (selected_fare_class)."
+                    label: "Fare Class"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "paymentMethod": string
+                    description: "Payment method pinned at payment step (selected_payment_method)."
+                    label: "Payment Method"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "checkedBags": object
+                    description: "Number of checked bags (selected_checked_bags)."
+                    label: "Checked Bags"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__integerType"
+                "seatPreference": string
+                    description: "Seat preference pinned at flight-pick (selected_seat_preference)."
+                    label: "Seat Preference"
+                    is_required: False
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
 
             outputs:
                 "success": boolean
-                    description: "True if the action completed without error."
+                    description: "True if the booking was issued."
                     label: "success"
                     is_displayable: True
                     is_used_by_planner: True
@@ -763,21 +811,27 @@ subagent flight_management:
                     is_displayable: False
                     is_used_by_planner: True
                 "confirmedCount": object
-                    description: "How many bookings were flipped to Confirmed."
+                    description: "Number of bookings issued (always 1 in the current flow)."
                     label: "Confirmed Count"
                     is_displayable: True
                     is_used_by_planner: True
                     complex_data_type_name: "lightning__integerType"
                 "confirmationCodes": string
-                    description: "Comma-separated list of confirmation codes that were just confirmed."
+                    description: "Confirmation code of the issued booking."
                     label: "Confirmation Codes"
+                    is_displayable: True
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "totalCharged": string
+                    description: "Total amount charged (e.g. $1430.00)."
+                    label: "Total Charged"
                     is_displayable: True
                     is_used_by_planner: True
                     complex_data_type_name: "lightning__textType"
 
         book_flight:
-            description: "Books a flight. Requires contactId, flightId from search results, travel date, and fare class."
-            label: "Book Flight"
+            description: "Selects (does NOT book) the flight the visitor agreed to. Validates the choice against the live Flight__c row, computes price + quote DTO, and echoes the inputs back as outputs so the agent can pin them. Confirmation is deferred to confirm_booking."
+            label: "Select Flight"
             require_user_confirmation: False
             include_in_progress_indicator: True
             progress_indicator_message: "Processing booking"
@@ -823,8 +877,8 @@ subagent flight_management:
 
             outputs:
                 "booking": object
-                    description: "The flight booking details"
-                    label: "bookingCode"
+                    description: "Quote-shaped DTO for the visitor's flight selection. NOT yet a real booking."
+                    label: "selection quote"
                     is_displayable: True
                     is_used_by_planner: True
                     complex_data_type_name: "@apexClassType/c__Skywave_BookFlight$Booking"
@@ -834,10 +888,40 @@ subagent flight_management:
                     is_displayable: False
                     is_used_by_planner: True
                 "success": boolean
-                    description: "true if the action completed without error"
+                    description: "true if the selection was valid and the quote built"
                     label: "success"
                     is_displayable: True
                     is_used_by_planner: True
+                "selectedFlightId": string
+                    description: "Echoed Flight__c Id — pin into selected_flight_id."
+                    label: "selected flight id"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "selectedTravelDate": string
+                    description: "Echoed travel date YYYY-MM-DD — pin into selected_travel_date."
+                    label: "selected travel date"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "selectedFareClass": string
+                    description: "Echoed canonical fare class — pin into selected_fare_class."
+                    label: "selected fare class"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "selectedCheckedBags": object
+                    description: "Echoed checked-bag count — pin into selected_checked_bags."
+                    label: "selected checked bags"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__integerType"
+                "selectedSeatPreference": string
+                    description: "Echoed seat preference — pin into selected_seat_preference."
+                    label: "selected seat preference"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
 
         resolve_contact:
             description: "Resolves a Contact ID from a known ID or email lookup"
