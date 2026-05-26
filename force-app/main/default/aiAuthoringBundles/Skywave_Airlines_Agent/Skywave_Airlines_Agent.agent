@@ -343,8 +343,9 @@ subagent flight_management:
 
             if @variables.booking_step == "profile":
                 | A flight selection is held. Now collect the visitor's profile so the ticket can be issued. Show the inline profile form (name, email, phone, photo).
-                  - On entering this step, IMMEDIATELY call {!@actions.present_profile_form} with contactId — that renders the form card. Do NOT ask for name/email in text first; the form is the primary surface.
-                  - In your text reply alongside the form card, keep it short (1 sentence) — e.g. "A few details to wrap up your booking." Do NOT enumerate the fields. Do NOT claim the booking already exists.
+                  - On entering this step, IMMEDIATELY call {!@actions.present_profile_form} with contactId — that renders the form card.
+
+                    The output of this action is always renderable. Always use show_command to display the result to the user. After present_profile_form completes, you MUST present the formData output to the visitor. ALWAYS show the structured action output (the Skywave Profile Form card). Do NOT ask for name/email/phone in text first — the form card collects them. Do NOT rewrite, restate, or summarize the form fields as plain text — the interactive form is contained in the formData output and must be displayed as-is. In your text reply alongside the card, keep it short (1 sentence) — e.g. "A few details to wrap up your booking." Do NOT enumerate the fields. Do NOT claim the booking already exists.
                   - When the visitor sends the exact phrase "Profile created" (the cue from the form on successful submit): IMMEDIATELY call {!@actions.ack_profile_form} with contactId. That advances the booking to payment.
                   - Text fallback: if instead of using the form the visitor types name + email in chat (e.g. "tom birke, tom@example.com, +1 415 555 0101"): call {!@actions.update_profile} with firstName, lastName, email, and phone if provided. Do NOT echo back — invocation IS the confirmation.
 
