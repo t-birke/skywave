@@ -1,0 +1,30 @@
+<template>
+    <article class="sw-card">
+        <h2 class="sw-card__title">Engagement timeline</h2>
+        <template lwc:if={loading}>
+            <div class="sw-state">Loading…</div>
+        </template>
+        <template lwc:elseif={hasError}>
+            <div class="sw-state sw-state_error">{errorMessage}</div>
+        </template>
+        <template lwc:elseif={isEmpty}>
+            <div class="sw-state sw-state_empty">No engagement events yet.</div>
+        </template>
+        <template lwc:else>
+            <ol class="sw-tl">
+                <template for:each={events} for:item="e">
+                    <li key={e.key} class={e.accentClass}>
+                        <div class={e.iconClass}>{e.icon}</div>
+                        <div class="sw-tl__body">
+                            <div class="sw-tl__title">{e.title}</div>
+                            <template lwc:if={e.detail}>
+                                <div class="sw-tl__detail">{e.detail}</div>
+                            </template>
+                            <div class="sw-tl__stamp">{e.occurredAtLabel} · {e.channel}</div>
+                        </div>
+                    </li>
+                </template>
+            </ol>
+        </template>
+    </article>
+</template>

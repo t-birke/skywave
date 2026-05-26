@@ -1,0 +1,58 @@
+:host {
+    --sw-navy: #0b1d3a;
+    --sw-text: #0b1d3a;
+    --sw-text-mute: #4f5a73;
+    --sw-card-bg: #ffffff;
+    --sw-card-border: #d8dee8;
+    --sw-bg-alt: #f5f7fb;
+    --sw-radius: 0.75rem;
+    --sw-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+    display: block;
+    font-family: var(--sw-font);
+}
+
+.sw-card {
+    background-color: var(--sw-card-bg);
+    border-radius: var(--sw-radius);
+    padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.sw-card__title {
+    margin: 0 0 0.85rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--sw-navy);
+}
+
+.sw-card__body {
+    background-color: var(--sw-bg-alt);
+    border: 1px dashed var(--sw-card-border);
+    border-radius: 0.55rem;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sw-card__icon {
+    font-size: 1.6rem;
+    color: var(--sw-text-mute);
+}
+
+.sw-card__lead {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--sw-navy);
+}
+
+.sw-card__sub {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--sw-text-mute);
+    line-height: 1.45;
+    max-width: 32ch;
+}

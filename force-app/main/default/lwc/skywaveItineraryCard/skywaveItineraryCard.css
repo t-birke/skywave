@@ -1,0 +1,409 @@
+:host {
+    --sw-navy: #0b1d3a;
+    --sw-navy-deep: #06122a;
+    --sw-blue-soft: #12305f;
+    --sw-mute: #6e7993;
+    --sw-text: #0b1d3a;
+    --sw-text-mute: #4f5a73;
+    --sw-card-bg: #ffffff;
+    --sw-card-border: #d8dee8;
+    --sw-card-divider: #e6e9f0;
+    --sw-bg-alt: #f5f7fb;
+    --sw-teal: #14b8a6;
+    --sw-teal-deep: #0f766e;
+    --sw-amber: #f3c14a;
+    --sw-success: #15803d;
+    --sw-radius: 0.75rem;
+    --sw-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+    display: block;
+    font-family: var(--sw-font);
+    color: var(--sw-text);
+}
+
+.sw-card {
+    background-color: var(--sw-card-bg);
+    border-radius: var(--sw-radius);
+    padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.sw-card__title {
+    margin: 0 0 1rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--sw-navy);
+    letter-spacing: -0.01em;
+}
+
+.sw-state {
+    padding: 1rem;
+    text-align: center;
+    color: var(--sw-text-mute);
+    font-size: 0.875rem;
+}
+.sw-state_error {
+    color: #b00020;
+    background-color: rgba(186, 5, 23, 0.08);
+    border-radius: 0.5rem;
+}
+.sw-state_empty {
+    background-color: var(--sw-bg-alt);
+    border-radius: 0.5rem;
+    border: 1px dashed var(--sw-card-border);
+}
+
+.sw-itin {
+    background-color: var(--sw-card-bg);
+    border: 1px solid var(--sw-card-border);
+    border-radius: var(--sw-radius);
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.sw-itin_expanded {
+    border-color: var(--sw-navy);
+    box-shadow: 0 4px 16px rgba(11, 29, 58, 0.08);
+}
+
+/* Header (always visible — clickable to expand/collapse) */
+.sw-itin__header {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr) auto auto;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 0.9rem 1.1rem;
+    cursor: pointer;
+    user-select: none;
+}
+.sw-itin__header:hover {
+    background-color: var(--sw-bg-alt);
+}
+
+.sw-itin__route {
+    min-width: 0;
+}
+
+.sw-itin__title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--sw-navy);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sw-itin__date {
+    margin: 0.15rem 0 0;
+    font-size: 0.78rem;
+    color: var(--sw-text-mute);
+}
+
+/* Big times block */
+.sw-itin__times {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.sw-itin__time {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.1;
+}
+.sw-itin__time_arr {
+    align-items: flex-end;
+}
+
+.sw-itin__time-h {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--sw-navy);
+    letter-spacing: -0.02em;
+}
+
+.sw-itin__time-code {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--sw-text-mute);
+    letter-spacing: 0.04em;
+    margin-top: 0.1rem;
+}
+
+.sw-itin__connector {
+    position: relative;
+    height: 1px;
+    background-color: var(--sw-card-border);
+    align-self: center;
+    margin-top: 0.6rem;
+}
+
+.sw-itin__connector::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--sw-navy);
+    transform: translate(-50%, -50%);
+}
+
+.sw-itin__connector-label {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background-color: var(--sw-card-bg);
+    padding: 0 0.55rem;
+    font-size: 0.7rem;
+    color: var(--sw-text-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+/* Right-side chip stack */
+.sw-itin__chips {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.3rem;
+    white-space: nowrap;
+}
+.sw-itin__chip {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.2rem 0.55rem;
+    border-radius: 0.4rem;
+    background-color: var(--sw-bg-alt);
+    color: var(--sw-text-mute);
+    letter-spacing: 0.02em;
+}
+.sw-itin__chip_fare {
+    background-color: var(--sw-navy);
+    color: #ffffff;
+}
+.sw-itin__chip_status {
+    background-color: rgba(21, 128, 61, 0.1);
+    color: var(--sw-success);
+}
+.sw-itin__chip_code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.68rem;
+}
+
+.sw-itin__toggle {
+    background: none;
+    border: 1px solid var(--sw-card-border);
+    border-radius: 0.4rem;
+    width: 2rem;
+    height: 2rem;
+    cursor: pointer;
+    color: var(--sw-navy);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.sw-itin__toggle:hover {
+    background-color: var(--sw-bg-alt);
+}
+
+/* Expanded body */
+.sw-itin__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    gap: 1.5rem;
+    padding: 1rem 1.25rem 1.25rem;
+    border-top: 1px solid var(--sw-card-divider);
+    background-color: var(--sw-bg-alt);
+}
+
+@media (max-width: 800px) {
+    .sw-itin__body { grid-template-columns: 1fr; }
+}
+
+.sw-itin__section-title {
+    margin: 0 0 0.6rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--sw-navy);
+}
+
+.sw-itin__total-pill {
+    margin: 0 0 0.75rem;
+    background-color: var(--sw-card-bg);
+    border: 1px solid var(--sw-card-border);
+    border-radius: 0.5rem;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.78rem;
+    color: var(--sw-text-mute);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.sw-itin__segments {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.sw-itin__segment {
+    background-color: var(--sw-card-bg);
+    border: 1px solid var(--sw-card-border);
+    border-radius: 0.55rem;
+    padding: 0.65rem 0.85rem;
+}
+
+.sw-itin__layover {
+    background-color: var(--sw-bg-alt);
+    border-radius: 0.4rem;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.72rem;
+    color: var(--sw-text-mute);
+    margin-bottom: 0.45rem;
+    border-left: 3px solid var(--sw-amber);
+}
+
+.sw-itin__seg-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.85rem;
+    align-items: stretch;
+}
+
+.sw-itin__seg-duration {
+    font-size: 0.72rem;
+    color: var(--sw-text-mute);
+    align-self: center;
+    background-color: var(--sw-bg-alt);
+    border-radius: 0.35rem;
+    padding: 0.25rem 0.5rem;
+    white-space: nowrap;
+}
+
+.sw-itin__seg-stops {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    border-left: 2px solid var(--sw-card-border);
+    padding-left: 0.85rem;
+    position: relative;
+}
+
+.sw-itin__seg-stop {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.5rem;
+    align-items: baseline;
+    position: relative;
+}
+.sw-itin__seg-stop::before {
+    content: "";
+    position: absolute;
+    left: -1.05rem;
+    top: 0.45rem;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--sw-navy);
+}
+
+.sw-itin__seg-time {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--sw-navy);
+}
+
+.sw-itin__seg-city {
+    font-size: 0.85rem;
+    color: var(--sw-text);
+}
+
+.sw-itin__seg-code {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--sw-text-mute);
+    letter-spacing: 0.04em;
+}
+
+.sw-itin__seg-meta {
+    margin-top: 0.45rem;
+    font-size: 0.72rem;
+    color: var(--sw-text-mute);
+    padding-left: 1px;
+}
+
+/* Fare card sidecar */
+.sw-itin__fare-card {
+    background-color: var(--sw-card-bg);
+    border: 1px solid var(--sw-card-border);
+    border-radius: 0.55rem;
+    padding: 0.85rem 1rem;
+    height: fit-content;
+}
+
+.sw-itin__fare-list {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.sw-itin__fare-row {
+    display: flex;
+    flex-direction: column;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--sw-card-divider);
+    gap: 0.15rem;
+}
+.sw-itin__fare-row:last-child {
+    border-bottom: none;
+}
+.sw-itin__fare-row_total {
+    margin-top: 0.4rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--sw-card-border);
+    border-bottom: none;
+}
+
+.sw-itin__fare-row dt {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--sw-text-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.sw-itin__fare-row dd {
+    margin: 0;
+    font-size: 0.83rem;
+    color: var(--sw-text);
+    line-height: 1.4;
+}
+
+.sw-itin__fare-row_total dd {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--sw-navy);
+    display: flex;
+    align-items: baseline;
+    gap: 0.45rem;
+}
+
+.sw-itin__pay-method {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--sw-text-mute);
+}
