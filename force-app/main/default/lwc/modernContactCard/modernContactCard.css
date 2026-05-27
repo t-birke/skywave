@@ -136,6 +136,40 @@
     gap: var(--slds-g-spacing-3, 0.75rem);
 }
 
+/* Skywave fork: email/phone row sits under name/location. */
+.info-row_contact {
+    margin-top: var(--slds-g-spacing-1, 0.25rem);
+    gap: var(--slds-g-spacing-3, 0.75rem);
+}
+
+.contact-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--slds-g-spacing-1, 0.25rem);
+    font-size: var(--slds-g-font-size-2, 0.8125rem);
+    color: var(--slds-g-color-neutral-base-50, #706e6b);
+    text-decoration: none;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.contact-link:hover {
+    color: var(--slds-g-color-brand-base-50, #0176d3);
+    text-decoration: underline;
+}
+
+.contact-link lightning-icon {
+    --slds-c-icon-color-foreground-default: var(--slds-g-color-neutral-base-50, #706e6b);
+    flex-shrink: 0;
+}
+
+.contact-link-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
 .location-wrapper {
     display: flex;
     align-items: center;

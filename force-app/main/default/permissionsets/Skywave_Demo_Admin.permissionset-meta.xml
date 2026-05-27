@@ -68,6 +68,11 @@
     </objectPermissions>
     <fieldPermissions>
         <editable>true</editable>
+        <field>Contact.ContactCardPicture__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
         <field>Survey_Question__c.Active__c</field>
         <readable>true</readable>
     </fieldPermissions>

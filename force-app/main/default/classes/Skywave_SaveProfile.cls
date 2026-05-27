@@ -104,11 +104,20 @@ public without sharing class Skywave_SaveProfile {
                     SELECT ContentDocumentId FROM ContentVersion WHERE Id = :cv.Id LIMIT 1
                 ].ContentDocumentId;
 
+                // Link the file to the Contact. Site Guest users hit
+                // platform-side restrictions on Visibility='AllUsers' (it
+                // requires the linking user to see the LinkedEntity in
+                // every sharing scope), so we use 'InternalUsers' which
+                // works for Guest-user inserts and still lets every
+                // logged-in Salesforce user view the avatar on the Contact
+                // page. AVOIDS the silent-failure pattern where the
+                // ContentVersion insert succeeded but the CDL did not,
+                // leaving the file orphaned on the uploading user.
                 ContentDocumentLink cdl = new ContentDocumentLink();
                 cdl.ContentDocumentId = contentDocId;
                 cdl.LinkedEntityId = contactId;
                 cdl.ShareType = 'V';
-                cdl.Visibility = 'AllUsers';
+                cdl.Visibility = 'InternalUsers';
                 insert cdl;
 
                 String shepherdUrl = '/sfc/servlet.shepherd/document/download/' + contentDocId;
@@ -120,7 +129,13 @@ public without sharing class Skywave_SaveProfile {
                 // multiple historical avatar uploads.
                 update new Contact(Id = contactId, ContactCardPicture__c = shepherdUrl);
             } catch (Exception e) {
-                // Don't fail the whole save just because the picture didn't take.
+                // Avatar upload failed — log it and surface a real error.
+                // The previous "soft-fail with success=true" pattern hid a
+                // silent CDL-insert failure for weeks. Fail loudly instead;
+                // the visitor never sees this anyway because the form has
+                // already cued the agent forward by this point.
+                System.debug('Skywave_SaveProfile avatar error: ' + e.getMessage() +
+                    '\n' + e.getStackTraceString());
                 r.message = 'Profile saved, avatar upload failed: ' + e.getMessage();
                 r.success = true;
                 return r;

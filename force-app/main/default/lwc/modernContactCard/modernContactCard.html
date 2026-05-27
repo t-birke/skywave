@@ -42,19 +42,19 @@
                     <span class="status-indicator" title="Online"></span>
                 </div>
                 
-                <!-- Name, Location, and Tags next to profile image -->
+                <!-- Name, Location, Email/Phone, and Tags next to profile image -->
                 <div class="profile-info">
                     <h1 class="contact-name">{displayName}</h1>
                     <div class="info-row">
                         <div class="location-wrapper">
-                            <lightning-icon 
-                                icon-name="utility:location" 
+                            <lightning-icon
+                                icon-name="utility:location"
                                 size="xx-small"
                                 alternative-text="Location"
                             ></lightning-icon>
                             <span class="location-text">{displayLocation}</span>
                         </div>
-                        
+
                         <!-- Tags -->
                         <template if:true={showTagsPills}>
                             <div class="tags-wrapper">
@@ -64,6 +64,23 @@
                             </div>
                         </template>
                     </div>
+                    <!-- Skywave fork: email + phone shown alongside location for at-a-glance context. -->
+                    <template if:true={showContactRow}>
+                        <div class="info-row info-row_contact">
+                            <template if:true={contactEmail}>
+                                <a class="contact-link" href={emailHref}>
+                                    <lightning-icon icon-name="utility:email" size="xx-small" alternative-text="Email"></lightning-icon>
+                                    <span class="contact-link-text">{contactEmail}</span>
+                                </a>
+                            </template>
+                            <template if:true={contactPhone}>
+                                <a class="contact-link" href={phoneHref}>
+                                    <lightning-icon icon-name="utility:phone_portrait" size="xx-small" alternative-text="Phone"></lightning-icon>
+                                    <span class="contact-link-text">{contactPhone}</span>
+                                </a>
+                            </template>
+                        </div>
+                    </template>
                 </div>
             </div>
         </header>

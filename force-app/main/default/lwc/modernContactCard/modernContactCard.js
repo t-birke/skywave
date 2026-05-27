@@ -136,6 +136,7 @@ export default class ModernContactCard extends NavigationMixin(LightningElement)
     contactName = '';
     contactLocation = '';
     contactEmail = '';
+    contactPhone = '';
     contactProfileImageUrl = '';
     contactBackgroundUrl = '';
     contactHealthScore = '';
@@ -165,6 +166,11 @@ export default class ModernContactCard extends NavigationMixin(LightningElement)
     get displayLocation() {
         return this.contactLocation || 'Location';
     }
+
+    // Skywave fork: email/phone row helpers.
+    get showContactRow() { return Boolean(this.contactEmail) || Boolean(this.contactPhone); }
+    get emailHref() { return this.contactEmail ? `mailto:${this.contactEmail}` : ''; }
+    get phoneHref() { return this.contactPhone ? `tel:${this.contactPhone}` : ''; }
 
     get displayProfileImage() {
         // Priority: Contact field value > fallbackImageUrl > legacy profileImageUrl > default avatar
@@ -433,11 +439,13 @@ export default class ModernContactCard extends NavigationMixin(LightningElement)
 
         const name = getFieldValue(contactData, CONTACT_NAME_FIELD);
         const email = getFieldValue(contactData, CONTACT_EMAIL_FIELD);
+        const phone = getFieldValue(contactData, CONTACT_PHONE_FIELD);
         const city = getFieldValue(contactData, CONTACT_MAILING_CITY_FIELD);
         const state = getFieldValue(contactData, CONTACT_MAILING_STATE_FIELD);
 
         this.contactName = name || '';
         this.contactEmail = email || '';
+        this.contactPhone = phone || '';
         
         if (city || state) {
             this.contactLocation = `${city || ''}${city && state ? ', ' : ''}${state || ''}`.trim();
