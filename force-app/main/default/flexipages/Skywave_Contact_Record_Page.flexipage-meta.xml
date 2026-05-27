@@ -3,12 +3,43 @@
     <flexiPageRegions>
         <itemInstances>
             <componentInstance>
-                <componentName>force:highlightsPanel</componentName>
-                <identifier>force_highlightsPanel</identifier>
+                <componentName>c:modernContactCard</componentName>
+                <identifier>modernContactCard</identifier>
+                <componentInstanceProperties>
+                    <name>themeMode</name>
+                    <value>Light</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>profileImageField</name>
+                    <value>ContactCardPicture__c</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>showHealthScore</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>showTags</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>chartTitle</name>
+                    <value>Engagement</value>
+                </componentInstanceProperties>
             </componentInstance>
         </itemInstances>
-        <name>header</name>
+        <name>leftsidebar</name>
         <type>Region</type>
+    </flexiPageRegions>
+
+    <flexiPageRegions>
+        <itemInstances>
+            <componentInstance>
+                <componentName>c:skywaveItineraryCard</componentName>
+                <identifier>skywaveItineraryCard_bookingsTab</identifier>
+            </componentInstance>
+        </itemInstances>
+        <name>customerBookingsTabContent</name>
+        <type>Facet</type>
     </flexiPageRegions>
 
     <flexiPageRegions>
@@ -31,7 +62,7 @@
                 </componentInstanceProperties>
                 <componentInstanceProperties>
                     <name>relatedListApiName</name>
-                    <value>Bookings__r</value>
+                    <value>Cases</value>
                 </componentInstanceProperties>
                 <componentInstanceProperties>
                     <name>relatedListComponentOverride</name>
@@ -46,7 +77,33 @@
                     <value>true</value>
                 </componentInstanceProperties>
                 <componentName>force:relatedListSingleContainer</componentName>
-                <identifier>force_relatedList_bookings</identifier>
+                <identifier>force_relatedList_cases</identifier>
+            </componentInstance>
+        </itemInstances>
+        <itemInstances>
+            <componentInstance>
+                <componentInstanceProperties>
+                    <name>parentFieldApiName</name>
+                    <value>Contact.Id</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>relatedListApiName</name>
+                    <value>MessagingSessions</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>relatedListComponentOverride</name>
+                    <value>NONE</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>rowsToDisplay</name>
+                    <value>10</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>showActionBar</name>
+                    <value>true</value>
+                </componentInstanceProperties>
+                <componentName>force:relatedListSingleContainer</componentName>
+                <identifier>force_relatedList_messaging</identifier>
             </componentInstance>
         </itemInstances>
         <name>relatedTabContent</name>
@@ -54,6 +111,24 @@
     </flexiPageRegions>
 
     <flexiPageRegions>
+        <itemInstances>
+            <componentInstance>
+                <componentInstanceProperties>
+                    <name>active</name>
+                    <value>true</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>body</name>
+                    <value>customerBookingsTabContent</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>title</name>
+                    <value>Customer Bookings</value>
+                </componentInstanceProperties>
+                <componentName>flexipage:tab</componentName>
+                <identifier>customerBookingsTab</identifier>
+            </componentInstance>
+        </itemInstances>
         <itemInstances>
             <componentInstance>
                 <componentInstanceProperties>
@@ -76,10 +151,10 @@
                 </componentInstanceProperties>
                 <componentInstanceProperties>
                     <name>title</name>
-                    <value>Bookings</value>
+                    <value>Related</value>
                 </componentInstanceProperties>
                 <componentName>flexipage:tab</componentName>
-                <identifier>bookingsTab</identifier>
+                <identifier>relatedTab</identifier>
             </componentInstance>
         </itemInstances>
         <name>maintabs</name>
@@ -87,18 +162,6 @@
     </flexiPageRegions>
 
     <flexiPageRegions>
-        <itemInstances>
-            <componentInstance>
-                <componentName>c:skywaveItineraryCard</componentName>
-                <identifier>skywaveItineraryCard</identifier>
-            </componentInstance>
-        </itemInstances>
-        <itemInstances>
-            <componentInstance>
-                <componentName>c:skywaveEngagementTimeline</componentName>
-                <identifier>skywaveEngagementTimeline</identifier>
-            </componentInstance>
-        </itemInstances>
         <itemInstances>
             <componentInstance>
                 <componentInstanceProperties>
@@ -120,18 +183,24 @@
     <flexiPageRegions>
         <itemInstances>
             <componentInstance>
+                <componentName>c:skywaveEngagementTimeline</componentName>
+                <identifier>skywaveEngagementTimeline</identifier>
+            </componentInstance>
+        </itemInstances>
+        <itemInstances>
+            <componentInstance>
                 <componentName>c:skywaveAffinitiesPlaceholder</componentName>
                 <identifier>skywaveAffinitiesPlaceholder</identifier>
             </componentInstance>
         </itemInstances>
-        <name>sidebar</name>
+        <name>rightsidebar</name>
         <type>Region</type>
     </flexiPageRegions>
 
     <masterLabel>Skywave Contact Record Page</masterLabel>
     <sobjectType>Contact</sobjectType>
     <template>
-        <name>flexipage:recordHomeTemplateDesktop</name>
+        <name>flexipage:recordHomeThreeColTemplateDesktop</name>
     </template>
     <type>RecordPage</type>
 </FlexiPage>

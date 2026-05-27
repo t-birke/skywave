@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>ContactCardPicture__c</fullName>
+    <label>Contact Card Picture</label>
+    <description>Shepherd-style download path of the avatar ContentVersion most recently uploaded for this Contact. Stamped by Skywave_SaveProfile after a successful avatar upload. Read by the Modern Contact Card LWC on the Skywave Contact record page. Locking the URL into a field (rather than re-resolving from ContentDocumentLink at read time) avoids ambiguity when a Contact has multiple historical avatar uploads.</description>
+    <externalId>false</externalId>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Url</type>
+</CustomField>

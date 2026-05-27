@@ -111,7 +111,14 @@ public without sharing class Skywave_SaveProfile {
                 cdl.Visibility = 'AllUsers';
                 insert cdl;
 
-                r.avatarUrl = '/sfc/servlet.shepherd/document/download/' + contentDocId;
+                String shepherdUrl = '/sfc/servlet.shepherd/document/download/' + contentDocId;
+                r.avatarUrl = shepherdUrl;
+
+                // Persist on the Contact so the Modern Contact Card LWC has a
+                // stable read-side field. Locks the URL to one specific
+                // ContentVersion — avoids ambiguity if the Contact ever has
+                // multiple historical avatar uploads.
+                update new Contact(Id = contactId, ContactCardPicture__c = shepherdUrl);
             } catch (Exception e) {
                 // Don't fail the whole save just because the picture didn't take.
                 r.message = 'Profile saved, avatar upload failed: ' + e.getMessage();

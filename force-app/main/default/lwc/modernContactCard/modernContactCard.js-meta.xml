@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>Modern Contact Card</masterLabel>
+    <description>A modern, SLDS 2 compliant contact card with profile information and CSAT history chart</description>
+    <targets>
+        <target>lightning__RecordPage</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__RecordPage">
+            <objects>
+                <object>Contact</object>
+                <object>Case</object>
+                <object>MessagingSession</object>
+                <object>VoiceCall</object>
+            </objects>
+            
+            <!-- Theme Configuration -->
+            <property name="themeMode" type="String" default="Light" label="Theme Mode" datasource="Light,Dark" description="Choose light or dark theme" />
+            
+            <!-- Header Background Configuration -->
+            <property name="headerBackgroundField" type="String" default="ContactCardBackground__c" label="Background Image Field" description="API name of the Contact field containing the header background image URL" />
+            <property name="headerBackgroundUrl" type="String" default="" label="Default Background URL" description="Fallback URL for header background if Contact field is empty (leave empty for gradient)" />
+            
+            <!-- Profile Configuration -->
+            <property name="profileImageField" type="String" default="ContactCardPicture__c" label="Profile Image Field" description="API name of the Contact field containing the profile image URL (e.g. ContactCardPicture__c)" />
+            <property name="profileImageUrl" type="String" default="" label="Fallback Image URL (Legacy)" description="Fallback URL if Contact field is empty" />
+            <property name="fallbackImageUrl" type="String" default="" label="Fallback Image URL" description="URL to use if the Contact field is empty" />
+            
+            <!-- Health Score Configuration -->
+            <property name="healthScoreField" type="String" default="ContactCardHealthScore__c" label="Health Score Field" description="API name of the Contact field containing the health score (e.g. ContactCardHealthScore__c)" />
+            <property name="healthScoreLabel" type="String" default="Health" label="Health Score Label" description="Label to display before the health score value" />
+            <property name="healthScoreFallback" type="String" default="" label="Health Score Fallback" description="Fallback value if Contact field is empty" />
+            <property name="showHealthScore" type="Boolean" default="true" label="Show Health Score" description="Show/hide the health score pill" />
+            
+            <!-- Tags Configuration -->
+            <property name="tagsField" type="String" default="ContactCardTags__c" label="Tags Field" description="API name of the Contact field containing comma-separated tags" />
+            <property name="tags" type="String" default="" label="Fallback Tags" description="Comma-separated tags to display if Contact field is empty (e.g. VIP, Premium)" />
+            <property name="showTags" type="Boolean" default="true" label="Show Tags" description="Show/hide the tag pills" />
+            
+            <!-- VoiceCall Configuration (Optional) -->
+            <property name="voiceCallContactField" type="String" default="" label="VoiceCall Contact Field" description="API name of the Contact lookup field on VoiceCall (e.g. Contact__c). Leave blank if not using on VoiceCall pages." />
+            
+            <!-- Skywave fork: Metric 1 = Member Number -->
+            <property name="field1Label" type="String" default="MEMBER #" label="Field 1 Label" />
+            <property name="field1Value" type="String" default="" label="Field 1 Fallback" />
+            <property name="field1Icon" type="String" default="utility:number_input" label="Field 1 Icon" />
+            <property name="showField1" type="Boolean" default="true" label="Show Field 1" />
+
+            <!-- Skywave fork: Metric 2 = Membership Tier -->
+            <property name="field2Label" type="String" default="TIER" label="Field 2 Label" />
+            <property name="field2Value" type="String" default="" label="Field 2 Fallback" />
+            <property name="field2Icon" type="String" default="utility:ribbon" label="Field 2 Icon" />
+            <property name="showField2" type="Boolean" default="true" label="Show Field 2" />
+
+            <!-- Skywave fork: Metric 3 = Loyalty Points -->
+            <property name="field3Label" type="String" default="POINTS" label="Field 3 Label" />
+            <property name="field3Value" type="String" default="" label="Field 3 Fallback" />
+            <property name="field3Icon" type="String" default="utility:trail" label="Field 3 Icon" />
+            <property name="showField3" type="Boolean" default="true" label="Show Field 3" />
+
+            <!-- Skywave fork: Metric 4 = Member Since -->
+            <property name="field4Label" type="String" default="MEMBER SINCE" label="Field 4 Label" />
+            <property name="field4Value" type="String" default="" label="Field 4 Fallback" />
+            <property name="field4Icon" type="String" default="utility:date_input" label="Field 4 Icon" />
+            <property name="showField4" type="Boolean" default="true" label="Show Field 4" />
+
+            <!-- Skywave fork: Metric 5 = Total Spend (computed via Apex) -->
+            <property name="field5Label" type="String" default="TOTAL SPEND" label="Field 5 Label" />
+            <property name="field5Value" type="String" default="" label="Field 5 Fallback" />
+            <property name="field5Icon" type="String" default="utility:money" label="Field 5 Icon" />
+            <property name="showField5" type="Boolean" default="true" label="Show Field 5" />
+
+            <!-- Skywave fork: Metric 6 = Next Trip (computed via Apex) -->
+            <property name="field6Label" type="String" default="NEXT TRIP" label="Field 6 Label" />
+            <property name="field6Value" type="String" default="" label="Field 6 Fallback" />
+            <property name="field6Icon" type="String" default="utility:event" label="Field 6 Icon" />
+            <property name="showField6" type="Boolean" default="true" label="Show Field 6" />
+            
+            <!-- Chart Configuration -->
+            <property name="chartTitle" type="String" default="CSAT History" label="Chart Title" description="Title displayed above the chart" />
+            <property name="engagementData" type="String" default="55,60,65,70,68,72,75,80,78,75,72,85" label="Engagement Data" description="Comma-separated engagement scores (0-100)" />
+            <property name="satisfactionData" type="String" default="70,75,72,78,80,82,78,85,82,88,85,90" label="Satisfaction Data" description="Comma-separated satisfaction scores (0-100)" />
+            <property name="chartLabels" type="String" default="W14,W19,W24,W29,W34,W39,W44,W49,W2,W7,W12,W17" label="Chart Labels" description="Comma-separated X-axis labels" />
+            <property name="engagementLabel" type="String" default="Engage" label="Engagement Legend Label" description="Legend label for engagement line" />
+            <property name="satisfactionLabel" type="String" default="Sat" label="Satisfaction Legend Label" description="Legend label for satisfaction line" />
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>
