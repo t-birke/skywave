@@ -223,8 +223,17 @@ a.Created_Days__c = today.daysBetween(today);
             s.AI_Agent_Channel_Type__c = 'EnhancedWebChat';
             s.AI_Agent_Session_End_Type__c = 'EndedNormally';
             s.Session_Owner_Object__c = 'Contact';
-s.Start_Days__c = daysOffset(startTs);
+            s.Start_Days__c = daysOffset(startTs);
             s.Start_Time__c = formatTime(startTs);
+            // End_Timestamp__c is a plain writable DateTime (no End_Days/
+            // End_Time formula pair like the Interaction object). The
+            // Start_Timestamp__c formula reads Start_Days/Start_Time as a
+            // wall-clock string in GMT, so End must be stored as the same
+            // wall-clock reinterpreted as a GMT instant — otherwise the
+            // running user's TZ offset is applied to End but not Start, the
+            // two disagree, duration goes negative, and Studio hides the
+            // session. See commit 2acc772 for the failure this replaces.
+            s.End_Timestamp__c = asGmtInstant(endTs);
             sessions.add(s);
 
             // Two participants — agent + user
@@ -236,8 +245,9 @@ s.Start_Days__c = daysOffset(startTs);
             agentP.AI_Agent_Version_Api_Name__c = AGENT_API_NAME;
             agentP.AI_Agent_Type__c = 'EinsteinServiceAgent';
             agentP.AI_Agent_Session_Participant_Role__c = 'AGENT';
-agentP.Start_Days__c = s.Start_Days__c;
+            agentP.Start_Days__c = s.Start_Days__c;
             agentP.Start_Time__c = formatTime(startTs);
+            agentP.End_Timestamp__c = asGmtInstant(endTs);
             participants.add(agentP);
 
             SDO_Analytics_AIAgentSessionParticipa_v2__c userP = new SDO_Analytics_AIAgentSessionParticipa_v2__c();
@@ -248,8 +258,9 @@ agentP.Start_Days__c = s.Start_Days__c;
             userP.AI_Agent_Version_Api_Name__c = AGENT_API_NAME;
             userP.AI_Agent_Type__c = 'EinsteinServiceAgent';
             userP.AI_Agent_Session_Participant_Role__c = 'USER';
-userP.Start_Days__c = s.Start_Days__c;
+            userP.Start_Days__c = s.Start_Days__c;
             userP.Start_Time__c = formatTime(startTs);
+            userP.End_Timestamp__c = asGmtInstant(endTs);
             participants.add(userP);
 
             // One interaction (user turn -> agent turn pair)
@@ -442,6 +453,23 @@ ta.Created_Days__c = s.Start_Days__c;
 
     private static String formatTime(DateTime dt) {
         return dt.format('HH:mm:ss');
+    }
+
+    /**
+     * Re-anchor a DateTime's wall-clock components to GMT.
+     *
+     * The seeder builds startTs/endTs with DateTime.newInstance(date, time),
+     * which treats the supplied date+time as the running user's local zone.
+     * But the Start_Timestamp__c formula evaluates Start_Days/Start_Time as
+     * a wall-clock string in GMT. To keep End on the same footing as Start,
+     * take the *local* wall-clock fields of dt and rebuild the same fields
+     * as a GMT instant. This makes End - Start a real, non-negative duration
+     * regardless of the running user's time zone.
+     */
+    private static DateTime asGmtInstant(DateTime dt) {
+        return DateTime.newInstanceGmt(
+            dt.year(), dt.month(), dt.day(),
+            dt.hour(), dt.minute(), dt.second());
     }
 
     /**
