@@ -33,6 +33,17 @@ committed.** Read this before adding anything that looks like a credential.
    rewriting doesn't help — only rotation does.
 3. Document the incident in `SECRETS.md` so future-you knows it happened.
 
+## Credential inventory (where each secret lives)
+
+Check here FIRST before regenerating or re-deriving any credential.
+
+| Secret | Store | Notes |
+|--------|-------|-------|
+| Heroku Relay app consumer key | `.env` → `SF_CLIENT_ID` | JWT app for the consumer site (`Skywave_Heroku_Relay`). Private key: `secrets/jwt.key`. |
+| Data Cloud app cert + key | `.secrets/dc.crt`, `.secrets/dc.key` | For `Skywave_DataCloud_Integration`. `dc.key` matches the cert deployed in the Connected App. For direct Data Cloud API calls (sf-datacloud-api-auth skill). |
+| Data Cloud ingest cert + key | `.secrets/dc_ingest.crt`, `.secrets/dc_ingest.key` | Second keypair for the ingest scope. |
+| **data360 MCP credentials** | **`.secrets/dc.env`** | Canonical store for the data360 MCP server's auth. The MCP jar supports ONLY static `access_token` or `client_credentials` — **NO JWT/private-key input**. Use client_credentials: consumer key + secret of `Skywave_DataCloud_Integration`. Consumer secret is fetch-once from App Manager → Manage Consumer Details. |
+
 ## Files that look secret-ish but are NOT
 
 - `force-app/main/default/connectedApps/*.connectedApp-meta.xml` —
