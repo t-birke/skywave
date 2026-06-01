@@ -223,7 +223,10 @@ a.Created_Days__c = today.daysBetween(today);
             SDO_Analytics_AIAgentSession_v2__c s = new SDO_Analytics_AIAgentSession_v2__c();
             s.External_ID__c = sessionUuid;
             s.Demo_Identifier__c = DEMO_TAG;
-            s.AI_Agent_Channel_Type__c = 'EnhancedWebChat';
+            // Match the channel real EnhancedMessaging sessions use exactly
+            // ('SCRT2 - EmbeddedMessaging') — verified against AIPlatform
+            // rows. 'EnhancedWebChat' is not a value the platform emits.
+            s.AI_Agent_Channel_Type__c = 'SCRT2 - EmbeddedMessaging';
             // Session end type drives the Session Flow outcome label. STDM
             // valid values are resolved / escalated / deflected / other
             // (canvas + internal guide; 'EndedNormally' was invented).
@@ -299,6 +302,30 @@ a.Created_Days__c = today.daysBetween(today);
             it.Telemetry_Trace__c = traceId;
             it.Telemetry_Trace_Span__c = uuid();
             interactions.add(it);
+
+            // Session-terminator interaction. Every real (AIPlatform)
+            // session carries exactly one SESSION_END interaction in
+            // addition to its TURN rows — a bare marker with no messages or
+            // steps, topic NOT_SET, start=end at session close. This is how
+            // the platform marks a session "complete"; without it the
+            // session never appears in the Sessions list even though all
+            // its TURN data is present and correct. (The guide notes
+            // Observability filters SESSION_END out of normal-turn views —
+            // it is the terminator, not a turn.)
+            SDO_Analytics_AiAgentInteraction_v2__c endIt =
+                new SDO_Analytics_AiAgentInteraction_v2__c();
+            endIt.External_ID__c = uuid();
+            endIt.Demo_Identifier__c = DEMO_TAG;
+            endIt.AI_Agent_Session__c = sessionUuid;
+            endIt.Topic_API_Name__c = 'NOT_SET';
+            endIt.Ai_Agent_Interaction_Type__c = 'SESSION_END';
+            endIt.Start_Days__c = s.Start_Days__c;
+            endIt.Start_Time__c = formatTime(endTs);
+            endIt.End_Days__c = s.Start_Days__c;
+            endIt.End_Time__c = formatTime(endTs);
+            endIt.Telemetry_Trace__c = traceId;
+            endIt.Telemetry_Trace_Span__c = uuid();
+            interactions.add(endIt);
 
             // Two messages — user + agent
             DateTime userTs = startTs.addSeconds(2);
