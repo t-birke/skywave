@@ -205,8 +205,11 @@ a.Created_Days__c = today.daysBetween(today);
             TopicSpec topic = pickTopic(seatBucket);
             List<String> sample = pickSample(topic.bucket);
 
-            // Session timing — anywhere from 14 days ago to ~6h ago.
-            Integer daysBack = Math.mod(Math.abs(Crypto.getRandomInteger()), 14);
+            // Session timing — 1 to 14 days ago. Start at daysBack=1 (not 0):
+            // a "today" date combined with an afternoon/evening time below
+            // lands ahead of an early-morning org clock, producing
+            // future-dated sessions that muddy the demo's time range.
+            Integer daysBack = 1 + Math.mod(Math.abs(Crypto.getRandomInteger()), 14);
             Integer hourOfDay = 8 + Math.mod(Math.abs(Crypto.getRandomInteger()), 12);
             Integer minute = Math.mod(Math.abs(Crypto.getRandomInteger()), 60);
             DateTime startTs = DateTime.newInstance(
@@ -221,7 +224,13 @@ a.Created_Days__c = today.daysBetween(today);
             s.External_ID__c = sessionUuid;
             s.Demo_Identifier__c = DEMO_TAG;
             s.AI_Agent_Channel_Type__c = 'EnhancedWebChat';
-            s.AI_Agent_Session_End_Type__c = 'EndedNormally';
+            // Session end type drives the Session Flow outcome label. STDM
+            // valid values are resolved / escalated / deflected / other
+            // (canvas + internal guide; 'EndedNormally' was invented).
+            // Reinforce the Chapter 6 story: seat-change sessions escalate,
+            // everything else resolves.
+            s.AI_Agent_Session_End_Type__c =
+                (seatBucket && topic.bucket == 'seat') ? 'escalated' : 'resolved';
             s.Session_Owner_Object__c = 'Contact';
             s.Start_Days__c = daysOffset(startTs);
             s.Start_Time__c = formatTime(startTs);
@@ -270,11 +279,25 @@ a.Created_Days__c = today.daysBetween(today);
             it.Demo_Identifier__c = DEMO_TAG;
             it.AI_Agent_Session__c = sessionUuid;
             it.Topic_API_Name__c = topic.apiName;
-            it.Ai_Agent_Interaction_Type__c = 'PROMPT_RESPONSE';
-it.Start_Days__c = s.Start_Days__c;
+            // STDM interaction type is 'TURN' (one per user/agent exchange) —
+            // verified against the AIPlatform-sourced rows. The dashboard
+            // counts TURN rows for "Number of Interactions" and derives
+            // duration/latency from them; an invented type like
+            // 'PROMPT_RESPONSE' renders the session but leaves every metric
+            // blank ("--").
+            it.Ai_Agent_Interaction_Type__c = 'TURN';
+            it.Start_Days__c = s.Start_Days__c;
             it.Start_Time__c = formatTime(startTs);
             it.End_Days__c = s.Start_Days__c;
             it.End_Time__c = formatTime(endTs);
+            // Telemetry trace IDs let the UI link a chat bubble to its
+            // session trace. They can be synthetic UUIDs but must be
+            // non-empty — the seeder previously left them blank, so the
+            // trace view wouldn't open. (STDM ref: TelemetryTraceId /
+            // TelemetryTraceSpanId on AIAgentInteraction.)
+            String traceId = uuid();
+            it.Telemetry_Trace__c = traceId;
+            it.Telemetry_Trace_Span__c = uuid();
             interactions.add(it);
 
             // Two messages — user + agent
@@ -285,8 +308,15 @@ it.Start_Days__c = s.Start_Days__c;
             userMsg.AI_Agent_Session__c = sessionUuid;
             userMsg.AI_Agent_Interaction__c = interactionUuid;
             userMsg.AI_Agent_Session_Participant__c = userP.External_ID__c;
-            userMsg.AI_Agent_Interaction_Message_Type__c = 'USER_INPUT';
-            userMsg.Ai_Agent_Interaction_Msg_Content_Type__c = 'TEXT';
+            // STDM message-type vocabulary is 'Input'/'Output' (NOT
+            // 'USER_INPUT'/'AGENT_RESPONSE') and content type is the MIME
+            // string 'text/plain' (NOT 'TEXT') — verified against
+            // AIPlatform rows. The Session Log decides left/right bubble
+            // alignment from this value; an unrecognized type makes every
+            // message fall through to the agent (right→left) default, which
+            // is why both bubbles appeared as the agent.
+            userMsg.AI_Agent_Interaction_Message_Type__c = 'Input';
+            userMsg.Ai_Agent_Interaction_Msg_Content_Type__c = 'text/plain';
             userMsg.Content__c = sample[0];
 userMsg.Message_Sent_Days__c = s.Start_Days__c;
             userMsg.Message_Sent_Time__c = formatTime(userTs);
@@ -299,16 +329,22 @@ userMsg.Message_Sent_Days__c = s.Start_Days__c;
             agentMsg.AI_Agent_Session__c = sessionUuid;
             agentMsg.AI_Agent_Interaction__c = interactionUuid;
             agentMsg.AI_Agent_Session_Participant__c = agentP.External_ID__c;
-            agentMsg.AI_Agent_Interaction_Message_Type__c = 'AGENT_RESPONSE';
-            agentMsg.Ai_Agent_Interaction_Msg_Content_Type__c = 'TEXT';
+            agentMsg.AI_Agent_Interaction_Message_Type__c = 'Output';
+            agentMsg.Ai_Agent_Interaction_Msg_Content_Type__c = 'text/plain';
             agentMsg.Content__c = sample[1];
 agentMsg.Message_Sent_Days__c = s.Start_Days__c;
             agentMsg.Message_Sent_Time__c = formatTime(agentTs);
             messages.add(agentMsg);
 
-            // Three steps — planner-thinking, action-call, planner-reply.
-            // Names match the public Skywave agent's reasoning steps.
-            String[] stepNames = new String[]{ 'PlannerStep', 'ActionStep', 'ResponseStep' };
+            // Three reasoning steps rendered inside the session trace view.
+            // Step-type vocabulary must match the STDM enum that view
+            // understands — TOPIC_STEP / LLM_STEP / ACTION_STEP (verified
+            // against AIPlatform rows, which also emit VARIABLE_UPDATE_STEP,
+            // TRUST_GUARDRAILS_STEP, SESSION_END). Invented names like
+            // 'PlannerStep' render as unknown step types in the trace. Each
+            // step's span shares the interaction's trace id so the trace
+            // hangs together as one tree.
+            String[] stepNames = new String[]{ 'TOPIC_STEP', 'LLM_STEP', 'ACTION_STEP' };
             DateTime cursor = startTs;
             String prevStepUuid = null;
             for (String stepName : stepNames) {
@@ -320,6 +356,7 @@ agentMsg.Message_Sent_Days__c = s.Start_Days__c;
                 step.AI_Agent_Interaction__c = interactionUuid;
                 step.Ai_Agent_Interaction_Step_Type__c = stepName;
                 step.Name__c = stepName;
+                step.Telemetry_Trace_Span_Id__c = traceId;
 step.Start_Days__c = s.Start_Days__c;
                 step.Start_Time__c = formatTime(stepStart);
                 step.End_Days__c = s.Start_Days__c;
