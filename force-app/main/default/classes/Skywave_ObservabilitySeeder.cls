@@ -247,6 +247,18 @@ public with sharing class Skywave_ObservabilitySeeder {
         // on the dashboards.
         Date today = Date.today();
 
+        // Resolve the participant identities that Analytics aggregates on.
+        // A session is only counted in Analytics if its participants carry a
+        // Participant__c id — verified by diffing our (empty -> invisible)
+        // synthetic rows against both DriveMax and our own REAL sessions
+        // (populated -> visible) in the same org. Match the real-session
+        // pattern: AGENT -> the live GenAiPlannerDefinition, USER ->
+        // MessagingEndUser records (anonymous chat users; Analytics shows
+        // one row per distinct MessagingEndUser). Query at runtime so the
+        // seeder stays portable across orgs.
+        String plannerId = resolvePlannerId();
+        List<Id> endUserIds = resolveMessagingEndUserIds();
+
         // Buffers so each table is one big insert at the end.
         List<SDO_Analytics_AIAgentSession_v2__c> sessions =
             new List<SDO_Analytics_AIAgentSession_v2__c>();
@@ -326,6 +338,12 @@ public with sharing class Skywave_ObservabilitySeeder {
             agentP.AI_Agent_Version_Api_Name__c = AGENT_API_NAME;
             agentP.AI_Agent_Type__c = 'EinsteinServiceAgent';
             agentP.AI_Agent_Session_Participant_Role__c = 'AGENT';
+            // AGENT identity = the live GenAiPlannerDefinition. Required for
+            // Analytics to count the session (empty -> session invisible).
+            if (plannerId != null) {
+                agentP.Participant__c = plannerId;
+                agentP.Participant_Object__c = 'GenAiPlannerDefinition';
+            }
             agentP.Start_Days__c = s.Start_Days__c;
             agentP.Start_Time__c = formatTime(startTs);
             agentP.End_Timestamp__c = asGmtInstant(endTs);
@@ -339,6 +357,14 @@ public with sharing class Skywave_ObservabilitySeeder {
             userP.AI_Agent_Version_Api_Name__c = AGENT_API_NAME;
             userP.AI_Agent_Type__c = 'EinsteinServiceAgent';
             userP.AI_Agent_Session_Participant_Role__c = 'USER';
+            // USER identity = a MessagingEndUser (anonymous chat user).
+            // Rotate across the available ones so Analytics shows multiple
+            // distinct users rather than one. Same Analytics requirement as
+            // the agent side: a non-empty Participant__c.
+            if (!endUserIds.isEmpty()) {
+                userP.Participant__c = endUserIds[Math.mod(i, endUserIds.size())];
+                userP.Participant_Object__c = 'MessagingEndUser';
+            }
             userP.Start_Days__c = s.Start_Days__c;
             userP.Start_Time__c = formatTime(startTs);
             userP.End_Timestamp__c = asGmtInstant(endTs);
@@ -583,6 +609,34 @@ mi.Start_Days__c = s.Start_Days__c;
         return Math.mod(Math.abs(Crypto.getRandomInteger()), 100) < 70
             ? options[0]
             : options[Math.mod(Math.abs(Crypto.getRandomInteger()), options.size())];
+    }
+
+    /**
+     * The GenAiPlannerDefinition id for the live Skywave agent — used as the
+     * AGENT participant's Participant__c. Picks the highest version
+     * (Skywave_Airlines_Agent_v*). Returns null if none deployed (the seed
+     * still runs; those sessions just won't aggregate in Analytics).
+     */
+    private static String resolvePlannerId() {
+        List<GenAiPlannerDefinition> planners = [
+            SELECT Id, DeveloperName FROM GenAiPlannerDefinition
+            WHERE DeveloperName LIKE 'Skywave_Airlines_Agent_v%'
+            ORDER BY CreatedDate DESC LIMIT 1
+        ];
+        return planners.isEmpty() ? null : planners[0].Id;
+    }
+
+    /**
+     * Real MessagingEndUser ids (anonymous chat users) for USER participants.
+     * Analytics shows one row per distinct user, so rotating across these
+     * gives the dashboard a realistic spread. Empty list if the org has none.
+     */
+    private static List<Id> resolveMessagingEndUserIds() {
+        List<Id> ids = new List<Id>();
+        for (MessagingEndUser m : [SELECT Id FROM MessagingEndUser LIMIT 25]) {
+            ids.add(m.Id);
+        }
+        return ids;
     }
 
     private static String formatTime(DateTime dt) {

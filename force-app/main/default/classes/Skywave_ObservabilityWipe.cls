@@ -9,6 +9,11 @@
  *
  * Run:
  *   Database.executeBatch(new Skywave_ObservabilityWipe(), 2000);
+ *
+ * SCOPED DELETE: only removes rows this project seeded
+ * (Demo_Identifier__c = Skywave_ObservabilitySeeder.DEMO_TAG). This is
+ * essential once the QBrix's own DriveMax data coexists in the same tables
+ * — an unfiltered delete would destroy the stock demo data too.
  */
 public with sharing class Skywave_ObservabilityWipe
         implements Database.Batchable<SObject>, Database.Stateful {
@@ -31,7 +36,11 @@ public with sharing class Skywave_ObservabilityWipe
 
     public Database.QueryLocator start(Database.BatchableContext bc) {
         String obj = objectsToWipe[cursor];
-        return Database.getQueryLocator('SELECT Id FROM ' + obj);
+        // Scope to this project's own seed rows so coexisting DriveMax/QBrix
+        // data is never touched.
+        String demoTag = Skywave_ObservabilitySeeder.DEMO_TAG;
+        return Database.getQueryLocator(
+            'SELECT Id FROM ' + obj + ' WHERE Demo_Identifier__c = :demoTag');
     }
 
     public void execute(Database.BatchableContext bc, List<SObject> scope) {
