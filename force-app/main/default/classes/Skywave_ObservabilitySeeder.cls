@@ -89,22 +89,57 @@ public with sharing class Skywave_ObservabilitySeeder {
         }
     };
 
+    // The Optimization "Intents" view is driven by a tag definition named
+    // AIE_Request_Category_<AgentApiName> with Source_Type 'Generated' —
+    // verified by diffing the working DriveMax QBrix data (its
+    // AIE_Request_Category_DriveMax_Suppport def carries ~41 granular
+    // request-category values, each = one intent cluster on the dashboard).
+    // Our earlier generic 3-bucket Request_Category tag with the wrong def
+    // name is why no intents surfaced. This must match that pattern exactly.
+    private static final String AIE_INTENT_DEF =
+        'AIE_Request_Category_' + AGENT_API_NAME;
+
     // Tag definitions seeded once — referenced by every Tag row.
-    // (Mirrors the stock Optimization analyzer's tag schema.)
     private static final List<List<String>> TAG_DEFS = new List<List<String>>{
         // [developerName, label, dataType, sourceType]
+        // Intent + relevance tags — match the DriveMax/analyzer schema that
+        // the Optimization Intents & Insights views actually read.
+        new String[]{ AIE_INTENT_DEF,          'Optimization Request Category', 'Text',    'Generated' },
+        new String[]{ 'Quality_Score',          'Relevance Score',        'Integer',  'Predefined' },
+        // Moment-level quality tags (drive the Chapter 6 satisfaction bias).
         new String[]{ 'Topic_Quality',          'Topic Quality',          'PICKLIST', 'OPTIMIZATION' },
         new String[]{ 'User_Satisfaction',      'User Satisfaction',      'PICKLIST', 'OPTIMIZATION' },
-        new String[]{ 'Resolution_Status',      'Resolution Status',      'PICKLIST', 'OPTIMIZATION' },
-        new String[]{ 'Request_Category',       'Request Category',       'STRING',   'OPTIMIZATION' }
+        new String[]{ 'Resolution_Status',      'Resolution Status',      'PICKLIST', 'OPTIMIZATION' }
     };
 
-    // Possible tag values per tag definition.
+    // Possible tag values per OPTIMIZATION tag definition.
     private static final Map<String, List<String>> TAG_VALUES = new Map<String, List<String>>{
         'Topic_Quality'      => new List<String>{ 'High', 'Medium', 'Low' },
         'User_Satisfaction'  => new List<String>{ 'Satisfied', 'Neutral', 'Unsatisfied' },
-        'Resolution_Status'  => new List<String>{ 'Resolved', 'Unresolved', 'Escalated' },
-        'Request_Category'   => new List<String>{ 'Self-Service', 'Information', 'Transaction' }
+        'Resolution_Status'  => new List<String>{ 'Resolved', 'Unresolved', 'Escalated' }
+    };
+
+    // Granular intent values per topic bucket — these become the dashboard
+    // Intents. One is chosen per session and the matching AIE intent tag is
+    // associated to that session + its moment (DriveMax associates each
+    // intent tag to both). seat_selection intents are deliberately the ones
+    // that underperform for the Chapter 6 story.
+    private static final Map<String, List<String>> INTENTS = new Map<String, List<String>>{
+        'seat'    => new List<String>{ 'Seat Change Requests',
+                                       'Seat Upgrade Requests',
+                                       'Seat Assignment Corrections' },
+        'booking' => new List<String>{ 'Flight Search and Booking',
+                                       'Reservation Modifications and Cancellations',
+                                       'Passenger Name Corrections',
+                                       'Booking Confirmation Queries' },
+        'loyalty' => new List<String>{ 'Mileage Balance Inquiries',
+                                       'Tier Status and Benefits',
+                                       'Miles Redemption Requests' },
+        'support' => new List<String>{ 'Lost Baggage Claims',
+                                       'In-Flight Service Complaints',
+                                       'Refund Requests for Service Issues' },
+        'misc'    => new List<String>{ 'Off-Topic General Queries',
+                                       'Unsupported Requests' }
     };
 
     // ---- Wipe job: deletes all SDO_Analytics_* rows in dependency order
@@ -134,6 +169,15 @@ public with sharing class Skywave_ObservabilitySeeder {
      * Inserted once before sessions; referenced by every Tag row.
      */
     private static Map<String, String> tagDefIdByDevName = new Map<String, String>();
+    // Tag-definition-association External_IDs by def dev-name. Tag
+    // associations must reference these via
+    // AI_Agent_Tag_Definition_Association_Id__c — DriveMax sets this on
+    // every association and our earlier version omitted it.
+    private static Map<String, String> tagDefAssocIdByDevName = new Map<String, String>();
+    // Pre-created intent-value tags reused across sessions (DriveMax creates
+    // each distinct intent value once, then associates it to many
+    // sessions/moments). Keyed by intent value string -> tag External_ID.
+    private static Map<String, String> intentTagIdByValue = new Map<String, String>();
 
     private static void seedTagDefinitions() {
         DateTime now = System.now();
@@ -159,18 +203,43 @@ public with sharing class Skywave_ObservabilitySeeder {
         }
 
         // Per-agent association — links each tag definition to the agent.
+        // Capture the External_IDs so tag associations can point back here.
         List<SDO_Analytics_AIAgentTagDefinitionAss_v2__c> assocs = new List<SDO_Analytics_AIAgentTagDefinitionAss_v2__c>();
         for (String[] td : TAG_DEFS) {
             SDO_Analytics_AIAgentTagDefinitionAss_v2__c a = new SDO_Analytics_AIAgentTagDefinitionAss_v2__c();
-            a.External_ID__c = uuid();
+            String assocUuid = uuid();
+            a.External_ID__c = assocUuid;
             a.Demo_Identifier__c = DEMO_TAG;
             a.AI_Agent_Api_Name__c = AGENT_API_NAME;
             a.AI_Agent_Tag_Definition_Id__c = tagDefIdByDevName.get(td[0]);
-a.Created_Days__c = today.daysBetween(today);
+            a.Created_Days__c = daysOffset(now);
             a.Created_Time__c = formatTime(now);
             assocs.add(a);
+            tagDefAssocIdByDevName.put(td[0], assocUuid);
         }
         insert assocs;
+
+        // Pre-create one intent tag per distinct intent value (reused across
+        // sessions, DriveMax-style) under the AIE_Request_Category def.
+        List<SDO_Analytics_AIAgentTag_v2__c> intentTags = new List<SDO_Analytics_AIAgentTag_v2__c>();
+        for (String bucket : INTENTS.keySet()) {
+            for (String intentValue : INTENTS.get(bucket)) {
+                if (intentTagIdByValue.containsKey(intentValue)) continue;
+                String tagUuid = uuid();
+                SDO_Analytics_AIAgentTag_v2__c t = new SDO_Analytics_AIAgentTag_v2__c();
+                t.External_ID__c = tagUuid;
+                t.Demo_Identifier__c = DEMO_TAG;
+                t.AI_Agent_Tag_Definition_Id__c = tagDefIdByDevName.get(AIE_INTENT_DEF);
+                t.Value__c = intentValue;
+                t.Description__c = intentValue;
+                t.Is_Active__c = true;
+                t.Created_Days__c = daysOffset(now);
+                t.Created_Time__c = formatTime(now);
+                intentTags.add(t);
+                intentTagIdByValue.put(intentValue, tagUuid);
+            }
+        }
+        insert intentTags;
     }
 
     private static void seedSessions(Integer count) {
@@ -419,18 +488,31 @@ mi.Start_Days__c = s.Start_Days__c;
             mi.Start_Time__c = formatTime(startTs);
             momentInts.add(mi);
 
-            // Tags + tag-associations. Bias: seat-change → Low/Unsatisfied/Unresolved.
+            // ---- Intent association (drives the Optimization Intents view).
+            // Pick a granular intent value for this session's topic bucket
+            // and associate the pre-created AIE intent tag to BOTH the
+            // session and its moment (the DriveMax pattern). seat-change
+            // intents are the underperformers for Chapter 6.
+            List<String> bucketIntents = INTENTS.get(topic.bucket);
+            String intentValue = bucketIntents[
+                Math.mod(Math.abs(Crypto.getRandomInteger()), bucketIntents.size())];
+            tagAssocs.add(makeTagAssoc(
+                intentTagIdByValue.get(intentValue), AIE_INTENT_DEF,
+                sessionUuid, momentUuid, 'Intent: ' + intentValue, s, endTs));
+
+            // ---- Moment-quality tags. Bias: seat-change → Low/Unsatisfied/
+            // Unresolved so Chapter 6's aggregate shows it underperforming.
+            // Each value is its own tag row (created per session) + an
+            // association that, like DriveMax, sets the def-association id.
             Map<String, String> picked = new Map<String, String>();
             if (seatBucket && topic.bucket == 'seat') {
                 picked.put('Topic_Quality',     'Low');
                 picked.put('User_Satisfaction', 'Unsatisfied');
                 picked.put('Resolution_Status', 'Unresolved');
-                picked.put('Request_Category',  'Self-Service');
             } else {
                 picked.put('Topic_Quality',     pickHigh('Topic_Quality'));
                 picked.put('User_Satisfaction', pickHigh('User_Satisfaction'));
                 picked.put('Resolution_Status', pickHigh('Resolution_Status'));
-                picked.put('Request_Category',  pickAny('Request_Category'));
             }
 
             for (String tagDevName : picked.keySet()) {
@@ -442,20 +524,13 @@ mi.Start_Days__c = s.Start_Days__c;
                 tag.Value__c = picked.get(tagDevName);
                 tag.Description__c = picked.get(tagDevName);
                 tag.Is_Active__c = true;
-tag.Created_Days__c = s.Start_Days__c;
+                tag.Created_Days__c = s.Start_Days__c;
                 tag.Created_Time__c = formatTime(endTs);
                 tags.add(tag);
 
-                SDO_Analytics_AIAgentTagAssociation_v2__c ta = new SDO_Analytics_AIAgentTagAssociation_v2__c();
-                ta.External_ID__c = uuid();
-                ta.Demo_Identifier__c = DEMO_TAG;
-                ta.AI_Agent_Session_Id__c = sessionUuid;
-                ta.AI_Agent_Moment_Id__c = momentUuid;
-                ta.AI_Agent_Tag_Id__c = tagUuid;
-                ta.Association_Reason__c = 'Pre-baked Skywave Phase 4.5 seed';
-ta.Created_Days__c = s.Start_Days__c;
-                ta.Created_Time__c = formatTime(endTs);
-                tagAssocs.add(ta);
+                tagAssocs.add(makeTagAssoc(
+                    tagUuid, tagDevName, sessionUuid, momentUuid,
+                    'Pre-baked Skywave Phase 4.5 seed', s, endTs));
             }
         }
 
@@ -510,13 +585,33 @@ ta.Created_Days__c = s.Start_Days__c;
             : options[Math.mod(Math.abs(Crypto.getRandomInteger()), options.size())];
     }
 
-    private static String pickAny(String tagName) {
-        List<String> options = TAG_VALUES.get(tagName);
-        return options[Math.mod(Math.abs(Crypto.getRandomInteger()), options.size())];
-    }
-
     private static String formatTime(DateTime dt) {
         return dt.format('HH:mm:ss');
+    }
+
+    /**
+     * Build a tag association linking a tag to a session + moment, setting
+     * AI_Agent_Tag_Definition_Association_Id__c (the field DriveMax always
+     * populates and our earlier version omitted — the link from the
+     * association back to the def-association row).
+     */
+    private static SDO_Analytics_AIAgentTagAssociation_v2__c makeTagAssoc(
+            String tagUuid, String defDevName, String sessionUuid,
+            String momentUuid, String reason,
+            SDO_Analytics_AIAgentSession_v2__c s, DateTime endTs) {
+        SDO_Analytics_AIAgentTagAssociation_v2__c ta =
+            new SDO_Analytics_AIAgentTagAssociation_v2__c();
+        ta.External_ID__c = uuid();
+        ta.Demo_Identifier__c = DEMO_TAG;
+        ta.AI_Agent_Session_Id__c = sessionUuid;
+        ta.AI_Agent_Moment_Id__c = momentUuid;
+        ta.AI_Agent_Tag_Id__c = tagUuid;
+        ta.AI_Agent_Tag_Definition_Association_Id__c =
+            tagDefAssocIdByDevName.get(defDevName);
+        ta.Association_Reason__c = reason;
+        ta.Created_Days__c = s.Start_Days__c;
+        ta.Created_Time__c = formatTime(endTs);
+        return ta;
     }
 
     /**
