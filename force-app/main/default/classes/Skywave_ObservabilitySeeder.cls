@@ -315,7 +315,16 @@ public with sharing class Skywave_ObservabilitySeeder {
             // everything else resolves.
             s.AI_Agent_Session_End_Type__c =
                 (seatBucket && topic.bucket == 'seat') ? 'escalated' : 'resolved';
-            s.Session_Owner_Object__c = 'Contact';
+            // Match DriveMax's explicit 'NOT_SET' sentinel on the optional
+            // session fields (DriveMax populates these literally, not null —
+            // the mapping/analytics layer may expect the sentinel rather
+            // than an empty value). Related_Voice_Call__c is excluded: it's a
+            // real lookup to VoiceCall (rejects the 'NOT_SET' string), and
+            // DriveMax leaves it null too.
+            s.Individual__c = 'NOT_SET';
+            s.Previous_Session_Id__c = 'NOT_SET';
+            s.Session_Owner_Object__c = 'NOT_SET';
+            s.Variable__c = 'NOT_SET';
             s.Start_Days__c = daysOffset(startTs);
             s.Start_Time__c = formatTime(startTs);
             // End_Timestamp__c is a plain writable DateTime (no End_Days/
