@@ -182,8 +182,16 @@
         <tab>Skywave_Survey_Author</tab>
         <visibility>Visible</visibility>
     </tabSettings>
+    <tabSettings>
+        <tab>Skywave_Session_Inspector</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
     <classAccesses>
         <apexClass>Skywave_DemoMonitorController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_SessionInspectorController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
