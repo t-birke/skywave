@@ -1,0 +1,96 @@
+<template>
+    <lightning-card title="Session Inspector" icon-name="standard:service_appointment">
+        <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+            <p class="slds-text-color_weak slds-m-bottom_x-small">
+                Enter an observability session id (the <code>External_ID__c</code> on
+                SDO_Analytics_AIAgentSession, i.e. the AiAgentSession DMO id) to see every
+                related SDO object and field that was seeded or ingested for that conversation.
+            </p>
+            <div class="slds-grid slds-gutters slds-grid_vertical-align-end">
+                <div class="slds-col slds-grow">
+                    <lightning-input
+                        type="text"
+                        label="Session Id"
+                        value={sessionId}
+                        placeholder="e.g. 98a017a6-72d5-4b49-9966-c451399c53df"
+                        onchange={handleIdChange}
+                        onkeyup={handleKeyup}>
+                    </lightning-input>
+                </div>
+                <div class="slds-col slds-no-flex">
+                    <lightning-button
+                        variant="brand"
+                        label="Inspect"
+                        title="Inspect"
+                        onclick={handleInspect}
+                        disabled={loading}>
+                    </lightning-button>
+                </div>
+            </div>
+        </div>
+
+        <template if:true={loading}>
+            <div class="slds-align_absolute-center slds-p-around_large">
+                <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+            </div>
+        </template>
+
+        <template if:true={errorMsg}>
+            <div class="slds-p-horizontal_medium">
+                <div class="slds-text-color_error slds-m-bottom_small">{errorMsg}</div>
+            </div>
+        </template>
+
+        <template if:true={notFound}>
+            <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+                <div class="slds-box slds-theme_warning">
+                    No session found with that id. Related child objects (if any) are still
+                    shown below.
+                </div>
+            </div>
+        </template>
+
+        <template if:true={hasResults}>
+            <div class="slds-p-horizontal_medium">
+                <template for:each={groups} for:item="group">
+                    <div key={group.key} class="slds-m-bottom_large">
+                        <h2 class="slds-text-heading_small slds-m-bottom_x-small">
+                            {group.label}
+                            <span class="slds-badge slds-m-left_x-small">{group.recordCount}</span>
+                            <span class="slds-text-color_weak slds-text-body_small slds-m-left_x-small">
+                                {group.objectApiName}
+                            </span>
+                        </h2>
+
+                        <template if:true={group.isEmpty}>
+                            <p class="slds-text-color_weak slds-p-vertical_x-small">No records.</p>
+                        </template>
+
+                        <template if:false={group.isEmpty}>
+                            <div class="slds-scrollable_x slds-box slds-box_xx-small">
+                                <template for:each={group.rows} for:item="row">
+                                    <table key={row.key}
+                                        class="slds-table slds-table_bordered slds-table_fixed-layout slds-m-bottom_small">
+                                        <tbody>
+                                            <template for:each={row.cells} for:item="cell">
+                                                <tr key={cell.key}>
+                                                    <th scope="row"
+                                                        class="slds-cell-wrap field-label">
+                                                        {cell.label}
+                                                    </th>
+                                                    <td class="slds-cell-wrap field-value">
+                                                        {cell.value}
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+            </div>
+        </template>
+    </lightning-card>
+</template>
