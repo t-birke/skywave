@@ -401,7 +401,18 @@ public with sharing class Skywave_ObservabilitySeeder {
                     mi.Start_Time__c = formatTime(turnStart);
                     momentInts.add(mi);
 
-                    cursor = turnEnd.addSeconds(5);
+                    // Inter-turn gap = realistic USER think/away time, which
+                    // is independent of (and much longer than) the agent's
+                    // 2-4s response time. In a chat the user often fires a
+                    // question, switches to other work while the answer
+                    // appears, then checks back much later to read and react.
+                    // Model that with a wide, right-skewed gap rather than a
+                    // flat few seconds: ~70% a normal reading pause (15-75s),
+                    // ~30% a long away-from-keyboard gap (1.5-5 min).
+                    Integer userGap = (rand(100) < 70)
+                        ? 15 + rand(60)        // attentive: 15-75s
+                        : 90 + rand(210);      // stepped away: 90-300s
+                    cursor = turnEnd.addSeconds(userGap);
                     sessionEnd = turnEnd;
                 }
 
