@@ -176,13 +176,29 @@ start_agent agent_router:
                     set @variables.flights_within_72hrs = @outputs.imminentFlights
                     set @variables.check_imminent_flights_success = @outputs.success
 
+            if @variables.survey_resolved is False:
+                run @actions.resolve_session
+                    with conversationId = @variables.Conversation_Id
+                    with testingSession = @variables.testingSession
+                    set @variables.survey_summary = @outputs.summary
+                    set @variables.survey_responses_json = @outputs.responsesJson
+                    set @variables.resolved_contact_id = @outputs.contactId
+                    set @variables.survey_resolved = True
+
+            if @variables.retrieve_active_booking_done is False and @variables.resolved_contact_id != "003000000000000" and @variables.resolved_contact_id != "":
+                run @actions.get_bookings
+                    with contactId = @variables.resolved_contact_id
+                    set @variables.active_bookings = @outputs.bookings
+                    set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
+                    set @variables.retrieve_active_booking_done = @outputs.success
+
             if @variables.booking_step == "profile" or @variables.booking_step == "payment" or @variables.booking_step == "confirm":
                 transition to @subagent.flight_management
 
             | You are a router only. Do NOT answer questions or provide help directly. Always use a transition action.
               Route by intent:
               - Flight bookings, upcoming flights, flight status, booking a flight, changing or canceling flights -> use go_to_flight_management
-              - Seat selection or seat changes for a flight within 72 hours -> use go_to_seat_selection
+              - Seat selection or seat changes -> use go_to_seat_change_unavailable
               - Correcting or updating the traveler's first or last name on a booking -> use go_to_name_change
               - Questions about mileage balance, tier points, loyalty points, or frequent flyer miles -> use go_to_mileage_account
               - Support cases, complaints, case status, creating a case -> use go_to_case_management
@@ -204,9 +220,8 @@ start_agent agent_router:
             go_to_ambiguous_question: @utils.transition to @subagent.ambiguous_question
                 description: "Handle unclear or ambiguous requests that need clarification"
 
-            go_to_seat_selection: @utils.transition to @subagent.seat_selection
-                description: "Select or change seats for a flight departing within 72 hours"
-                available when @variables.flights_within_72hrs > 0
+            go_to_seat_change_unavailable: @utils.transition to @subagent.seat_change_unavailable
+                description: "Handle seat selection or seat change requests, which the agent cannot currently fulfill"
 
             go_to_case_management: @utils.transition to @subagent.case_management
                 description: "Create, view, or update support cases"
@@ -294,6 +309,87 @@ start_agent agent_router:
                     is_displayable: False
                     is_used_by_planner: True
 
+        resolve_session:
+            description: "Resolves the visitor's MessagingSession.ConversationId to their declared survey answers and anonymous Contact Id. Run once at the router (gated by survey_resolved) so booking context is available no matter which subagent the planner routes to."
+            label: "Resolve Session Context"
+            require_user_confirmation: False
+            include_in_progress_indicator: False
+            target: "apex://Skywave_ResolveSession"
+
+            inputs:
+                "conversationId": string
+                    description: "The MessagingSession.ConversationId, sourced from the @MessagingSession.ConversationId linked variable. Optional because studio preview can't seed it; falls back to testingSession when blank."
+                    label: "Conversation Id"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "testingSession": string
+                    description: "Studio-preview fallback. When the agent is run in studio preview the linked Conversation_Id picker is platform-broken, so this mutable variable can be set instead. Real chat ignores it (conversationId wins)."
+                    label: "Testing Session"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "answerCount": object
+                    description: "How many distinct survey questions the visitor has answered."
+                    label: "Answer Count"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__integerType"
+                "responsesJson": string
+                    description: "JSON map of question_key → {questionText, answerText, answerKey} for fine-grained reasoning."
+                    label: "Survey Responses (JSON)"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "summary": string
+                    description: "One-line natural-language summary of the visitor's declared preferences. Intended for direct use in agent reasoning."
+                    label: "Summary"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "contactId": string
+                    description: "Salesforce Id of the anonymous Contact for this conversation. Use as input to subsequent booking/lookup actions."
+                    label: "Contact Id"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+
+        get_bookings:
+            description: "Gets all active flight bookings for the user. Run once at the router (gated by retrieve_active_booking_done) so the booking/segment context is loaded before any subagent — including seat change — needs it."
+            label: "Get Bookings"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Checking your flights"
+            target: "apex://Skywave_GetFlightBookings"
+
+            inputs:
+                "contactId": string
+                    description: "the contact Id of the user"
+                    label: "contactIds"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "bookings": list[object]
+                    description: "a list of bookings for the customer"
+                    label: "bookings"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "@apexClassType/c__Skywave_GetFlightBookings$Booking"
+                "errorMessage": string
+                    description: "details in case of an error"
+                    label: "error message"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "success": boolean
+                    description: "true if the action completed without error"
+                    label: "success"
+                    is_displayable: False
+                    is_used_by_planner: True
+
 subagent flight_management:
     label: "Flight Management"
 
@@ -341,7 +437,6 @@ subagent flight_management:
                 | No booking is in progress. The visitor can:
                   - View existing bookings: use {!@variables.active_bookings} (already loaded). Give a SHORT one-line summary per booking, then ask which one they mean. Use exact values; do NOT paraphrase numbers.
                   - Cancel a booking: state its cancellationConditions, ask them to confirm, then call {!@actions.cancel_booking} with the bookingReference.
-                  - Change a seat: use {!@actions.change_seat}.
                   - Search for flights: call {!@actions.search_flights} with origin (IATA), destination (IATA), departure date (YYYY-MM-DD), and fare class. Use canonical fare class names: Economy, Premium Economy, Business, First. Treat synonyms (economy plus → Premium Economy, business class → Business, etc.) as the canonical name.
 
                     The output of this action is always renderable. Always use show_command to display the result to the user. After search_flights completes, you MUST present the flightResult output to the visitor. ALWAYS show the structured action output (the Flight Search Result card). Do NOT rewrite, restate, or summarize the flight options as plain text or bullet lists — the interactive flight cards are contained in the flightResult output and must be displayed as-is. In your text reply alongside the cards, keep it short (1-2 sentences) for color only — e.g. confirm route + date and ask which flight they prefer. Do NOT enumerate flight numbers, times, or prices in prose; the cards already show them.
@@ -455,11 +550,6 @@ subagent flight_management:
                 set @variables.active_bookings = @outputs.bookings
                 set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
                 set @variables.retrieve_active_booking_done = @outputs.success
-
-            change_seat: @actions.change_seat
-                with bookingSegmentId = ...
-                with newSeatNumber = ...
-                with seatPreference = ...
 
             cancel_booking: @actions.cancel_booking
                 with bookingReference = ...
@@ -1031,54 +1121,6 @@ subagent flight_management:
                     is_displayable: False
                     is_used_by_planner: True
 
-        change_seat:
-            description: "Change seat selection for a flight booking segment"
-            label: "Change Seat"
-            require_user_confirmation: False
-            include_in_progress_indicator: True
-            progress_indicator_message: "Changing seat assignment"
-            target: "apex://Skywave_ChangeSeat"
-
-            inputs:
-                "bookingSegmentId": string
-                    description: "The Booking Segment ID to change seat for"
-                    label: "Booking Segment ID"
-                    is_required: True
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-                "newSeatNumber": string
-                    description: "The desired seat number (e.g., 12A)"
-                    label: "New Seat Number"
-                    is_required: False
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-                "seatPreference": string
-                    description: "Seat preference if no specific seat: Window, Aisle, or Middle"
-                    label: "Seat Preference"
-                    is_required: False
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-
-            outputs:
-                "errorMessage": string
-                    description: "details in case of an error"
-                    label: "error message"
-                    complex_data_type_name: "lightning__textType"
-                    is_used_by_planner: True
-                    is_displayable: False
-                "success": boolean
-                    description: "true if the action completed without error"
-                    label: "success"
-                    complex_data_type_name: "lightning__booleanType"
-                    is_used_by_planner: True
-                    is_displayable: False
-                "updatedSegment": object
-                    description: "Information about the seat change"
-                    label: "updated segment"
-                    complex_data_type_name: "@apexClassType/c__Skywave_ChangeSeat$SegmentInfo"
-                    is_used_by_planner: True
-                    is_displayable: True
-
         cancel_booking:
             description: "Cancels a flight booking and processes the refund"
             label: "Cancel Booking"
@@ -1202,67 +1244,16 @@ subagent ambiguous_question:
               Do not answer ambiguous questions. Do not invoke any actions.
               Politely guide the user to provide more specific details about their request.
 
-subagent seat_selection:
-    label: "Seat Selection"
+subagent seat_change_unavailable:
+    label: "Seat Change Unavailable"
 
-    description: "Helps users select or change seats on their flights"
+    description: "Handles seat selection or seat change requests, which the agent cannot currently fulfill. Declines on-brand and offers other help."
 
     reasoning:
         instructions: ->
-            | Help the customer book a seat on their flight based on the plane model and seats available.
-              For upgraded seat options, check the loyalty tier status.
-              If the user has a preferred seat, suggest it if available.
-
-        actions:
-            change_seat: @actions.change_seat
-                with bookingSegmentId = ...
-                with newSeatNumber = ...
-                with seatPreference = ...
-                set @variables.flight_booking_error_detail = @outputs.errorMessage
-                set @variables.Booking_Outcome = @outputs.success
-
-    actions:
-        change_seat:
-            description: "Change seat selection for a flight booking segment"
-            label: "Change Seat"
-            target: "apex://Skywave_ChangeSeat"
-
-            inputs:
-                bookingSegmentId: string
-                    description: "The Booking Segment ID to change seat for"
-                    label: "Booking Segment ID"
-                    is_required: True
-                    complex_data_type_name: "lightning__textType"
-                newSeatNumber: string
-                    description: "The desired seat number (e.g., 12A)"
-                    label: "New Seat Number"
-                    is_required: False
-                    complex_data_type_name: "lightning__textType"
-                seatPreference: string
-                    description: "Seat preference if no specific seat: Window, Aisle, or Middle"
-                    label: "Seat Preference"
-                    is_required: False
-                    complex_data_type_name: "lightning__textType"
-
-            outputs:
-                errorMessage: string
-                    description: "details in case of an error"
-                    label: "error message"
-                    complex_data_type_name: "lightning__textType"
-                    is_used_by_planner: True
-                    is_displayable: False
-                success: boolean
-                    description: "true if the action completed without error"
-                    label: "success"
-                    complex_data_type_name: "lightning__booleanType"
-                    is_used_by_planner: True
-                    is_displayable: False
-                updatedSegment: object
-                    description: "Information about the seat change"
-                    label: "updated segment"
-                    complex_data_type_name: "@apexClassType/c__Skywave_ChangeSeat$SegmentInfo"
-                    is_used_by_planner: True
-                    is_displayable: True
+            | The visitor has asked to select or change a seat. You are NOT able to help with seat changes right now — this capability is not available.
+              Reply briefly and warmly in one or two sentences: apologise that you can't change or select seats at the moment, and offer to help with something else instead (viewing or booking flights, cancelling a booking, name corrections, mileage, or a support case).
+              Do NOT invoke any action. Do NOT attempt a workaround. Do NOT promise to do it later or open a case for it unless the visitor explicitly asks. Keep it natural — do not mention internal systems, versions, or that the feature is "not built yet".
 
 subagent name_change:
     label: "Name Change"
