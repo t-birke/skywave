@@ -809,10 +809,29 @@ Observability data model.
   - Phase 1: inspect (`sf org display`, queries)
   - Phase 2: diff
   - Phase 3: `Edit` the `.agent` file
-  - Phase 4: deploy + publish + activate
+  - Phase 4: deploy + publish + activate **+ republish the ESD**
+    (see ⚠️ below) — in this demo the activate step really just flips
+    to the pre-deployed goldilocks version, but the ESD republish is
+    NOT optional
   - Phase 5: chain into `testing-agentforce` skill to scaffold test spec
   - Phase 6: `sf agent test run`
   - Phase 7: summary
+
+> ⚠️ **MANDATORY: republish the ESD after every agent publish/activate.**
+> The goldilocks seat-change subagent renders a **custom Lightning Type**
+> (the seatmap card). Activating a new agent version does NOT invalidate the
+> Embedded Service Deployment's cached bundle — until the ESD is republished,
+> real ECv2 chat keeps serving the old bundle, `__supports_result_display__`
+> stays false, and the CLT card silently degrades to plain text (the action
+> still runs). **Confirmed empirically: the card only renders after a manual
+> ESD republish.** There is no public API for the Publish button (PLATFORM_FEEDBACK
+> #10), so the skill drives `scripts/publishEmbeddedServiceDeployment.mjs`
+> (headless Playwright) as part of its activate step, then the chat page must
+> be hard-refreshed. `sf agent preview` does NOT exercise the customer_web_client
+> connection runtime, so a preview trace is not a reliable signal here — only
+> real chat after an ESD republish is authoritative. This applies equally to
+> Step 4's reset helper (flipping back to the stripped version also needs an
+> ESD republish, or the next audience's chat is left in a broken cached state).
 - **Testing Center UI tour for Chapter 8.** The skill scaffolds + runs
   tests in the terminal, but the talk track narrates **Testing Center
   in Agentforce Studio** with the test cases visible (incl. the
@@ -1112,6 +1131,14 @@ The parking lot above is for "deferred until demo is stable." This
 backlog is for "we shipped v1 of X but want a slicker v2 someday."
 Add items as they come up. Don't pre-prioritize.
 
+- **Testing Center UI tour for Chapter 8 (deferred from Phase 5).** The
+  signed-off §6/Q1 plan had `skywave-extend-agent` also scaffold + run an
+  `AiEvaluationDefinition` that surfaces in Agentforce Studio's Testing
+  Center, narrated as "agentically generated tests." Cut from the initial
+  Phase 5 build for schedule reasons (Tom, Phase 5 kickoff). The skill's
+  4-step spec (investigate → create actions → edit agent → publish/activate
+  + ESD republish) ships first; revisit the Testing Center beat before the
+  live run if Chapter 8 needs it.
 - **`skywaveSurveyAuthor` LWC drag-and-drop reorder.** v1 ships with
   up/down arrow buttons on each question and option. Drag-and-drop
   is slicker on desktop but brittler on touch and adds ~50 LOC; not
