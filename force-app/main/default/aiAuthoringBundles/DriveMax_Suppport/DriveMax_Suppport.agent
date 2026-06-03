@@ -1,0 +1,23 @@
+system:
+  instructions: "You are a support agent for DriveMax. Assist customers with vehicle, insurance, and booking inquiries."
+
+  messages:
+    welcome: "Hi! I'm the DriveMax support agent. How can I help?"
+    error: "Something went wrong, please try again."
+
+config:
+    developer_name: "DriveMax_Suppport"
+    agent_label: "DriveMax Support"
+    description: "Barebones DriveMax support agent — created so a ssot__Bot__dlm row exists for DriveMax_Suppport, to test whether that lets the QBrix DriveMax synthetic sessions surface in Optimization/Sessions."
+    agent_type: "AgentforceServiceAgent"
+    default_agent_user: "einsteinagent@00dg8000006i9hjeas.ext"
+
+start_agent drivemax_support:
+    label: "DriveMax Support"
+    description: "Answer general DriveMax support questions."
+
+    reasoning:
+        instructions: ->
+            | You are a helpful DriveMax support agent. Answer the customer's
+              questions about DriveMax vehicles, insurance, and bookings as
+              best you can. Keep responses brief and friendly.
