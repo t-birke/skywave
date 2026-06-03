@@ -330,7 +330,12 @@ public with sharing class Skywave_ObservabilitySeeder {
                 for (Integer t = 0; t < turns.size(); t++) {
                     List<String> pair = turns[t];
                     DateTime turnStart = cursor;
-                    DateTime turnEnd = turnStart.addSeconds(20 + rand(40));
+                    // Interaction Start->End duration is what the dashboard
+                    // reports as Average Agent Latency (NOT the message-to-
+                    // message delta). Keep it to a realistic agent response
+                    // time of 2-4s; a wider window here inflates the latency
+                    // metric (e.g. 20-60s -> ~40s average).
+                    DateTime turnEnd = turnStart.addSeconds(2 + rand(3));
                     String interactionUuid = uuid();
                     String traceId = uuid();
                     turnInteractionIds.add(interactionUuid);
@@ -351,13 +356,14 @@ public with sharing class Skywave_ObservabilitySeeder {
                     it.Telemetry_Trace_Span__c = uuid();
                     interactions.add(it);
 
-                    // user + agent messages
+                    // user + agent messages — keep within the interaction's
+                    // 2-4s window: user speaks at start, agent replies at end.
                     messages.add(buildMessage(sessionUuid, interactionUuid,
                         userParticipantPlaceholder(sessionUuid), 'Input', pair[0],
-                        turnStart.addSeconds(2)));
+                        turnStart));
                     messages.add(buildMessage(sessionUuid, interactionUuid,
                         agentParticipantPlaceholder(sessionUuid), 'Output', pair[1],
-                        turnStart.addSeconds(8)));
+                        turnEnd));
 
                     // steps: main turn gets 2, follow-up gets 1
                     Integer stepN = (t == 0) ? 2 : 1;
