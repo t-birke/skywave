@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ConnectedApp xmlns="http://soap.sforce.com/2006/04/metadata">
+    <contactEmail>tom.birke@salesforce.com</contactEmail>
+    <label>Skywave Data Cloud Integration</label>
+    <description>JWT Bearer connected app for Skywave's programmatic Data Cloud API access. Used to trigger SDO_Analytics_*_Home stream refreshes after the Phase 4.5 observability seeder rewrites the QBrix tables. CDP scopes (cdp_query_api / cdp_ingest_api) must be added post-deploy via App Manager — they are not deployable via metadata.</description>
+    <oauthConfig>
+        <callbackUrl>http://localhost</callbackUrl>
+        <certificate>MIIDUTCCAjmgAwIBAgIUO9zl9HX/zPOUj4LIE99/CJGLmFwwDQYJKoZIhvcNAQELBQAwODELMAkGA1UEBhMCREUxEDAOBgNVBAoMB1NreXdhdmUxFzAVBgNVBAMMDnNreXdhdmUtZGMtand0MB4XDTI2MDUyNzIwMDAxMloXDTI3MDUyNzIwMDAxMlowODELMAkGA1UEBhMCREUxEDAOBgNVBAoMB1NreXdhdmUxFzAVBgNVBAMMDnNreXdhdmUtZGMtand0MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAs6xwtepydNPDuemHz4ePz8u4c6kLsEyHHxW4NuhxpBmze1r525XII8KZxDRjMsbxRI8IBiSayIJREXFz84yGJcTIcrvlyypsPFpp7GBxBnU25hHxXpszrSlIVd3iihvMZLxpYSK877fsUIA3G2MbNVbjCGcq8McwH7acMdsi6qkK9E+N5Bjcz14rgxFrf7btCirgDD49aOGRd/0h/DTMaTXKkwR9X52ZnvuZWUahxjjbwO9z44KnKvOYs6jHvtSv4cwWCYsyIPW9ZtOJYG+NvyswG63sH2bRzo6Rmb2uMdSdJzuJ8vtWX2TB6cl6Nwp4JUBeqsgxyWilzE1p+qWY9QIDAQABo1MwUTAdBgNVHQ4EFgQUvjsr2eWxzlMGBIikzWCQdFBzEnEwHwYDVR0jBBgwFoAUvjsr2eWxzlMGBIikzWCQdFBzEnEwDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAQk4f+hJuS4ZIP2r1MkwBNetUMBx74e14aoWM7g1jz7XRMk9yPHlSIFo+fghwuG9+1GFhmyF4xLmY42JXxDGhaJzgXLy7thvixtUpS+Zd7TWDeBfgcYrXJHtwx2P58J4IRvG8lcmn3Pqk2jGlNEbXP7Gl7lQc2BdKaXiB8Trg8lSGWwO/WZu22TDSo5r40LWHL8XH4weqPTO3QsjBa/VekOUve1K149kXAxy56xt5KzvfguJ+L/4Onr3I3ufNMX998+KPlXM8O0b/QsRuDpR5cxEncM7b49z9c5pFTTV7/i0b3pbzgFytnnuMgqPjsGzXIrhbUxHHUmB+xqnjp33rTg==</certificate>
+        <scopes>Api</scopes>
+        <scopes>RefreshToken</scopes>
+    </oauthConfig>
+</ConnectedApp>

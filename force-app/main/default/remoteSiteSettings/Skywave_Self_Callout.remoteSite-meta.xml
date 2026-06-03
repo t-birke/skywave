@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RemoteSiteSetting xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Allows Apex HTTP callouts back to this org's own domain. Used by Skywave_DataStreamRunner to invoke the Connect REST data-stream Refresh Now endpoint, which requires interactive-context scopes only available via UserInfo.getSessionId().</description>
+    <disableProtocolSecurity>false</disableProtocolSecurity>
+    <isActive>true</isActive>
+    <url>https://trailsignup-fb3f5426f87c5d.my.salesforce.com</url>
+</RemoteSiteSetting>

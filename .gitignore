@@ -53,3 +53,10 @@ secrets/
 *.p12
 *.jks
 *.pfx
+
+# Stashed observability seed data (demo data export)
+.stash/
+
+# Observability dataset export — build artifact, not source
+skywave-observability-dataset/
+skywave-observability-dataset.zip
