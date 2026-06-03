@@ -9,14 +9,26 @@
 set -euo pipefail
 
 AGENT_API_NAME="Skywave_Airlines_Agent"
+AGENT_FILE="force-app/main/default/aiAuthoringBundles/${AGENT_API_NAME}/${AGENT_API_NAME}.agent"
 
-echo "─── Looking up agent user ───"
-AGENT_USER=$(sf data query --json \
-  -q "SELECT Username FROM User WHERE FirstName = 'Skywave' AND LastName = 'Agent' LIMIT 1" \
-  | jq -r '.result.records[0].Username // empty')
+# AGENT_USER must be exported: sfdx-project.json declares a replaceWithEnv
+# replacement (skywaveserviceagent@example.com -> $AGENT_USER) that runs at
+# deploy AND publish time, and errors if the var is unset — even though the
+# .agent file already carries the real default_agent_user once deployed.
+echo "─── Resolving agent user ───"
+# 1) Authoritative source: the default_agent_user already in the .agent file.
+AGENT_USER=$(sed -n 's/.*default_agent_user: *"\([^"]*\)".*/\1/p' "$AGENT_FILE" | head -1)
+
+# 2) If the file still holds the placeholder (fresh checkout), query the org
+#    for the active Einstein Agent User.
+if [ -z "$AGENT_USER" ] || [ "$AGENT_USER" = "skywaveserviceagent@example.com" ]; then
+  AGENT_USER=$(sf data query --json \
+    -q "SELECT Username FROM User WHERE Profile.Name = 'Einstein Agent User' AND IsActive = true ORDER BY CreatedDate DESC LIMIT 1" \
+    | jq -r '.result.records[0].Username // empty')
+fi
 
 if [ -z "$AGENT_USER" ]; then
-  echo "ERROR: Could not find the Skywave Agent user. Has orgInit.sh been run?" >&2
+  echo "ERROR: Could not resolve the Einstein Agent User (not in $AGENT_FILE and none active in org). Has orgInit.sh been run?" >&2
   exit 1
 fi
 export AGENT_USER
