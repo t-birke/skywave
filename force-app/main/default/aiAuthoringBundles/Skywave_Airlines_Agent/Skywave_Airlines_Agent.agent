@@ -74,24 +74,18 @@ variables:
     selected_total_charged: mutable string = ""
         label: "Selected Total Charged"
         description: "Total amount string (e.g. '$1430.00') returned by ack_profile_form. Displayed in the payment-picker card."
-    check_imminent_flights_success: mutable boolean = False
-        label: "Check Imminent Flights Success"
-        description: ""
-    check_imminent_flight_error_message: mutable string
-        label: "Check Imminent Flight Error Message"
-        description: ""
-    flights_within_72hrs: mutable number = 0
-        label: "Flights Within 72hrs"
-        description: ""
     active_bookings: mutable object
         label: "Active Bookings"
         description: ""
     retrieve_active_booking_error_message: mutable string
         label: "Retrieve Active Booking Error Message"
         description: ""
-    retrieve_active_booking_done: mutable boolean = False
-        label: "Retrieve Active Booking Done"
-        description: ""
+    active_booking_count: mutable number = -1
+        label: "Active Booking Count"
+        description: "Number of active bookings for the visitor. -1 = get_bookings has not run yet; 0 = ran, no bookings; N = booking count. Set once at the router and refreshed once after a booking confirms. Sole gate for whether get_bookings runs, the seat-change routing gate (count > 0), and the seat funnel's single-vs-multiple-booking branch."
+    seat_change_active_booking_number_of_segments: mutable number = -1
+        label: "Seat Change: Segments on Chosen Booking"
+        description: "Number of flight segments on the booking the visitor is changing a seat on. -1 = not yet queried. Populated by get_segment_count once the booking is identified; drives the seat funnel's single-vs-multiple-flight branch."
     Tier_Status: mutable string
         label: "Tier Status"
         description: ""
@@ -169,13 +163,6 @@ start_agent agent_router:
                     with contactId = @variables.ContactId
                     set @variables.resolved_contact_id = @outputs.contactId
 
-            if @variables.resolved_contact_id != "" and @variables.check_imminent_flights_success == False:
-                run @actions.get_upcoming_flights
-                    with contactId = @variables.resolved_contact_id
-                    set @variables.check_imminent_flight_error_message = @outputs.errorMessage
-                    set @variables.flights_within_72hrs = @outputs.imminentFlights
-                    set @variables.check_imminent_flights_success = @outputs.success
-
             if @variables.survey_resolved is False:
                 run @actions.resolve_session
                     with conversationId = @variables.Conversation_Id
@@ -185,20 +172,35 @@ start_agent agent_router:
                     set @variables.resolved_contact_id = @outputs.contactId
                     set @variables.survey_resolved = True
 
-            if @variables.retrieve_active_booking_done is False and @variables.resolved_contact_id != "003000000000000" and @variables.resolved_contact_id != "":
+            # Central booking load — runs exactly ONCE (active_booking_count starts
+            # at -1). Every subagent that needs bookings reads @variables.active_bookings
+            # and @variables.active_booking_count; none of them re-fetch.
+            if @variables.active_booking_count == -1 and @variables.resolved_contact_id != "003000000000000" and @variables.resolved_contact_id != "":
                 run @actions.get_bookings
                     with contactId = @variables.resolved_contact_id
                     set @variables.active_bookings = @outputs.bookings
                     set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
-                    set @variables.retrieve_active_booking_done = @outputs.success
+                    set @variables.active_booking_count = @outputs.bookingCount
+
+            # Post-confirm refresh — runs ONCE after a booking is confirmed, so the
+            # just-made booking appears in active_bookings/active_booking_count. This
+            # is what lets a visitor book a flight and THEN change its seat against
+            # an up-to-date list.
+            if @variables.booking_confirmed is True and @variables.bookings_refreshed_post_confirm is False and @variables.resolved_contact_id != "003000000000000" and @variables.resolved_contact_id != "":
+                run @actions.get_bookings
+                    with contactId = @variables.resolved_contact_id
+                    set @variables.active_bookings = @outputs.bookings
+                    set @variables.active_booking_count = @outputs.bookingCount
+                    set @variables.bookings_refreshed_post_confirm = True
 
             if @variables.booking_step == "profile" or @variables.booking_step == "payment" or @variables.booking_step == "confirm":
-                transition to @subagent.flight_management
+                transition to @subagent.flight_booking
 
             | You are a router only. Do NOT answer questions or provide help directly. Always use a transition action.
               Route by intent:
-              - Flight bookings, upcoming flights, flight status, booking a flight, changing or canceling flights -> use go_to_flight_management
-              - Seat selection or seat changes -> use go_to_seat_selection
+              - Booking a NEW flight (search, choose, pay for a new ticket) -> use go_to_flight_booking
+              - Viewing, canceling, or changing an EXISTING booking or flight -> use go_to_flight_management
+              - Seat selection or seat changes on an existing booking -> use go_to_seat_selection
               - Correcting or updating the traveler's first or last name on a booking -> use go_to_name_change
               - Questions about mileage balance, tier points, loyalty points, or frequent flyer miles -> use go_to_mileage_account
               - Support cases, complaints, case status, creating a case -> use go_to_case_management
@@ -208,8 +210,11 @@ start_agent agent_router:
               Never attempt to help the customer yourself. Always route.
 
         actions:
+            go_to_flight_booking: @utils.transition to @subagent.flight_booking
+                description: "Route to book a NEW flight (search, select, profile, payment, confirm)"
+
             go_to_flight_management: @utils.transition to @subagent.flight_management
-                description: "Route to flight management for booking, viewing, changing, or canceling flights"
+                description: "Route to view, cancel, or change an existing booking or flight"
 
             go_to_escalation: @utils.transition to @subagent.escalation
                 description: "Transfer to a live human agent"
@@ -221,7 +226,8 @@ start_agent agent_router:
                 description: "Handle unclear or ambiguous requests that need clarification"
 
             go_to_seat_selection: @utils.transition to @subagent.seat_selection
-                description: "Select or change the seat on one of the visitor's bookings"
+                description: "Select or change the seat on one of the visitor's existing bookings"
+                available when @variables.active_booking_count > 0
 
             go_to_case_management: @utils.transition to @subagent.case_management
                 description: "Create, view, or update support cases"
@@ -276,39 +282,6 @@ start_agent agent_router:
                     is_displayable: False
                     is_used_by_planner: True
 
-        get_upcoming_flights:
-            description: "Gets upcoming flights for the user within the next 72 hours"
-            label: "Get Upcoming Flights"
-            require_user_confirmation: False
-            include_in_progress_indicator: False
-            target: "apex://Skywave_GetUpcomingFlights"
-
-            inputs:
-                "contactId": string
-                    description: "The contact id for the customer"
-                    label: "contactId"
-                    is_required: True
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-
-            outputs:
-                "errorMessage": string
-                    description: "details in case of an error"
-                    label: "error message"
-                    is_displayable: False
-                    is_used_by_planner: True
-                "imminentFlights": object
-                    description: "flights within the next 72 hours"
-                    label: "imminent flights"
-                    complex_data_type_name: "lightning__integerType"
-                    is_displayable: False
-                    is_used_by_planner: True
-                "success": boolean
-                    description: "true if the action completed without error"
-                    label: "success"
-                    is_displayable: False
-                    is_used_by_planner: True
-
         resolve_session:
             description: "Resolves the visitor's MessagingSession.ConversationId to their declared survey answers and anonymous Contact Id. Run once at the router (gated by survey_resolved) so booking context is available no matter which subagent the planner routes to."
             label: "Resolve Session Context"
@@ -357,7 +330,7 @@ start_agent agent_router:
                     complex_data_type_name: "lightning__textType"
 
         get_bookings:
-            description: "Gets all active flight bookings for the user. Run once at the router (gated by retrieve_active_booking_done) so the booking/segment context is loaded before any subagent — including seat change — needs it."
+            description: "Gets all active flight bookings for the user, plus a scalar bookingCount. Run once at the router (gated by active_booking_count == -1) and once after a booking confirms, so booking context is loaded before any subagent — including seat change — needs it. No subagent re-fetches."
             label: "Get Bookings"
             require_user_confirmation: False
             include_in_progress_indicator: True
@@ -379,6 +352,12 @@ start_agent agent_router:
                     is_displayable: False
                     is_used_by_planner: True
                     complex_data_type_name: "@apexClassType/c__Skywave_GetFlightBookings$Booking"
+                "bookingCount": object
+                    description: "Number of active bookings returned (0 if none). Pinned into active_booking_count."
+                    label: "Booking Count"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__integerType"
                 "errorMessage": string
                     description: "details in case of an error"
                     label: "error message"
@@ -390,13 +369,16 @@ start_agent agent_router:
                     is_displayable: False
                     is_used_by_planner: True
 
-subagent flight_management:
-    label: "Flight Management"
+subagent flight_booking:
+    label: "Flight Booking"
 
-    description: "Assist users with booking, canceling, or changing flights, including checking if they have flights within the next 72 hours."
+    description: "Books a NEW flight for the visitor through five deterministic steps: search, select, profile, payment, confirm. Does NOT view, cancel, or change existing bookings."
 
     reasoning:
         instructions: ->
+            # Deterministic booking-step ladder. Each completed sub-action flips a
+            # flag; this recomputes booking_step from those flags every turn so the
+            # flow can't get stuck or skip a step.
             if @variables.booking_confirmed is True:
                 set @variables.booking_step = "done"
             if @variables.payment_processed is True and @variables.booking_confirmed is False:
@@ -406,82 +388,44 @@ subagent flight_management:
             if @variables.flight_selected is True and @variables.profile_collected is False:
                 set @variables.booking_step = "profile"
 
-            if @variables.survey_resolved is False:
-                run @actions.resolve_session
-                    with conversationId = @variables.Conversation_Id
-                    with testingSession = @variables.testingSession
-                    set @variables.survey_summary = @outputs.summary
-                    set @variables.survey_responses_json = @outputs.responsesJson
-                    set @variables.resolved_contact_id = @outputs.contactId
-                    set @variables.survey_resolved = True
-
-            if @variables.retrieve_active_booking_done is False and @variables.resolved_contact_id != "003000000000000" and @variables.resolved_contact_id != "":
-                run @actions.get_bookings
-                    with contactId = @variables.resolved_contact_id
-                    set @variables.active_bookings = @outputs.bookings
-                    set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
-                    set @variables.retrieve_active_booking_done = @outputs.success
-
-            if @variables.booking_step == "done" and @variables.bookings_refreshed_post_confirm is False:
-                run @actions.get_bookings
-                    with contactId = @variables.resolved_contact_id
-                    set @variables.active_bookings = @outputs.bookings
-                    set @variables.bookings_refreshed_post_confirm = True
-
-            | You are a Skywave Airlines booking agent. The visitor is anonymous. Address them in second person ("you", "your"). Never guess a name.
+            | You are a Skywave Airlines booking agent helping the visitor book a NEW flight. The visitor is anonymous. Address them in second person ("you", "your"). Never guess a name.
+              If at any point the visitor says they want to stop, cancel this booking, or asks for something NOT related to completing this new booking (e.g. seat changes, viewing other bookings, mileage, support), STOP the booking flow: set booking_step back to empty by calling {!@actions.abort_booking}, then briefly acknowledge and let them restate what they need.
 
             if @variables.survey_summary is not None and @variables.survey_summary != "":
                 | The visitor previously answered a short travel-preferences survey. {!@variables.survey_summary}
                   Use these preferences naturally — lean toward their stated favourite destination when suggesting flights, propose their preferred cabin class without asking, respect their seat preference. Do NOT enumerate the survey answers; weave them in.
-            if @variables.booking_step == "":
-                | No booking is in progress. The visitor can:
-                  - View existing bookings: use {!@variables.active_bookings} (already loaded). Give a SHORT one-line summary per booking, then ask which one they mean. Use exact values; do NOT paraphrase numbers.
-                  - Cancel a booking: state its cancellationConditions, ask them to confirm, then call {!@actions.cancel_booking} with the bookingReference.
-                  - Search for flights: call {!@actions.search_flights} with origin (IATA), destination (IATA), departure date (YYYY-MM-DD), and fare class. Use canonical fare class names: Economy, Premium Economy, Business, First. Treat synonyms (economy plus → Premium Economy, business class → Business, etc.) as the canonical name.
 
-                    The output of this action is always renderable. Always use show_command to display the result to the user. After search_flights completes, you MUST present the flightResult output to the visitor. ALWAYS show the structured action output (the Flight Search Result card). Do NOT rewrite, restate, or summarize the flight options as plain text or bullet lists — the interactive flight cards are contained in the flightResult output and must be displayed as-is. In your text reply alongside the cards, keep it short (1-2 sentences) for color only — e.g. confirm route + date and ask which flight they prefer. Do NOT enumerate flight numbers, times, or prices in prose; the cards already show them.
-                  - Select a flight: when the visitor agrees to a specific flight from search results, call {!@actions.book_flight} with contactId, flightId, travelDate, fareClass, checkedBags, seatPreference. This action does NOT create a booking yet — it just validates the choice and pins the selection. The booking is issued later by confirm_booking, after profile + payment. Do NOT narrate "your booking is reserved" — the booking does not exist yet.
+            if @variables.booking_step == "":
+                | STEP 1 — Search. Collect origin (IATA), destination (IATA), departure date (YYYY-MM-DD), and fare class, then call {!@actions.search_flights}. Skip seat and baggage for now. Use canonical fare class names: Economy, Premium Economy, Business, First (treat synonyms like "economy plus" → Premium Economy, "business class" → Business).
+
+                  The output of this action is always renderable. Always use show_command to display the result to the user. After search_flights completes, you MUST present the flightResult output to the visitor. ALWAYS show the structured action output (the Flight Search Result card). Do NOT rewrite, restate, or summarize the flight options as plain text or bullet lists — the interactive flight cards are contained in the flightResult output and must be displayed as-is. In your text reply alongside the cards, keep it short (1-2 sentences) for color only. Do NOT enumerate flight numbers, times, or prices in prose; the cards already show them.
+
+                  STEP 2 — Select. The flight card has a Book button; when the visitor taps it, the card posts the exact phrase "Book flight <FLIGHTNUMBER>" to chat. When you see that phrase, IMMEDIATELY call {!@actions.book_flight} passing that flight number as flightId (book_flight resolves a flight number OR an Id). This pins the selection; it does NOT create a booking yet. Do NOT narrate "your booking is reserved". If book_flight fails, tell the visitor and ask them to tap a flight card again.
 
             if @variables.booking_step == "profile":
-                | A flight selection is held. Now collect the visitor's profile so the ticket can be issued. Show the inline profile form (name, email, phone, photo).
+                | STEP 3 — Profile. A flight selection is held. Collect the visitor's profile so the ticket can be issued.
                   - On entering this step, IMMEDIATELY call {!@actions.present_profile_form} with contactId — that renders the form card.
 
-                    The output of this action is always renderable. Always use show_command to display the result to the user. After present_profile_form completes, you MUST present the formData output to the visitor. ALWAYS show the structured action output (the Skywave Profile Form card). Do NOT ask for name/email/phone in text first — the form card collects them. Do NOT rewrite, restate, or summarize the form fields as plain text — the interactive form is contained in the formData output and must be displayed as-is. In your text reply alongside the card, keep it short (1 sentence) — e.g. "A few details to wrap up your booking." Do NOT enumerate the fields. Do NOT claim the booking already exists.
+                    The output of this action is always renderable. Always use show_command to display the result to the user. After present_profile_form completes, you MUST present the formData output to the visitor. ALWAYS show the structured action output (the Skywave Profile Form card). Do NOT ask for name/email/phone in text first — the form card collects them. Do NOT rewrite, restate, or summarize the form fields as plain text — the interactive form is contained in the formData output and must be displayed as-is. In your text reply alongside the card, keep it short (1 sentence). Do NOT enumerate the fields. Do NOT claim the booking already exists.
                   - When the visitor sends the exact phrase "Profile created" (the cue from the form on successful submit): IMMEDIATELY call {!@actions.ack_profile_form} with contactId. That advances the booking to payment.
                   - Text fallback: if instead of using the form the visitor types name + email in chat (e.g. "tom birke, tom@example.com, +1 415 555 0101"): call {!@actions.update_profile} with firstName, lastName, email, and phone if provided. Do NOT echo back — invocation IS the confirmation.
 
             if @variables.booking_step == "payment":
-                | Profile saved and a Pending/Unpaid Booking__c is held under {!@variables.selected_booking_code} for {!@variables.selected_total_charged}. Show the inline payment-picker card so the visitor can complete payment.
+                | STEP 4 — Payment. Profile saved and a Pending/Unpaid Booking__c is held under {!@variables.selected_booking_code} for {!@variables.selected_total_charged}. Show the inline payment-picker card so the visitor can complete payment.
                   - On entering this step, IMMEDIATELY call {!@actions.present_payment_form} with contactId, bookingCode, and totalCharged — that renders the payment card.
 
-                    The output of this action is always renderable. Always use show_command to display the result to the user. After present_payment_form completes, you MUST present the formData output to the visitor. ALWAYS show the structured action output (the Skywave Payment Picker card). Do NOT ask "how would you like to pay" in text — the card collects the choice. Do NOT rewrite, restate, or summarize the payment options as plain text — the interactive card is contained in the formData output and must be displayed as-is. In your text reply alongside the card, keep it short (1 sentence) — e.g. "Almost done — choose how you'd like to pay." Do NOT enumerate the buttons.
-                  - Do NOT call any process_payment action — there is no such agent action anymore. The card invokes Apex directly to flip the booking from Unpaid to Paid.
-                  - When the visitor sends the exact phrase "Payment completed" (the cue from the payment LWC): IMMEDIATELY call {!@actions.confirm_booking} with contactId and bookingCode. That re-reads the booking from the DB to verify the payment actually flipped through.
+                    The output of this action is always renderable. Always use show_command to display the result to the user. After present_payment_form completes, you MUST present the formData output to the visitor. ALWAYS show the structured action output (the Skywave Payment Picker card). Do NOT ask "how would you like to pay" in text — the card collects the choice. Do NOT rewrite, restate, or summarize the payment options as plain text — the interactive card is contained in the formData output and must be displayed as-is. In your text reply alongside the card, keep it short (1 sentence). Do NOT enumerate the buttons.
+                  - The card invokes Apex directly to flip the booking from Unpaid to Paid. When the visitor sends the exact phrase "Payment completed" (the cue from the payment LWC): IMMEDIATELY call {!@actions.confirm_booking} with contactId and bookingCode.
 
             if @variables.booking_step == "confirm":
-                | Payment cue received. Verify the booking actually flipped to Paid before declaring success.
+                | STEP 5 — Confirm. Payment cue received. Verify the booking actually flipped to Paid before declaring success.
                   IMMEDIATELY call {!@actions.confirm_booking} with contactId and bookingCode. When @outputs.success indicates the booking is verified, tell the visitor their ticket is confirmed and quote @outputs.confirmationCodes. Otherwise, share @outputs.errorMessage and offer to retry payment.
 
             if @variables.booking_step == "done":
                 | Booking is fully confirmed. Code(s): {!@variables.booked_confirmation_codes}.
-                  - "Do I have a booking?" → YES, quote the code(s).
-                  - Do NOT call update_profile, process_payment, or confirm_booking again.
-                  - If the visitor wants ANOTHER flight, run {!@actions.search_flights} — that begins a new cycle.
+                  Confirm warmly and ask if there's anything else you can help with (e.g. changing the seat on this new booking). Do NOT call update_profile, ack_profile_form, or confirm_booking again. If the visitor wants to book ANOTHER flight, call {!@actions.reset_booking} to clear the booking state, then start a new search.
 
         actions:
-            resolve_session: @actions.resolve_session
-                description: "Look up the visitor's declared survey answers from the anonymous Contact created at survey-complete time, keyed by the chat conversationId. Runs once at the start of flight management; outputs are cached in @variables.survey_summary and @variables.survey_responses_json."
-                with conversationId = ...
-
-            identify_customer: @actions.resolve_contact
-                description: "Look up a customer by their email address to identify them"
-                available when @variables.resolved_contact_id == ""
-                with email = ...
-                set @variables.resolved_contact_id = @outputs.contactId
-
-            Reschedule_Flights: @actions.Reschedule_Flights
-                with "Input:New_Flight_Requested" = ...
-
             search_flights: @actions.search_flights
                 description: "Searches the schedule for matching flights and returns priced FlightOption records. Pass fareClass — without it the price defaults to Economy and confuses the visitor."
                 with departureDate = ...
@@ -491,7 +435,7 @@ subagent flight_management:
                 set @variables.Latest_Flight_Search_Results = @outputs.flightSummary
 
             book_flight: @actions.book_flight
-                description: "Selects the flight the visitor agreed to and pins the choice into mutable variables. This action does NOT create a booking — confirmation is deferred to confirm_booking. Pass the canonical fare class (Economy / Premium Economy / Business / First). After this succeeds, the agent moves to profile collection."
+                description: "Selects the flight the visitor agreed to (resolves a flight NUMBER or a Flight Id) and pins the choice. Call when the flight card posts 'Book flight <number>'. Does NOT create a booking — confirmation is deferred. After this succeeds the flow moves to profile collection."
                 with contactId = @variables.resolved_contact_id
                 with flightId = ...
                 with travelDate = ...
@@ -517,11 +461,11 @@ subagent flight_management:
                 set @variables.profile_collected = @outputs.success
 
             present_profile_form: @actions.present_profile_form
-                description: "Display the inline profile form card. Invoke ONCE when booking_step transitions to 'profile' — the form is the primary collection surface. Do NOT call this repeatedly; once displayed, wait for the 'Profile created' cue from the form on submit."
+                description: "Display the inline profile form card. Invoke ONCE when booking_step transitions to 'profile'. Do NOT call repeatedly; once displayed, wait for the 'Profile created' cue."
                 with contactId = @variables.resolved_contact_id
 
             ack_profile_form: @actions.ack_profile_form
-                description: "Invoke as soon as the visitor's profile is saved — either after the 'Profile created' cue from the form LWC, or after update_profile (text-fallback path) succeeds. This action does TWO things: marks profile_collected and inserts the Booking__c (Pending/Unpaid) using the pinned selection variables. Returns bookingCode + totalCharged for the agent to pin into selected_booking_code + selected_total_charged for the payment widget."
+                description: "Invoke as soon as the visitor's profile is saved (after 'Profile created' cue, or after update_profile succeeds). Marks profile_collected and inserts the Booking__c (Pending/Unpaid). Returns bookingCode + totalCharged."
                 with contactId = @variables.resolved_contact_id
                 with flightId = @variables.selected_flight_id
                 with travelDate = @variables.selected_travel_date
@@ -533,102 +477,36 @@ subagent flight_management:
                 set @variables.selected_total_charged = @outputs.totalCharged
 
             present_payment_form: @actions.present_payment_form
-                description: "Display the inline payment-picker card (Apple Pay / Credit Card / Demo Pay). Invoke ONCE when booking_step transitions to 'payment'. The card calls Apex imperatively for the demo charge, so the agent does NOT call any 'process_payment' action — the LWC handles payment end-to-end. Once the visitor pays, the LWC posts 'Payment completed' to chat as the cue."
+                description: "Display the inline payment-picker card. Invoke ONCE when booking_step transitions to 'payment'. The card calls Apex imperatively; the agent does NOT charge. The LWC posts 'Payment completed' on success."
                 with contactId = @variables.resolved_contact_id
                 with bookingCode = @variables.selected_booking_code
                 with totalCharged = @variables.selected_total_charged
 
             confirm_booking: @actions.confirm_booking
-                description: "Verify-only — re-reads the booking from the DB to confirm the payment widget actually ran and Status/Payment_Status flipped. Invoke when the visitor sends 'Payment completed' (cue from the payment LWC). If the booking is still Unpaid, surface that to the visitor instead of declaring success."
+                description: "Verify-only — re-reads the booking to confirm the payment widget flipped Status/Payment_Status. Invoke when the visitor sends 'Payment completed'. If still Unpaid, surface that instead of declaring success."
                 with contactId = @variables.resolved_contact_id
                 with bookingCode = @variables.selected_booking_code
                 set @variables.booking_confirmed = @outputs.success
                 set @variables.booked_confirmation_codes = @outputs.confirmationCodes
 
-            get_bookings: @actions.get_bookings
-                with contactId = ...
-                set @variables.active_bookings = @outputs.bookings
-                set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
-                set @variables.retrieve_active_booking_done = @outputs.success
+            abort_booking: @utils.setVariables
+                description: "Abort the in-progress booking when the visitor wants to stop or asks for something unrelated to completing this new booking. Clears the booking pipeline so the router can re-route on the next turn."
+                with booking_step = ""
+                with flight_selected = False
+                with profile_collected = False
+                with payment_processed = False
 
-            cancel_booking: @actions.cancel_booking
-                with bookingReference = ...
-                with contactId = @variables.resolved_contact_id
-
-            change_flight: @actions.change_flight
-                with Flight = ...
-                with requested_change = ...
+            reset_booking: @utils.setVariables
+                description: "Clear all booking state to start a brand-new booking after one has completed. Use only when the visitor explicitly wants to book ANOTHER flight."
+                with booking_step = ""
+                with flight_selected = False
+                with profile_collected = False
+                with payment_processed = False
+                with booking_confirmed = False
+                with selected_booking_code = ""
+                with selected_total_charged = ""
 
     actions:
-        resolve_session:
-            description: "Resolves the visitor's MessagingSession.ConversationId to their declared survey answers, by querying the anonymous Contact created at survey-complete time. Returns a natural-language summary plus a JSON map of question_key → {questionText, answerText, answerKey}."
-            label: "Resolve Session Context"
-            require_user_confirmation: False
-            include_in_progress_indicator: False
-            target: "apex://Skywave_ResolveSession"
-
-            inputs:
-                "conversationId": string
-                    description: "The MessagingSession.ConversationId, sourced from the @MessagingSession.ConversationId linked variable. Optional because studio preview can't seed it; falls back to testingSession when blank."
-                    label: "Conversation Id"
-                    is_required: False
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-                "testingSession": string
-                    description: "Studio-preview fallback. When the agent is run in studio preview the linked Conversation_Id picker is platform-broken, so this mutable variable can be set instead. Real chat ignores it (conversationId wins)."
-                    label: "Testing Session"
-                    is_required: False
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-
-            outputs:
-                "answerCount": object
-                    description: "How many distinct survey questions the visitor has answered."
-                    label: "Answer Count"
-                    is_displayable: False
-                    is_used_by_planner: True
-                    complex_data_type_name: "lightning__integerType"
-                "responsesJson": string
-                    description: "JSON map of question_key → {questionText, answerText, answerKey} for fine-grained reasoning."
-                    label: "Survey Responses (JSON)"
-                    is_displayable: False
-                    is_used_by_planner: True
-                    complex_data_type_name: "lightning__textType"
-                "summary": string
-                    description: "One-line natural-language summary of the visitor's declared preferences. Intended for direct use in agent reasoning."
-                    label: "Summary"
-                    is_displayable: False
-                    is_used_by_planner: True
-                    complex_data_type_name: "lightning__textType"
-                "contactId": string
-                    description: "Salesforce Id of the anonymous Contact for this conversation. Use as input to subsequent booking/lookup actions."
-                    label: "Contact Id"
-                    is_displayable: False
-                    is_used_by_planner: True
-                    complex_data_type_name: "lightning__textType"
-
-        Reschedule_Flights:
-            description: "Reschedule flights based on user tier and booking type"
-            label: "Reschedule Flights"
-            require_user_confirmation: False
-            include_in_progress_indicator: False
-            target: "generatePromptResponse://Skywave_RescheduleFlights"
-
-            inputs:
-                "Input:New_Flight_Requested": string
-                    description: "requested flight"
-                    label: "New Flight Requested"
-                    is_required: True
-                    complex_data_type_name: "lightning__textType"
-
-            outputs:
-                "promptResponse": string
-                    description: "The prompt response generated by the action based on the specified prompt and input."
-                    label: "Prompt Response"
-                    complex_data_type_name: "lightning__textType"
-                    filter_from_agent: False
-                    is_displayable: True
-
         search_flights:
             description: "Searches available flight itineraries"
             label: "Search Flights"
@@ -689,8 +567,102 @@ subagent flight_management:
                     filter_from_agent: False
                     is_displayable: False
 
+        book_flight:
+            description: "Selects (does NOT book) the flight the visitor agreed to. Resolves a flight NUMBER or a Flight__c Id, validates against the live row, computes price + quote DTO, and echoes the inputs back so the agent can pin them. Confirmation is deferred to confirm_booking."
+            label: "Select Flight"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Processing booking"
+            target: "apex://Skywave_BookFlight"
+
+            inputs:
+                "contactId": string
+                    description: "The contact ID for the booking"
+                    label: "Contact ID"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "flightId": string
+                    description: "The flight to book. Accepts either a Flight__c record Id OR a flight number (e.g. SW2200) — book_flight resolves either. Pass the flight number from the 'Book flight <number>' chat cue."
+                    label: "Flight ID or Number"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "travelDate": string
+                    description: "Date of travel (YYYY-MM-DD)"
+                    label: "Travel Date"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "fareClass": string
+                    description: "Fare class the visitor agreed to during search: Economy, Premium Economy, Business, or First. If blank, the action defaults to Economy."
+                    label: "Fare Class"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "checkedBags": object
+                    description: "Number of checked bags"
+                    label: "Checked Bags"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__integerType"
+                "seatPreference": string
+                    description: "Seat preference (e.g., Window, Aisle)"
+                    label: "Seat Preference"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "booking": object
+                    description: "Quote-shaped DTO for the visitor's flight selection. NOT yet a real booking."
+                    label: "selection quote"
+                    is_displayable: True
+                    is_used_by_planner: True
+                    complex_data_type_name: "@apexClassType/c__Skywave_BookFlight$Booking"
+                "errorMessage": string
+                    description: "details in case of an error"
+                    label: "error message"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "success": boolean
+                    description: "true if the selection was valid and the quote built"
+                    label: "success"
+                    is_displayable: True
+                    is_used_by_planner: True
+                "selectedFlightId": string
+                    description: "Echoed Flight__c Id — pin into selected_flight_id."
+                    label: "selected flight id"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "selectedTravelDate": string
+                    description: "Echoed travel date YYYY-MM-DD — pin into selected_travel_date."
+                    label: "selected travel date"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "selectedFareClass": string
+                    description: "Echoed canonical fare class — pin into selected_fare_class."
+                    label: "selected fare class"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "selectedCheckedBags": object
+                    description: "Echoed checked-bag count — pin into selected_checked_bags."
+                    label: "selected checked bags"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__integerType"
+                "selectedSeatPreference": string
+                    description: "Echoed seat preference — pin into selected_seat_preference."
+                    label: "selected seat preference"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+
         update_profile:
-            description: "Writes the visitor's first name, last name, and email onto the anonymous Contact created at survey time. Used by Phase 4 once a booking has been placed and the visitor provides their real identity."
+            description: "Writes the visitor's first name, last name, and email onto the anonymous Contact created at survey time."
             label: "Update Visitor Profile"
             require_user_confirmation: False
             include_in_progress_indicator: True
@@ -747,7 +719,7 @@ subagent flight_management:
                     is_used_by_planner: True
 
         present_profile_form:
-            description: "Renders the Skywave Profile Form card so the visitor can complete name, email, phone, and avatar inline in chat. The form posts back via @AuraEnabled imperative; on submit the visitor's chat sends 'Profile created' which the agent treats as the cue."
+            description: "Renders the Skywave Profile Form card so the visitor can complete name, email, phone, and avatar inline in chat. On submit the visitor's chat sends 'Profile created'."
             label: "Present Profile Form"
             require_user_confirmation: False
             include_in_progress_indicator: False
@@ -782,7 +754,7 @@ subagent flight_management:
                     is_displayable: False
 
         ack_profile_form:
-            description: "Acknowledges that the visitor profile is saved AND inserts the Booking__c (Pending/Unpaid) using pinned selection variables. Returns the bookingCode + totalCharged for the agent to pin and pass to the payment widget."
+            description: "Acknowledges that the visitor profile is saved AND inserts the Booking__c (Pending/Unpaid) using pinned selection variables. Returns the bookingCode + totalCharged."
             label: "Acknowledge Profile + Create Booking"
             require_user_confirmation: False
             include_in_progress_indicator: True
@@ -950,99 +922,65 @@ subagent flight_management:
                     is_used_by_planner: True
                     complex_data_type_name: "lightning__textType"
 
-        book_flight:
-            description: "Selects (does NOT book) the flight the visitor agreed to. Validates the choice against the live Flight__c row, computes price + quote DTO, and echoes the inputs back as outputs so the agent can pin them. Confirmation is deferred to confirm_booking."
-            label: "Select Flight"
+subagent flight_management:
+    label: "Flight Management"
+
+    description: "Assist the visitor with their EXISTING bookings: viewing them, cancelling a booking, or requesting a flight change. Does NOT book new flights (that is flight_booking's job)."
+
+    reasoning:
+        instructions: ->
+            | You are a Skywave Airlines agent helping the visitor with their EXISTING bookings. The visitor is anonymous. Address them in second person ("you", "your"). Never guess a name. The visitor's bookings have already been loaded centrally — use {!@variables.active_bookings}; do NOT fetch them again.
+
+              You handle three things only:
+              - View existing bookings: from {!@variables.active_bookings}, give a SHORT one-line summary per booking. Use exact values; do NOT paraphrase numbers. If they ask about a specific booking, summarise that one.
+              - Cancel a booking: state its cancellationConditions, ask the visitor to confirm, then call {!@actions.cancel_booking} with the bookingReference. Relay the confirmationMessage using exact values.
+              - Change a flight (route/time/date): call {!@actions.change_flight} with the original flight and the requested change, then relay the options/result.
+
+              If the visitor wants to BOOK A NEW flight, or change a SEAT, do NOT handle it here — briefly tell them you'll help with that and let them restate it so the router can send them to the right place.
+
+            if @variables.active_bookings is None:
+                | The visitor has no active bookings on file. Let them know, and offer to help book a new flight.
+
+        actions:
+            identify_customer: @actions.resolve_contact
+                description: "Look up a customer by their email address to identify them"
+                available when @variables.resolved_contact_id == ""
+                with email = ...
+                set @variables.resolved_contact_id = @outputs.contactId
+
+            Reschedule_Flights: @actions.Reschedule_Flights
+                with "Input:New_Flight_Requested" = ...
+
+            cancel_booking: @actions.cancel_booking
+                with bookingReference = ...
+                with contactId = @variables.resolved_contact_id
+
+            change_flight: @actions.change_flight
+                with Flight = ...
+                with requested_change = ...
+
+    actions:
+        Reschedule_Flights:
+            description: "Reschedule flights based on user tier and booking type"
+            label: "Reschedule Flights"
             require_user_confirmation: False
-            include_in_progress_indicator: True
-            progress_indicator_message: "Processing booking"
-            target: "apex://Skywave_BookFlight"
+            include_in_progress_indicator: False
+            target: "generatePromptResponse://Skywave_RescheduleFlights"
 
             inputs:
-                "contactId": string
-                    description: "The contact ID for the booking"
-                    label: "Contact ID"
+                "Input:New_Flight_Requested": string
+                    description: "requested flight"
+                    label: "New Flight Requested"
                     is_required: True
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-                "flightId": string
-                    description: "The Flight__c record ID to book (from search results)"
-                    label: "Flight ID"
-                    is_required: True
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-                "travelDate": string
-                    description: "Date of travel (YYYY-MM-DD)"
-                    label: "Travel Date"
-                    is_required: True
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-                "fareClass": string
-                    description: "Fare class the visitor agreed to during search: Economy, Premium Economy, Business, or First. If blank, the action defaults to Economy."
-                    label: "Fare Class"
-                    is_required: False
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-                "checkedBags": object
-                    description: "Number of checked bags"
-                    label: "Checked Bags"
-                    is_required: False
-                    is_user_input: False
-                    complex_data_type_name: "lightning__integerType"
-                "seatPreference": string
-                    description: "Seat preference (e.g., Window, Aisle)"
-                    label: "Seat Preference"
-                    is_required: False
-                    is_user_input: False
                     complex_data_type_name: "lightning__textType"
 
             outputs:
-                "booking": object
-                    description: "Quote-shaped DTO for the visitor's flight selection. NOT yet a real booking."
-                    label: "selection quote"
+                "promptResponse": string
+                    description: "The prompt response generated by the action based on the specified prompt and input."
+                    label: "Prompt Response"
+                    complex_data_type_name: "lightning__textType"
+                    filter_from_agent: False
                     is_displayable: True
-                    is_used_by_planner: True
-                    complex_data_type_name: "@apexClassType/c__Skywave_BookFlight$Booking"
-                "errorMessage": string
-                    description: "details in case of an error"
-                    label: "error message"
-                    is_displayable: False
-                    is_used_by_planner: True
-                "success": boolean
-                    description: "true if the selection was valid and the quote built"
-                    label: "success"
-                    is_displayable: True
-                    is_used_by_planner: True
-                "selectedFlightId": string
-                    description: "Echoed Flight__c Id — pin into selected_flight_id."
-                    label: "selected flight id"
-                    is_displayable: False
-                    is_used_by_planner: True
-                    complex_data_type_name: "lightning__textType"
-                "selectedTravelDate": string
-                    description: "Echoed travel date YYYY-MM-DD — pin into selected_travel_date."
-                    label: "selected travel date"
-                    is_displayable: False
-                    is_used_by_planner: True
-                    complex_data_type_name: "lightning__textType"
-                "selectedFareClass": string
-                    description: "Echoed canonical fare class — pin into selected_fare_class."
-                    label: "selected fare class"
-                    is_displayable: False
-                    is_used_by_planner: True
-                    complex_data_type_name: "lightning__textType"
-                "selectedCheckedBags": object
-                    description: "Echoed checked-bag count — pin into selected_checked_bags."
-                    label: "selected checked bags"
-                    is_displayable: False
-                    is_used_by_planner: True
-                    complex_data_type_name: "lightning__integerType"
-                "selectedSeatPreference": string
-                    description: "Echoed seat preference — pin into selected_seat_preference."
-                    label: "selected seat preference"
-                    is_displayable: False
-                    is_used_by_planner: True
-                    complex_data_type_name: "lightning__textType"
 
         resolve_contact:
             description: "Resolves a Contact ID from a known ID or email lookup"
@@ -1084,40 +1022,6 @@ subagent flight_management:
                 "errorMessage": string
                     description: "Error details"
                     label: "error message"
-                    is_displayable: False
-                    is_used_by_planner: True
-
-        get_bookings:
-            description: "Gets all active flight bookings for the user"
-            label: "Get Bookings"
-            require_user_confirmation: False
-            include_in_progress_indicator: True
-            progress_indicator_message: "Checking your flights"
-            target: "apex://Skywave_GetFlightBookings"
-
-            inputs:
-                "contactId": string
-                    description: "the contact Id of the user"
-                    label: "contactIds"
-                    is_required: True
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-
-            outputs:
-                "bookings": list[object]
-                    description: "a list of bookings for the customer"
-                    label: "bookings"
-                    is_displayable: False
-                    is_used_by_planner: True
-                    complex_data_type_name: "@apexClassType/c__Skywave_GetFlightBookings$Booking"
-                "errorMessage": string
-                    description: "details in case of an error"
-                    label: "error message"
-                    is_displayable: False
-                    is_used_by_planner: True
-                "success": boolean
-                    description: "true if the action completed without error"
-                    label: "success"
                     is_displayable: False
                     is_used_by_planner: True
 
@@ -1251,43 +1155,73 @@ subagent seat_selection:
 
     reasoning:
         instructions: ->
-            # active_bookings is already loaded by the router (get_bookings,
-            # gated by retrieve_active_booking_done). Re-fetch defensively only
-            # if a cold entry somehow skipped it.
-            if @variables.retrieve_active_booking_done is False and @variables.resolved_contact_id != "003000000000000" and @variables.resolved_contact_id != "":
-                run @actions.get_bookings
-                    with contactId = @variables.resolved_contact_id
-                    set @variables.active_bookings = @outputs.bookings
-                    set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
-                    set @variables.retrieve_active_booking_done = @outputs.success
+            | You help the visitor change the seat on one of their EXISTING flights. The visitor is anonymous; address them as "you". Bookings are already loaded centrally — use {!@variables.active_bookings} as the source of truth (never invent bookings, codes, or flight numbers). You can only show the seat map once the request is narrowed to exactly ONE flight.
 
-            | You help the visitor change the seat on one of their flights. The visitor is anonymous; address them as "you". Before you can show the seat map you MUST resolve the request down to exactly ONE flight (one booking, one flight on it). Use {!@variables.active_bookings} as the source of truth — never invent bookings, codes, or flight numbers.
+              The number of bookings the visitor has is {!@variables.active_booking_count}. Resolve the booking deterministically by that count, then resolve the flight by the segment count, then show the seat map:
 
-              Follow this resolution funnel using active_bookings:
-              - CASE 1 — no bookings: if the visitor has no bookings, tell them you don't see a booking to change a seat on, and offer to help book a flight instead. Do NOT call present_seat_map.
-              - CASE 2 — one booking with one flight: this is already fully resolved. IMMEDIATELY call {!@actions.present_seat_map} with that booking's bookingReference and leave flightNumber blank.
-              - CASE 3 — one booking with multiple flights (a connection or a return): ask which flight the seat change is for, giving a SHORT one-line summary per flight (route + date). When the visitor picks one, call {!@actions.present_seat_map} with that booking's bookingReference and the chosen flightNumber.
-              - CASE 4 — more than one booking: first ask which booking, with a SHORT one-line summary per booking (route + date + how far out). After they pick a booking, apply CASE 2 / CASE 3 logic to that booking's flights before calling present_seat_map.
+            # --- Resolve the booking ---
+            if @variables.active_booking_count == 1:
+                | The visitor has exactly ONE booking. Read its bookingReference (confirmation code) from {!@variables.active_bookings}. If you have not yet counted its flights this turn, IMMEDIATELY call {!@actions.get_segment_count} with that bookingReference to populate the segment count before deciding what to show.
+            if @variables.active_booking_count > 1:
+                | The visitor has MORE THAN ONE booking. First ask which booking the seat change is for, giving a SHORT one-line summary per booking (route + date + how far out) from {!@variables.active_bookings}. Once the visitor identifies a booking, call {!@actions.get_segment_count} with that booking's bookingReference to count its flights before showing anything.
 
-              When you call present_seat_map, its output is always renderable. Always use show_command to display the result to the user. You MUST present the seatMapData output to the visitor — the interactive seat-map card is contained in it and must be displayed as-is. Do NOT redraw the seat map, list seats, or describe the cabin in plain text. In your text reply alongside the card, keep it to one short sentence (e.g. "Here's the seat map — pick a seat and confirm.").
+            # --- Resolve the flight, then show the seat map ---
+            if @variables.seat_change_active_booking_number_of_segments == 1:
+                | The chosen booking has exactly ONE flight, so it is fully resolved. IMMEDIATELY call {!@actions.present_seat_map} with that booking's bookingReference and leave flightNumber blank.
+            if @variables.seat_change_active_booking_number_of_segments > 1:
+                | The chosen booking has MULTIPLE flights (a connection or a return). Ask which flight the seat change is for, giving a SHORT one-line summary per flight (route + date) from that booking in {!@variables.active_bookings}. When the visitor picks one, call {!@actions.present_seat_map} with the booking's bookingReference and the chosen flightNumber.
+
+            | When you call present_seat_map, its output is always renderable. Always use show_command to display the result to the user. You MUST present the seatMapData output to the visitor — the interactive seat-map card is contained in it and must be displayed as-is. Do NOT redraw the seat map, list seats, or describe the cabin in plain text. In your text reply alongside the card, keep it to one short sentence (e.g. "Here's the seat map — pick a seat and confirm.").
 
               The seat map handles everything else itself: the visitor selects a seat and taps Confirm (which changes the seat) or Abort. You will then receive one of two cues:
               - "seat change confirmed": the seat has ALREADY been changed by the card. Do NOT call any action. Simply confirm warmly in one sentence and ask if there's anything else you can help with.
               - "seat change aborted": the visitor cancelled. Do NOT call any action and do NOT retry. Acknowledge briefly and ask if there's anything else you can help with.
 
         actions:
+            get_segment_count: @actions.get_segment_count
+                description: "Count the flights on a booking so the funnel can decide whether to show the seat map directly (1 flight) or ask which flight (more than 1). Call with the chosen booking's confirmation code as soon as the booking is known."
+                with bookingCode = ...
+                set @variables.seat_change_active_booking_number_of_segments = @outputs.segmentCount
+
             present_seat_map: @actions.present_seat_map
                 description: "Render the interactive seat-map card for a single resolved flight. Call only after the funnel has narrowed to one booking + one flight. Pass the booking's confirmation code as bookingCode; pass flightNumber only when the booking has more than one flight."
                 with bookingCode = ...
                 with flightNumber = ...
 
-            get_bookings: @actions.get_bookings
-                with contactId = ...
-                set @variables.active_bookings = @outputs.bookings
-                set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
-                set @variables.retrieve_active_booking_done = @outputs.success
-
     actions:
+        get_segment_count:
+            description: "Returns the number of flight segments on a booking, looked up by confirmation code."
+            label: "Count Booking Segments"
+            require_user_confirmation: False
+            include_in_progress_indicator: False
+            target: "apex://Skywave_GetSegmentCount"
+
+            inputs:
+                "bookingCode": string
+                    description: "Confirmation code of the booking to count segments for."
+                    label: "Booking Code"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "segmentCount": object
+                    description: "Number of segments (flights) on the booking. 0 if not found."
+                    label: "Segment Count"
+                    complex_data_type_name: "lightning__integerType"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "success": boolean
+                    description: "true if the count was resolved"
+                    label: "success"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "errorMessage": string
+                    description: "details in case of an error"
+                    label: "error message"
+                    is_displayable: False
+                    is_used_by_planner: True
+
         present_seat_map:
             description: "Returns the Skywave Seat Map renderable card for a single resolved booking segment, looked up by booking confirmation code (and optional flight number)."
             label: "Present Seat Map"
@@ -1370,23 +1304,16 @@ subagent name_change:
 
     reasoning:
         instructions: ->
-            if @variables.retrieve_active_booking_done is False:
-                run @actions.get_bookings
-                    with contactId = @variables.resolved_contact_id
-                    set @variables.active_bookings = @outputs.bookings
-                    set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
-                    set @variables.retrieve_active_booking_done = @outputs.success
-
-            | Help Lauren correct the first or last name on one of her bookings. The customer is already authenticated — never ask for email or identification.
+            | Help the visitor correct the first or last name on one of their bookings. The visitor is already identified for this conversation — never ask for email or identification. Bookings are already loaded centrally — use {!@variables.active_bookings}; do NOT fetch them again.
 
             if @variables.active_bookings is None:
-                | Lauren currently has no bookings to update. Let her know and offer to help with something else.
+                | The visitor currently has no bookings to update. Let them know and offer to help with something else.
 
             if @variables.active_bookings is not None:
-                | Here are Lauren's current bookings: {!@variables.active_bookings}
-                  If she has more than one booking, ask which booking the name change is for using a SHORT one-line summary per booking (trip type, origin/destination, how far out).
-                  Ask for the corrected first name and last name, then confirm the change with her before calling the action.
-                  When she confirms, call {!@actions.change_name} with the booking's bookingReference, the new firstName, and the new lastName.
+                | Here are the visitor's current bookings: {!@variables.active_bookings}
+                  If they have more than one booking, ask which booking the name change is for using a SHORT one-line summary per booking (trip type, origin/destination, how far out).
+                  Ask for the corrected first name and last name, then confirm the change with them before calling the action.
+                  When they confirm, call {!@actions.change_name} with the booking's bookingReference, the new firstName, and the new lastName.
                   After the action returns, relay the confirmationMessage to the user using its exact values — do NOT paraphrase.
 
         actions:
@@ -1395,12 +1322,6 @@ subagent name_change:
                 with firstName = ...
                 with lastName = ...
                 with contactId = @variables.resolved_contact_id
-
-            get_bookings: @actions.get_bookings
-                with contactId = ...
-                set @variables.active_bookings = @outputs.bookings
-                set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
-                set @variables.retrieve_active_booking_done = @outputs.success
 
     actions:
         change_name:
@@ -1467,40 +1388,6 @@ subagent name_change:
                     description: "human-readable confirmation of the name change"
                     label: "confirmation message"
                     is_displayable: True
-                    is_used_by_planner: True
-
-        get_bookings:
-            description: "Gets all active flight bookings for the user"
-            label: "Get Bookings"
-            require_user_confirmation: False
-            include_in_progress_indicator: True
-            progress_indicator_message: "Checking your flights"
-            target: "apex://Skywave_GetFlightBookings"
-
-            inputs:
-                "contactId": string
-                    description: "the contact Id of the user"
-                    label: "contactIds"
-                    is_required: True
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-
-            outputs:
-                "bookings": list[object]
-                    description: "a list of bookings for the customer"
-                    label: "bookings"
-                    is_displayable: False
-                    is_used_by_planner: True
-                    complex_data_type_name: "@apexClassType/c__Skywave_GetFlightBookings$Booking"
-                "errorMessage": string
-                    description: "details in case of an error"
-                    label: "error message"
-                    is_displayable: False
-                    is_used_by_planner: True
-                "success": boolean
-                    description: "true if the action completed without error"
-                    label: "success"
-                    is_displayable: False
                     is_used_by_planner: True
 
 subagent mileage_account:

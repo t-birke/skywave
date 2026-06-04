@@ -25,6 +25,7 @@ public class Skywave_GetFlightBookings {
         r.bookings = new List<Booking>();
 
         if (String.isBlank(contactId)) {
+            r.bookingCount = 0;
             r.success = true;
             return r;
         }
@@ -49,6 +50,7 @@ public class Skywave_GetFlightBookings {
             for (Booking__c bk : bookings) {
                 r.bookings.add(buildBooking(bk));
             }
+            r.bookingCount = r.bookings.size();
             r.success = true;
         } catch (Exception e) {
             r.success = false;
@@ -201,6 +203,8 @@ public class Skywave_GetFlightBookings {
         public String errorMessage;
         @InvocableVariable(label='bookings' description='a list of bookings for the customer')
         public List<Booking> bookings;
+        @InvocableVariable(label='booking count' description='number of active bookings returned (0 if none)')
+        public Integer bookingCount;
     }
 
     public class Booking {
