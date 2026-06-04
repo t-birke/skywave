@@ -1,6 +1,85 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <FlexiPage xmlns="http://soap.sforce.com/2006/04/metadata">
-    
+    <flexiPageRegions>
+        <itemInstances>
+            <componentInstance>
+                <componentInstanceProperties>
+                    <name>blurImagePreview</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>hideAudioNoteRecorderButton</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>hideConferenceButton</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>hideConversationHistory</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>hideEmojiButton</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>hideFilePickerButton</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>hideInactiveButton</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>hideQuickTextButton</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>hideQuickTextRecommendations</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>hideRichContentPickerButton</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>hideTransferButton</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>hideTranslationPreview</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>hideWhisperFlagButton</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>newLineOnEnter</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>showEndOrLeaveChatConfirmation</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentName>scrt:conversationBody</componentName>
+                <identifier>scrt_conversationBody</identifier>
+            </componentInstance>
+        </itemInstances>
+        <name>Facet-cffb2ece-7512-4b9b-ad21-574250406c90</name>
+        <type>Facet</type>
+    </flexiPageRegions>
+    <flexiPageRegions>
+        <itemInstances>
+            <componentInstance>
+                <componentName>skywaveVoiceItineraryCard</componentName>
+                <identifier>c_skywaveVoiceItineraryCard</identifier>
+            </componentInstance>
+        </itemInstances>
+        <name>Facet-skywave-bookings</name>
+        <type>Facet</type>
+    </flexiPageRegions>
     <flexiPageRegions>
         <itemInstances>
             <componentInstance>
@@ -11,7 +90,6 @@
         <name>Facet-ddc85cc0-8301-43be-85d9-3b4399ff8c0c</name>
         <type>Facet</type>
     </flexiPageRegions>
-    
     <flexiPageRegions>
         <itemInstances>
             <componentInstance>
@@ -111,16 +189,10 @@
     <flexiPageRegions>
         <itemInstances>
             <componentInstance>
-                <componentName>c:skywaveVoiceItineraryCard</componentName>
-                <identifier>c_skywaveVoiceItineraryCard</identifier>
-            </componentInstance>
-        </itemInstances>
-        <name>Facet-skywave-bookings</name>
-        <type>Facet</type>
-    </flexiPageRegions>
-    <flexiPageRegions>
-        <itemInstances>
-            <componentInstance>
+                <componentInstanceProperties>
+                    <name>label</name>
+                    <value>Tabs</value>
+                </componentInstanceProperties>
                 <componentInstanceProperties>
                     <name>tabs</name>
                     <value>Facet-1adf870f-ad21-4aca-b821-fe80d69614e2</value>
@@ -141,68 +213,8 @@
         </itemInstances>
         <itemInstances>
             <componentInstance>
-                <componentName>c:skywaveVoiceEngagementTimeline</componentName>
-                <identifier>c_skywaveVoiceEngagementTimeline</identifier>
-            </componentInstance>
-        </itemInstances>
-        <itemInstances>
-            <componentInstance>
-                <componentName>c:skywaveAffinitiesPlaceholder</componentName>
+                <componentName>skywaveAffinitiesPlaceholder</componentName>
                 <identifier>c_skywaveAffinitiesPlaceholder</identifier>
-            </componentInstance>
-        </itemInstances>
-        <itemInstances>
-            <componentInstance>
-                <componentInstanceProperties>
-                    <name>hideEinstein</name>
-                    <value>false</value>
-                </componentInstanceProperties>
-                <componentInstanceProperties>
-                    <name>hideWhenEmpty</name>
-                    <value>false</value>
-                </componentInstanceProperties>
-                <componentInstanceProperties>
-                    <name>launchOption</name>
-                    <value>launchModal</value>
-                </componentInstanceProperties>
-                <componentInstanceProperties>
-                    <name>maxDisplayPropositions</name>
-                    <value>3</value>
-                </componentInstanceProperties>
-                <componentInstanceProperties>
-                    <name>recommendationSource</name>
-                    <value>strategyBuilder</value>
-                </componentInstanceProperties>
-                <componentInstanceProperties>
-                    <name>shouldLaunchActionOnReject</name>
-                    <value>false</value>
-                </componentInstanceProperties>
-                <componentInstanceProperties>
-                    <name>showDescription</name>
-                    <value>true</value>
-                </componentInstanceProperties>
-                <componentInstanceProperties>
-                    <name>showImage</name>
-                    <value>true</value>
-                </componentInstanceProperties>
-                <componentInstanceProperties>
-                    <name>showRejectAction</name>
-                    <value>true</value>
-                </componentInstanceProperties>
-                <componentInstanceProperties>
-                    <name>showTitle</name>
-                    <value>false</value>
-                </componentInstanceProperties>
-                <componentInstanceProperties>
-                    <name>strategyName</name>
-                    <value>SDO_Service_Conversation_Helper_Strategy_DEFAULT</value>
-                </componentInstanceProperties>
-                <componentInstanceProperties>
-                    <name>widgetTitle</name>
-                    <value>Next Best Action</value>
-                </componentInstanceProperties>
-                <componentName>runtime_communities_nba:builderNbaWidget</componentName>
-                <identifier>runtime_communities_nba_builderNbaWidget</identifier>
             </componentInstance>
         </itemInstances>
         <itemInstances>
@@ -268,26 +280,53 @@
         <name>rightsidebar</name>
         <type>Region</type>
     </flexiPageRegions>
-    
-    <flexiPageRegions>
-        <itemInstances>
-            <componentInstance>
-                <componentName>scrt:conversationBody</componentName>
-                <identifier>scrt_conversationBody</identifier>
-            </componentInstance>
-        </itemInstances>
-        <name>Facet-cffb2ece-7512-4b9b-ad21-574250406c90</name>
-        <type>Facet</type>
-    </flexiPageRegions>
     <flexiPageRegions>
         <itemInstances>
             <componentInstance>
                 <componentInstanceProperties>
+                    <name>showField1</name>
+                    <value>true</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>showField2</name>
+                    <value>true</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>showField3</name>
+                    <value>true</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>showField4</name>
+                    <value>true</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>showField5</name>
+                    <value>true</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>showField6</name>
+                    <value>true</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>showHealthScore</name>
+                    <value>true</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>showTags</name>
+                    <value>true</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
                     <name>voiceCallContactField</name>
                     <value>Contact__c</value>
                 </componentInstanceProperties>
-                <componentName>c:modernContactCard</componentName>
+                <componentName>modernContactCard</componentName>
                 <identifier>c_modernContactCard</identifier>
+            </componentInstance>
+        </itemInstances>
+        <itemInstances>
+            <componentInstance>
+                <componentName>skywaveVoiceEngagementTimeline</componentName>
+                <identifier>c_skywaveVoiceEngagementTimeline</identifier>
             </componentInstance>
         </itemInstances>
         <name>leftsidebar</name>
