@@ -118,6 +118,9 @@ variables:
     profile_collected: mutable boolean = False
         label: "Profile Collected"
         description: "True once update_profile succeeded for the current pending booking. Tells the agent NOT to ask for name/email again."
+    profile_ever_collected: mutable boolean = False
+        label: "Profile Ever Collected"
+        description: "True once the visitor has completed the profile form at least once this session. Survives reset_booking, so a second booking skips the profile card and creates the booking straight away."
     payment_processed: mutable boolean = False
         label: "Payment Processed"
         description: "True once process_payment succeeded. Tells the agent NOT to ask for payment method again."
@@ -412,7 +415,22 @@ subagent flight_booking:
 
                   STEP 2 — Select. The flight card has a Book button; when the visitor taps it, the card posts the exact phrase "Book flight <FLIGHTNUMBER>" to chat. When you see that phrase, IMMEDIATELY call {!@actions.book_flight} passing that flight number as flightId (book_flight resolves a flight number OR an Id). This pins the selection; it does NOT create a booking yet. Do NOT narrate "your booking is reserved". If book_flight fails, tell the visitor and ask them to tap a flight card again.
 
-            if @variables.booking_step == "profile":
+            # Returning visitor: profile already captured earlier this session, so
+            # skip the form card entirely and create the Booking__c deterministically
+            # from the pinned selection. This fires once (profile_collected flips True).
+            if @variables.booking_step == "profile" and @variables.profile_ever_collected is True and @variables.profile_collected is False:
+                run @actions.ack_profile_form
+                    with contactId = @variables.resolved_contact_id
+                    with flightId = @variables.selected_flight_id
+                    with travelDate = @variables.selected_travel_date
+                    with fareClass = @variables.selected_fare_class
+                    with checkedBags = @variables.selected_checked_bags
+                    with seatPreference = @variables.selected_seat_preference
+                    set @variables.profile_collected = @outputs.success
+                    set @variables.selected_booking_code = @outputs.bookingCode
+                    set @variables.selected_total_charged = @outputs.totalCharged
+
+            if @variables.booking_step == "profile" and @variables.profile_ever_collected is False:
                 | STEP 3 — Profile. A flight selection is held. Collect the visitor's profile so the ticket can be issued.
                   - On entering this step, IMMEDIATELY call {!@actions.present_profile_form} with contactId — that renders the form card.
 
@@ -469,6 +487,7 @@ subagent flight_booking:
                 with email = ...
                 with phone = ...
                 set @variables.profile_collected = @outputs.success
+                set @variables.profile_ever_collected = @outputs.success
 
             present_profile_form: @actions.present_profile_form
                 description: "Display the inline profile form card. Invoke ONCE when booking_step transitions to 'profile'. Do NOT call repeatedly; once displayed, wait for the 'Profile created' cue."
@@ -483,6 +502,7 @@ subagent flight_booking:
                 with checkedBags = @variables.selected_checked_bags
                 with seatPreference = @variables.selected_seat_preference
                 set @variables.profile_collected = @outputs.success
+                set @variables.profile_ever_collected = @outputs.success
                 set @variables.selected_booking_code = @outputs.bookingCode
                 set @variables.selected_total_charged = @outputs.totalCharged
 
