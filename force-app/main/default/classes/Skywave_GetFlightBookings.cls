@@ -26,6 +26,7 @@ public class Skywave_GetFlightBookings {
 
         if (String.isBlank(contactId)) {
             r.bookingCount = 0;
+            r.singleBookingCode = '';
             r.success = true;
             return r;
         }
@@ -51,6 +52,11 @@ public class Skywave_GetFlightBookings {
                 r.bookings.add(buildBooking(bk));
             }
             r.bookingCount = r.bookings.size();
+            // When there's exactly one booking it IS the seat-change target, so
+            // surface its code as a scalar — Agent Script can't index the list
+            // deterministically, and the seat funnel needs this to run the
+            // segment count without spending an LLM cycle.
+            r.singleBookingCode = (bookings.size() == 1) ? bookings[0].Confirmation_Code__c : '';
             r.success = true;
         } catch (Exception e) {
             r.success = false;
@@ -205,6 +211,8 @@ public class Skywave_GetFlightBookings {
         public List<Booking> bookings;
         @InvocableVariable(label='booking count' description='number of active bookings returned (0 if none)')
         public Integer bookingCount;
+        @InvocableVariable(label='single booking code' description='Confirmation code when exactly one booking exists; blank otherwise. The seat-change target shortcut.')
+        public String singleBookingCode;
     }
 
     public class Booking {

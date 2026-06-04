@@ -86,6 +86,9 @@ variables:
     seat_change_active_booking_number_of_segments: mutable number = -1
         label: "Seat Change: Segments on Chosen Booking"
         description: "Segments on the booking being seat-changed. -1 = not yet queried. Set by get_segment_count; drives the single-vs-multiple-flight branch."
+    seat_target_booking_code: mutable string = ""
+        label: "Seat Change: Target Booking Code"
+        description: "Confirmation code of the booking the visitor is changing a seat on. Prefilled with the single booking code; set by the LLM when the visitor picks among several. Gates the deterministic segment-count run."
     Tier_Status: mutable string
         label: "Tier Status"
         description: ""
@@ -181,6 +184,7 @@ start_agent agent_router:
                     set @variables.active_bookings = @outputs.bookings
                     set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
                     set @variables.active_booking_count = @outputs.bookingCount
+                    set @variables.seat_target_booking_code = @outputs.singleBookingCode
 
             # Post-confirm refresh — runs ONCE after a booking is confirmed, so the
             # just-made booking appears in active_bookings/active_booking_count. This
@@ -191,6 +195,7 @@ start_agent agent_router:
                     with contactId = @variables.resolved_contact_id
                     set @variables.active_bookings = @outputs.bookings
                     set @variables.active_booking_count = @outputs.bookingCount
+                    set @variables.seat_target_booking_code = @outputs.singleBookingCode
                     set @variables.bookings_refreshed_post_confirm = True
 
             if @variables.booking_step == "profile" or @variables.booking_step == "payment" or @variables.booking_step == "confirm":
@@ -226,8 +231,7 @@ start_agent agent_router:
                 description: "Handle unclear or ambiguous requests that need clarification"
 
             go_to_seat_selection: @utils.transition to @subagent.seat_selection
-                description: "Select or change the seat on one of the visitor's existing bookings"
-                available when @variables.active_booking_count > 0
+                description: "Select or change the seat on one of the visitor's bookings, or explain there is no booking to change"
 
             go_to_case_management: @utils.transition to @subagent.case_management
                 description: "Create, view, or update support cases"
@@ -358,6 +362,12 @@ start_agent agent_router:
                     is_displayable: False
                     is_used_by_planner: True
                     complex_data_type_name: "lightning__integerType"
+                "singleBookingCode": string
+                    description: "Confirmation code when exactly one booking exists; blank otherwise. Pinned into seat_target_booking_code."
+                    label: "Single Booking Code"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
                 "errorMessage": string
                     description: "details in case of an error"
                     label: "error message"
@@ -1151,41 +1161,41 @@ subagent ambiguous_question:
 subagent seat_selection:
     label: "Seat Selection"
 
-    description: "Helps the visitor select or change the seat on one of their bookings, rendering an interactive seat map once a single flight is resolved."
+    description: "Seat selection and seat changes on existing bookings."
 
     reasoning:
         instructions: ->
-            | You help the visitor change the seat on one of their EXISTING flights. The visitor is anonymous; address them as "you". Bookings are already loaded centrally — use {!@variables.active_bookings} as the source of truth (never invent bookings, codes, or flight numbers). You can only show the seat map once the request is narrowed to exactly ONE flight.
+            # Once we know which booking (single booking is prefilled at the
+            # router; the LLM sets seat_target_booking_code when there are
+            # several), count its flights DETERMINISTICALLY — no LLM cycle.
+            if @variables.seat_target_booking_code != "" and @variables.seat_change_active_booking_number_of_segments == -1:
+                run @actions.get_segment_count
+                    with bookingCode = @variables.seat_target_booking_code
+                    set @variables.seat_change_active_booking_number_of_segments = @outputs.segmentCount
 
-              The number of bookings the visitor has is {!@variables.active_booking_count}. Resolve the booking deterministically by that count, then resolve the flight by the segment count, then show the seat map:
+            if @variables.active_booking_count == 0:
+                | You don't have a booking to change a seat on. Briefly say so and offer to help book a flight instead. Do not call any action.
 
-            # --- Resolve the booking ---
-            if @variables.active_booking_count == 1:
-                | The visitor has exactly ONE booking. Read its bookingReference (confirmation code) from {!@variables.active_bookings}. If you have not yet counted its flights this turn, IMMEDIATELY call {!@actions.get_segment_count} with that bookingReference to populate the segment count before deciding what to show.
-            if @variables.active_booking_count > 1:
-                | The visitor has MORE THAN ONE booking. First ask which booking the seat change is for, giving a SHORT one-line summary per booking (route + date + how far out) from {!@variables.active_bookings}. Once the visitor identifies a booking, call {!@actions.get_segment_count} with that booking's bookingReference to count its flights before showing anything.
+            if @variables.active_booking_count > 1 and @variables.seat_target_booking_code == "":
+                | Ask which booking the seat change is for. Give a SHORT one-line summary per booking (route + date) from {!@variables.active_bookings}. When the visitor picks one, set its confirmation code with {!@actions.select_booking}.
 
-            # --- Resolve the flight, then show the seat map ---
             if @variables.seat_change_active_booking_number_of_segments == 1:
-                | The chosen booking has exactly ONE flight, so it is fully resolved. IMMEDIATELY call {!@actions.present_seat_map} with that booking's bookingReference and leave flightNumber blank.
+                | IMMEDIATELY call {!@actions.present_seat_map} with bookingCode {!@variables.seat_target_booking_code} and leave flightNumber blank. You MUST invoke the action — do NOT claim a seat map is shown without calling it. The output is always renderable: use show_command to display the seatMapData card as-is. Do NOT redraw, list, or describe seats in text. Your text reply alongside the card must be ONE short sentence (e.g. "Here's the seat map — pick a seat and confirm.").
+
             if @variables.seat_change_active_booking_number_of_segments > 1:
-                | The chosen booking has MULTIPLE flights (a connection or a return). Ask which flight the seat change is for, giving a SHORT one-line summary per flight (route + date) from that booking in {!@variables.active_bookings}. When the visitor picks one, call {!@actions.present_seat_map} with the booking's bookingReference and the chosen flightNumber.
+                | This booking has several flights. Ask which flight, with a SHORT one-line summary per flight (route + date) from {!@variables.active_bookings}. When the visitor names one, IMMEDIATELY call {!@actions.present_seat_map} with bookingCode {!@variables.seat_target_booking_code} and the chosen flightNumber. You MUST invoke the action — do NOT claim a seat map is shown without calling it. The output is always renderable: use show_command to display the seatMapData card as-is. Do NOT redraw, list, or describe seats in text. Keep your text reply to ONE short sentence.
 
-            | When you call present_seat_map, its output is always renderable. Always use show_command to display the result to the user. You MUST present the seatMapData output to the visitor — the interactive seat-map card is contained in it and must be displayed as-is. Do NOT redraw the seat map, list seats, or describe the cabin in plain text. In your text reply alongside the card, keep it to one short sentence (e.g. "Here's the seat map — pick a seat and confirm.").
-
-              The seat map handles everything else itself: the visitor selects a seat and taps Confirm (which changes the seat) or Abort. You will then receive one of two cues:
-              - "seat change confirmed": the seat has ALREADY been changed by the card. Do NOT call any action. Simply confirm warmly in one sentence and ask if there's anything else you can help with.
-              - "seat change aborted": the visitor cancelled. Do NOT call any action and do NOT retry. Acknowledge briefly and ask if there's anything else you can help with.
+            if @variables.seat_change_active_booking_number_of_segments > 0:
+                | After the card is shown, the visitor confirms or aborts on it and you will receive a cue. On "seat change confirmed" the seat is ALREADY changed — do NOT call any action; confirm warmly in one sentence and ask if there's anything else. On "seat change aborted" — do NOT call any action or retry; acknowledge briefly and ask if there's anything else.
 
         actions:
-            get_segment_count: @actions.get_segment_count
-                description: "Count the flights on a booking so the funnel can decide whether to show the seat map directly (1 flight) or ask which flight (more than 1). Call with the chosen booking's confirmation code as soon as the booking is known."
-                with bookingCode = ...
-                set @variables.seat_change_active_booking_number_of_segments = @outputs.segmentCount
+            select_booking: @utils.setVariables
+                description: "Record which booking the visitor chose for the seat change, by its confirmation code. Use only when the visitor has more than one booking and names one."
+                with seat_target_booking_code = ...
 
             present_seat_map: @actions.present_seat_map
-                description: "Render the interactive seat-map card for a single resolved flight. Call only after the funnel has narrowed to one booking + one flight. Pass the booking's confirmation code as bookingCode; pass flightNumber only when the booking has more than one flight."
-                with bookingCode = ...
+                description: "Render the interactive seat-map card for one resolved flight. bookingCode is prefilled; pass flightNumber only when the booking has more than one flight."
+                with bookingCode = @variables.seat_target_booking_code
                 with flightNumber = ...
 
     actions:
