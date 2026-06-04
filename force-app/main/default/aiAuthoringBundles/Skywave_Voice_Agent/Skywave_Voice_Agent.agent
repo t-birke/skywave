@@ -263,6 +263,12 @@ subagent off_topic:
         instructions: ->
             | Briefly and politely steer back to what you can help with on this call: changing a seat or hearing about their bookings. Do NOT answer general-knowledge questions. Keep it to one short sentence.
 
+connection telephony:
+    adaptive_response_allowed: True
+    outbound_route_name: "flow://Skywave_Route_Voice_to_Queue"
+    outbound_route_type: "OmniChannelFlow"
+    escalation_message: "I'm transferring you to a specialist now."
+
 modality voice:
     voice_id: "UgBBYS2sOqTuMpoF3BR0"
     outbound_speed: 1.0
