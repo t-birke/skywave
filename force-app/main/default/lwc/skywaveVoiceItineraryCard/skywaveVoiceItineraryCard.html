@@ -1,0 +1,8 @@
+<template>
+    <template lwc:if={hasContact}>
+        <c-skywave-itinerary-card record-id={contactId}></c-skywave-itinerary-card>
+    </template>
+    <template lwc:else>
+        <p class="slds-text-color_weak slds-p-around_small">No caller identified for this call yet.</p>
+    </template>
+</template>

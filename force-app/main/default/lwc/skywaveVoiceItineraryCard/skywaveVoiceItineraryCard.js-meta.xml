@@ -2,15 +2,14 @@
 <LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
     <apiVersion>66.0</apiVersion>
     <isExposed>true</isExposed>
-    <masterLabel>Skywave Affinities (placeholder)</masterLabel>
-    <description>Placeholder card for the Phase 4.5 Data Cloud computed-affinities panel. Replaced once DC is wired.</description>
+    <masterLabel>Skywave Voice Itinerary Card</masterLabel>
+    <description>VoiceCall-page wrapper that resolves the caller Contact and shows their Skywave bookings.</description>
     <targets>
         <target>lightning__RecordPage</target>
     </targets>
     <targetConfigs>
         <targetConfig targets="lightning__RecordPage">
             <objects>
-                <object>Contact</object>
                 <object>VoiceCall</object>
             </objects>
         </targetConfig>
