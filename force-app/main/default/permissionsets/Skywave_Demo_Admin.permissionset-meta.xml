@@ -68,6 +68,11 @@
     </objectPermissions>
     <fieldPermissions>
         <editable>true</editable>
+        <field>Booking_Segment__c.Seat_Number__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
         <field>Contact.ContactCardPicture__c</field>
         <readable>true</readable>
     </fieldPermissions>

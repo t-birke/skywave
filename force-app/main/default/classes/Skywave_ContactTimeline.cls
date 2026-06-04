@@ -77,9 +77,47 @@ public with sharing class Skywave_ContactTimeline {
             }
         }
 
+        // Seat-change events — a Booking_Segment__c whose seat was changed after
+        // booking shows LastModifiedDate later than CreatedDate. (Seats set at
+        // booking time, if any, leave the two equal.) Surfaced as its own
+        // engagement event so a live seat change appears on the timeline.
+        addSeatChangeEvents(out, contactId);
+
         // Sort newest-first.
         out.sort(new EventComparator());
         return out;
+    }
+
+    private static void addSeatChangeEvents(List<Event> out, Id contactId) {
+        try {
+            for (Booking_Segment__c seg : [
+                SELECT Id, Seat_Number__c, CreatedDate, LastModifiedDate,
+                       Booking__r.Confirmation_Code__c, Flight__r.Flight_Number__c
+                FROM Booking_Segment__c
+                WHERE Booking__r.Contact__c = :contactId
+                  AND Seat_Number__c != null
+            ]) {
+                // SOQL can't compare two fields, so filter in Apex: a seat set
+                // at booking time leaves the two stamps equal; a later change
+                // bumps LastModifiedDate.
+                if (seg.LastModifiedDate == seg.CreatedDate) continue;
+
+                Event e = new Event();
+                e.key = seg.Id + ':seat';
+                e.occurredAt = seg.LastModifiedDate;
+                e.occurredAtLabel = formatStamp(seg.LastModifiedDate);
+                e.channel = 'booking';
+                e.icon = '💺';
+                String flightNo = seg.Flight__r == null ? '' : seg.Flight__r.Flight_Number__c;
+                String code = seg.Booking__r == null ? '' : seg.Booking__r.Confirmation_Code__c;
+                e.title = 'Seat changed to ' + seg.Seat_Number__c;
+                e.detail = 'Flight ' + flightNo + (String.isBlank(code) ? '' : ' · ' + code);
+                e.accent = 'teal';
+                out.add(e);
+            }
+        } catch (Exception ex) {
+            // FLS or query issue — timeline is still useful without seat events.
+        }
     }
 
     private static void addSurveyEvents(List<Event> out, Contact c) {
