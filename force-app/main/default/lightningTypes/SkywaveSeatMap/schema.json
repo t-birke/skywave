@@ -1,0 +1,5 @@
+{
+    "title": "Skywave Seat Map",
+    "description": "Output from Skywave_PresentSeatMap — JSON envelope rendered as an interactive seat-map card with a Confirm seat / Abort flow.",
+    "lightning:type": "@apexClassType/c__Skywave_SeatMapData"
+}

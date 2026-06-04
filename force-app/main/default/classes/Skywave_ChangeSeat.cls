@@ -20,6 +20,94 @@ public class Skywave_ChangeSeat {
         return results;
     }
 
+    /**
+     * Imperative entry point for the Skywave Seat Map renderer LWC.
+     *
+     * The visitor picks a seat in the chat-iframe seatmap and taps
+     * "Confirm seat". The LWC calls this @AuraEnabled method directly
+     * (NOT through the agent), mirroring Skywave_ProcessPayment. Runs
+     * `without sharing` (via the GuestSeatWriter inner class) so the
+     * ESW site guest user can update the Booking_Segment__c regardless
+     * of OWD/FLS.
+     *
+     * On success the LWC shows a confirmation (booking + flight + seat)
+     * and posts "seat change confirmed" to chat as the verify-only cue.
+     */
+    @AuraEnabled
+    public static SeatChangeResult confirmSeatChange(String bookingSegmentId, String newSeatNumber) {
+        SeatChangeResult r = new SeatChangeResult();
+        r.success = false;
+
+        if (String.isBlank(bookingSegmentId)) {
+            r.message = 'Booking segment id is required.';
+            return r;
+        }
+        if (String.isBlank(newSeatNumber)) {
+            r.message = 'A seat selection is required.';
+            return r;
+        }
+        if (!isValidSeatFormat(newSeatNumber)) {
+            r.message = 'Invalid seat format. Please use format like 12A, 15C, etc.';
+            return r;
+        }
+
+        try {
+            return new GuestSeatWriter().write(bookingSegmentId, newSeatNumber.toUpperCase());
+        } catch (Exception e) {
+            r.message = 'Seat change failed: ' + e.getMessage();
+            System.debug('confirmSeatChange error: ' + e.getMessage() + '\n' + e.getStackTraceString());
+            return r;
+        }
+    }
+
+    /**
+     * `without sharing` writer so the ESW guest user can persist the
+     * seat regardless of record sharing. Reads the segment + parent
+     * booking/flight, updates Seat_Number__c, and echoes back the
+     * human-facing identifiers the LWC displays in its confirmation.
+     */
+    private without sharing class GuestSeatWriter {
+        public SeatChangeResult write(String segmentId, String newSeat) {
+            SeatChangeResult r = new SeatChangeResult();
+            r.success = false;
+
+            List<Booking_Segment__c> segs = [
+                SELECT Id, Seat_Number__c,
+                       Booking__r.Confirmation_Code__c, Booking__r.Status__c,
+                       Flight__r.Flight_Number__c
+                FROM Booking_Segment__c
+                WHERE Id = :segmentId
+                LIMIT 1
+            ];
+            if (segs.isEmpty()) {
+                r.message = 'Booking segment not found.';
+                return r;
+            }
+
+            Booking_Segment__c seg = segs[0];
+            r.oldSeat = seg.Seat_Number__c;
+            seg.Seat_Number__c = newSeat;
+            update seg;
+
+            r.success = true;
+            r.bookingCode = seg.Booking__r.Confirmation_Code__c;
+            r.flightNumber = seg.Flight__r.Flight_Number__c;
+            r.seatNumber = newSeat;
+            r.message = 'Seat changed to ' + newSeat;
+            return r;
+        }
+    }
+
+    /** Result shape for the imperative LWC path (@AuraEnabled-serialisable). */
+    public class SeatChangeResult {
+        @AuraEnabled public Boolean success;
+        @AuraEnabled public String message;
+        @AuraEnabled public String bookingCode;
+        @AuraEnabled public String flightNumber;
+        @AuraEnabled public String seatNumber;
+        @AuraEnabled public String oldSeat;
+    }
+
     private static Result executeSeatChange(Request req) {
         Result r = new Result();
 

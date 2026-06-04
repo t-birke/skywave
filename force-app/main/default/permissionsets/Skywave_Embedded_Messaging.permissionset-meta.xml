@@ -68,6 +68,10 @@
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
+        <apexClass>Skywave_ChangeSeat</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
         <apexClass>Skywave_PaymentFormData</apexClass>
         <enabled>true</enabled>
     </classAccesses>

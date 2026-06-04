@@ -1,0 +1,83 @@
+<template>
+    <template lwc:if={placeholderMessage}>
+        <p class="sw-placeholder">{placeholderMessage}</p>
+    </template>
+
+    <template lwc:elseif={completed}>
+        <div class="sw-seat-success">
+            <span class="sw-seat-success__icon">✓</span>
+            <div>
+                <div class="sw-seat-success__title">Seat change confirmed</div>
+                <div class="sw-seat-success__sub">
+                    Booking {confirmedBookingCode} · Flight {confirmedFlightNumber} · Seat {confirmedSeat}
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template lwc:elseif={aborted}>
+        <div class="sw-seat-aborted">
+            <span class="sw-seat-aborted__icon">✕</span>
+            <div class="sw-seat-aborted__title">Seat change aborted</div>
+        </div>
+    </template>
+
+    <template lwc:elseif={processing}>
+        <div class="sw-seat-anim">
+            <div class="sw-seat-anim__sky">
+                <span class="sw-seat-anim__plane" aria-label="airplane">✈</span>
+            </div>
+            <div class="sw-seat-anim__caption">Changing your seat…</div>
+        </div>
+    </template>
+
+    <template lwc:else>
+        <article class="sw-seat-card">
+            <header class="sw-seat-card__header">
+                <h3 class="sw-seat-card__title">Choose your seat</h3>
+                <p class="sw-seat-card__sub">{headerSub}</p>
+            </header>
+
+            <div class="sw-seat-cabin">
+                <template for:each={rows} for:item="r">
+                    <div key={r.key} class="sw-seat-row">
+                        <span class="sw-seat-row__num">{r.row}</span>
+                        <template for:each={r.seats} for:item="seat">
+                            <button
+                                key={seat.code}
+                                type="button"
+                                class={seat.cssClass}
+                                data-code={seat.code}
+                                data-status={seat.status}
+                                disabled={seat.disabled}
+                                onclick={handleSeatClick}>
+                                {seat.code}
+                            </button>
+                        </template>
+                    </div>
+                </template>
+            </div>
+
+            <div class="sw-seat-legend">
+                <span class="sw-seat-legend__item"><span class="sw-seat-swatch sw-seat-swatch_available"></span>Available</span>
+                <span class="sw-seat-legend__item"><span class="sw-seat-swatch sw-seat-swatch_selected"></span>Selected</span>
+                <span class="sw-seat-legend__item"><span class="sw-seat-swatch sw-seat-swatch_taken"></span>Taken</span>
+            </div>
+
+            <p class="sw-seat-selection">{selectionLabel}</p>
+
+            <template lwc:if={errorMessage}>
+                <p class="sw-seat-error">{errorMessage}</p>
+            </template>
+
+            <div class="sw-seat-actions">
+                <button type="button" class="sw-seat-btn sw-seat-btn_abort" onclick={handleAbort}>
+                    Abort
+                </button>
+                <button type="button" class="sw-seat-btn sw-seat-btn_confirm" onclick={handleConfirm} disabled={confirmDisabled}>
+                    Confirm seat
+                </button>
+            </div>
+        </article>
+    </template>
+</template>

@@ -198,7 +198,7 @@ start_agent agent_router:
             | You are a router only. Do NOT answer questions or provide help directly. Always use a transition action.
               Route by intent:
               - Flight bookings, upcoming flights, flight status, booking a flight, changing or canceling flights -> use go_to_flight_management
-              - Seat selection or seat changes -> use go_to_seat_change_unavailable
+              - Seat selection or seat changes -> use go_to_seat_selection
               - Correcting or updating the traveler's first or last name on a booking -> use go_to_name_change
               - Questions about mileage balance, tier points, loyalty points, or frequent flyer miles -> use go_to_mileage_account
               - Support cases, complaints, case status, creating a case -> use go_to_case_management
@@ -220,8 +220,8 @@ start_agent agent_router:
             go_to_ambiguous_question: @utils.transition to @subagent.ambiguous_question
                 description: "Handle unclear or ambiguous requests that need clarification"
 
-            go_to_seat_change_unavailable: @utils.transition to @subagent.seat_change_unavailable
-                description: "Handle seat selection or seat change requests, which the agent cannot currently fulfill"
+            go_to_seat_selection: @utils.transition to @subagent.seat_selection
+                description: "Select or change the seat on one of the visitor's bookings"
 
             go_to_case_management: @utils.transition to @subagent.case_management
                 description: "Create, view, or update support cases"
@@ -1244,16 +1244,124 @@ subagent ambiguous_question:
               Do not answer ambiguous questions. Do not invoke any actions.
               Politely guide the user to provide more specific details about their request.
 
-subagent seat_change_unavailable:
-    label: "Seat Change Unavailable"
+subagent seat_selection:
+    label: "Seat Selection"
 
-    description: "Handles seat selection or seat change requests, which the agent cannot currently fulfill. Declines on-brand and offers other help."
+    description: "Helps the visitor select or change the seat on one of their bookings, rendering an interactive seat map once a single flight is resolved."
 
     reasoning:
         instructions: ->
-            | The visitor has asked to select or change a seat. You are NOT able to help with seat changes right now — this capability is not available.
-              Reply briefly and warmly in one or two sentences: apologise that you can't change or select seats at the moment, and offer to help with something else instead (viewing or booking flights, cancelling a booking, name corrections, mileage, or a support case).
-              Do NOT invoke any action. Do NOT attempt a workaround. Do NOT promise to do it later or open a case for it unless the visitor explicitly asks. Keep it natural — do not mention internal systems, versions, or that the feature is "not built yet".
+            # active_bookings is already loaded by the router (get_bookings,
+            # gated by retrieve_active_booking_done). Re-fetch defensively only
+            # if a cold entry somehow skipped it.
+            if @variables.retrieve_active_booking_done is False and @variables.resolved_contact_id != "003000000000000" and @variables.resolved_contact_id != "":
+                run @actions.get_bookings
+                    with contactId = @variables.resolved_contact_id
+                    set @variables.active_bookings = @outputs.bookings
+                    set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
+                    set @variables.retrieve_active_booking_done = @outputs.success
+
+            | You help the visitor change the seat on one of their flights. The visitor is anonymous; address them as "you". Before you can show the seat map you MUST resolve the request down to exactly ONE flight (one booking, one flight on it). Use {!@variables.active_bookings} as the source of truth — never invent bookings, codes, or flight numbers.
+
+              Follow this resolution funnel using active_bookings:
+              - CASE 1 — no bookings: if the visitor has no bookings, tell them you don't see a booking to change a seat on, and offer to help book a flight instead. Do NOT call present_seat_map.
+              - CASE 2 — one booking with one flight: this is already fully resolved. IMMEDIATELY call {!@actions.present_seat_map} with that booking's bookingReference and leave flightNumber blank.
+              - CASE 3 — one booking with multiple flights (a connection or a return): ask which flight the seat change is for, giving a SHORT one-line summary per flight (route + date). When the visitor picks one, call {!@actions.present_seat_map} with that booking's bookingReference and the chosen flightNumber.
+              - CASE 4 — more than one booking: first ask which booking, with a SHORT one-line summary per booking (route + date + how far out). After they pick a booking, apply CASE 2 / CASE 3 logic to that booking's flights before calling present_seat_map.
+
+              When you call present_seat_map, its output is always renderable. Always use show_command to display the result to the user. You MUST present the seatMapData output to the visitor — the interactive seat-map card is contained in it and must be displayed as-is. Do NOT redraw the seat map, list seats, or describe the cabin in plain text. In your text reply alongside the card, keep it to one short sentence (e.g. "Here's the seat map — pick a seat and confirm.").
+
+              The seat map handles everything else itself: the visitor selects a seat and taps Confirm (which changes the seat) or Abort. You will then receive one of two cues:
+              - "seat change confirmed": the seat has ALREADY been changed by the card. Do NOT call any action. Simply confirm warmly in one sentence and ask if there's anything else you can help with.
+              - "seat change aborted": the visitor cancelled. Do NOT call any action and do NOT retry. Acknowledge briefly and ask if there's anything else you can help with.
+
+        actions:
+            present_seat_map: @actions.present_seat_map
+                description: "Render the interactive seat-map card for a single resolved flight. Call only after the funnel has narrowed to one booking + one flight. Pass the booking's confirmation code as bookingCode; pass flightNumber only when the booking has more than one flight."
+                with bookingCode = ...
+                with flightNumber = ...
+
+            get_bookings: @actions.get_bookings
+                with contactId = ...
+                set @variables.active_bookings = @outputs.bookings
+                set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
+                set @variables.retrieve_active_booking_done = @outputs.success
+
+    actions:
+        present_seat_map:
+            description: "Returns the Skywave Seat Map renderable card for a single resolved booking segment, looked up by booking confirmation code (and optional flight number)."
+            label: "Present Seat Map"
+            require_user_confirmation: False
+            include_in_progress_indicator: False
+            target: "apex://Skywave_PresentSeatMap"
+
+            inputs:
+                "bookingCode": string
+                    description: "Confirmation code of the booking the visitor wants to change a seat on (from active_bookings)."
+                    label: "Booking Code"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "flightNumber": string
+                    description: "Flight number of the specific segment, when the booking has more than one flight. Leave blank for a single-flight booking."
+                    label: "Flight Number"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "seatMapData": object
+                    description: "Structured payload rendered as the Skywave Seat Map chat card."
+                    label: "Seat Map Data"
+                    complex_data_type_name: "c__SkywaveSeatMap"
+                    filter_from_agent: True
+                    is_displayable: True
+                "success": boolean
+                    description: "True if the seat map payload was prepared."
+                    label: "success"
+                    complex_data_type_name: "lightning__booleanType"
+                    filter_from_agent: False
+                    is_displayable: False
+                "message": string
+                    description: "Status detail."
+                    label: "Message"
+                    complex_data_type_name: "lightning__textType"
+                    filter_from_agent: False
+                    is_displayable: False
+
+        get_bookings:
+            description: "Gets all active flight bookings for the user"
+            label: "Get Bookings"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Checking your flights"
+            target: "apex://Skywave_GetFlightBookings"
+
+            inputs:
+                "contactId": string
+                    description: "the contact Id of the user"
+                    label: "contactIds"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "bookings": list[object]
+                    description: "a list of bookings for the customer"
+                    label: "bookings"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "@apexClassType/c__Skywave_GetFlightBookings$Booking"
+                "errorMessage": string
+                    description: "details in case of an error"
+                    label: "error message"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "success": boolean
+                    description: "true if the action completed without error"
+                    label: "success"
+                    is_displayable: False
+                    is_used_by_planner: True
 
 subagent name_change:
     label: "Name Change"
