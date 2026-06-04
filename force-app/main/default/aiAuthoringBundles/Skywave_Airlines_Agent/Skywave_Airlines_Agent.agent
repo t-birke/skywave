@@ -496,6 +496,7 @@ subagent flight_booking:
                 description: "Verify-only — re-reads the booking to confirm the payment widget flipped Status/Payment_Status. Invoke when the visitor sends 'Payment completed'. If still Unpaid, surface that instead of declaring success."
                 with contactId = @variables.resolved_contact_id
                 with bookingCode = @variables.selected_booking_code
+                set @variables.payment_processed = @outputs.success
                 set @variables.booking_confirmed = @outputs.success
                 set @variables.booked_confirmation_codes = @outputs.confirmationCodes
 
