@@ -1,0 +1,80 @@
+<template>
+    <article class="assistant">
+        <header class="header">
+            <lightning-icon icon-name="standard:agent_astro" size="small" alternative-text=""></lightning-icon>
+            <h2 class="slds-text-heading_medium header-title">Agentforce Service Assistant</h2>
+            <button class="info" type="button" aria-label="Mehr erfahren">
+                <lightning-icon icon-name="utility:info" size="x-small"></lightning-icon>
+            </button>
+        </header>
+
+        <div class="scroll-area">
+            <section class="intro" style={heroStyle}>
+                <div class="slds-text-body_small intro-copy">
+                    Hi! Ich bin dein Service Assistant, ein intelligenter Begleiter auf Basis von Agentforce.
+                    Mein Ziel ist es, im Hintergrund Informationen aufzubereiten und Aktionen vorzubereiten.
+                    Alles was ich finde, wird dem Datensatz zugeordnet.
+                </div>
+                <a href="javascript:void(0);" class="slds-text-body_small learn-more">Mehr erfahren…</a>
+            </section>
+
+        <section class={catchUpClass}>
+            <button class="catch-up-toggle" type="button" onclick={handleToggleCatchUp} aria-expanded={catchUpExpanded}>
+                <lightning-icon icon-name={catchUpIcon} size="x-small"></lightning-icon>
+                <lightning-icon icon-name="standard:messaging_conversation" size="small" alternative-text=""></lightning-icon>
+                <span class="catch-up-title">Conversation Catch Up</span>
+            </button>
+
+            <template lwc:if={catchUpExpanded}>
+                <div class="catch-up-body">
+                    <template lwc:if={summaryCreated}>
+                        <p class="created">Zusammenfassung erstellt am {summaryCreated}</p>
+                    </template>
+
+                    <p class="summary">{summary}</p>
+
+                    <div class="divider"></div>
+
+                    <h3 class="section-label">Topic</h3>
+                    <p class="summary">{topic}</p>
+
+                    <div class="actions">
+                        <lightning-button-icon
+                            icon-name="utility:bolt"
+                            variant="bare"
+                            alternative-text="Aktion ausführen"
+                            size="small">
+                        </lightning-button-icon>
+                        <lightning-button-icon
+                            icon-name="utility:bolt"
+                            variant="bare"
+                            alternative-text="Aktion ausführen"
+                            size="small">
+                        </lightning-button-icon>
+                        <lightning-button-icon
+                            icon-name="utility:copy_to_clipboard"
+                            variant="bare"
+                            alternative-text="Kopieren"
+                            size="small">
+                        </lightning-button-icon>
+                    </div>
+                </div>
+            </template>
+        </section>
+        </div>
+
+        <footer class="prompt">
+            <div class="prompt-field">
+                <textarea
+                    class="prompt-input"
+                    placeholder="Stelle eine Frage oder löse Agentforce Aktionen aus…"
+                    rows="2"
+                    aria-label="Agentforce Prompt"
+                ></textarea>
+                <button class="send" type="button" aria-label="Senden">
+                    <lightning-icon icon-name="utility:send" size="x-small"></lightning-icon>
+                </button>
+            </div>
+        </footer>
+    </article>
+</template>
