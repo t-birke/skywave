@@ -3,7 +3,7 @@ system:
 
     messages:
         welcome: |
-            Thanks for calling Skywave Airlines. How can I help you today?
+            Thanks for calling Skywave Airlines, {!@variables.CallerFirstName}. How can I help you today?
         error: "Sorry, something went wrong on my end. Could you say that again?"
 
 config:
@@ -21,6 +21,15 @@ variables:
     VoiceContactId: linked string
         source: @VoiceCall.Contact__c
         description: "Caller's Contact Id, set by the inbound phone-number-search subflow on call connect."
+    CallerFirstName: linked string
+        source: @VoiceCall.Caller_FirstName__c
+        description: "Caller first name, stamped onto the VoiceCall by Skywave_VoiceCall_Set_Caller_Fields; used for the personalised greeting on connect."
+    CallerLastName: linked string
+        source: @VoiceCall.Caller_LastName__c
+        description: "Caller last name, stamped onto the VoiceCall by Skywave_VoiceCall_Set_Caller_Fields."
+    CallerSalutation: linked string
+        source: @VoiceCall.Caller_Salutation__c
+        description: "Caller salutation (Mr/Ms), stamped onto the VoiceCall by Skywave_VoiceCall_Set_Caller_Fields."
 
     resolved_contact_id: mutable string = ""
         description: "Caller Contact Id, copied from VoiceContactId once present."

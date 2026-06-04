@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>63.0</apiVersion>
+    <areMetricsLoggedToDataCloud>false</areMetricsLoggedToDataCloud>
+    <description>Skywave: when VoiceCall.Contact__c is populated by the inbound phone-number lookup, stamp Caller_FirstName__c, Caller_LastName__c, Caller_Salutation__c from the Contact onto the VoiceCall so the voice agent&apos;s linked variables can read them at session start.</description>
+    <environments>Default</environments>
+    <interviewLabel>Skywave VoiceCall Set Caller Fields {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Skywave VoiceCall Set Caller Fields</label>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>OriginBuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>AutoLaunchedFlow</processType>
+    <recordLookups>
+        <name>Get_Contact</name>
+        <label>Get Contact</label>
+        <locationX>176</locationX>
+        <locationY>284</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Update_VoiceCall_Caller_Fields</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Id</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>$Record.Contact__c</elementReference>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>Contact</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
+    <recordUpdates>
+        <name>Update_VoiceCall_Caller_Fields</name>
+        <label>Update VoiceCall Caller Fields</label>
+        <locationX>176</locationX>
+        <locationY>404</locationY>
+        <inputAssignments>
+            <field>Caller_FirstName__c</field>
+            <value>
+                <elementReference>Get_Contact.FirstName</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Caller_LastName__c</field>
+            <value>
+                <elementReference>Get_Contact.LastName</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Caller_Salutation__c</field>
+            <value>
+                <elementReference>Get_Contact.Salutation</elementReference>
+            </value>
+        </inputAssignments>
+        <inputReference>$Record</inputReference>
+    </recordUpdates>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Get_Contact</targetReference>
+        </connector>
+        <filterFormula>AND(NOT(ISBLANK({!$Record.Contact__c})), ISBLANK({!$Record.Caller_LastName__c}))</filterFormula>
+        <object>VoiceCall</object>
+        <recordTriggerType>CreateAndUpdate</recordTriggerType>
+        <triggerType>RecordBeforeSave</triggerType>
+    </start>
+    <status>Active</status>
+</Flow>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Caller_FirstName__c</fullName>
+    <description>Caller first name, stamped from the linked Contact by the Skywave VoiceCall Set Caller Fields flow. Read by the voice agent as a linked variable.</description>
+    <externalId>false</externalId>
+    <label>Caller First Name</label>
+    <length>120</length>
+    <required>false</required>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>
