@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Phone_Digits__c</fullName>
+    <description>Contact.Phone reduced to digits only, maintained by the Skywave_ContactPhoneDigits trigger (insert and update). Lets the voice caller-resolver match a free-text-entered phone against the inbound caller ID on trailing digits, regardless of formatting.</description>
+    <externalId>false</externalId>
+    <label>Phone Digits</label>
+    <length>40</length>
+    <required>false</required>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>
