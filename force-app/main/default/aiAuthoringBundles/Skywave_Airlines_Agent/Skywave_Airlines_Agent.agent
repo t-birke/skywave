@@ -82,10 +82,10 @@ variables:
         description: ""
     active_booking_count: mutable number = -1
         label: "Active Booking Count"
-        description: "Number of active bookings for the visitor. -1 = get_bookings has not run yet; 0 = ran, no bookings; N = booking count. Set once at the router and refreshed once after a booking confirms. Sole gate for whether get_bookings runs, the seat-change routing gate (count > 0), and the seat funnel's single-vs-multiple-booking branch."
+        description: "Active bookings count: -1 not yet loaded, 0 none, N count. Set once at the router, refreshed after a booking confirms. Gates get_bookings, seat routing (>0), and the seat funnel."
     seat_change_active_booking_number_of_segments: mutable number = -1
         label: "Seat Change: Segments on Chosen Booking"
-        description: "Number of flight segments on the booking the visitor is changing a seat on. -1 = not yet queried. Populated by get_segment_count once the booking is identified; drives the seat funnel's single-vs-multiple-flight branch."
+        description: "Segments on the booking being seat-changed. -1 = not yet queried. Set by get_segment_count; drives the single-vs-multiple-flight branch."
     Tier_Status: mutable string
         label: "Tier Status"
         description: ""
@@ -330,7 +330,7 @@ start_agent agent_router:
                     complex_data_type_name: "lightning__textType"
 
         get_bookings:
-            description: "Gets all active flight bookings for the user, plus a scalar bookingCount. Run once at the router (gated by active_booking_count == -1) and once after a booking confirms, so booking context is loaded before any subagent — including seat change — needs it. No subagent re-fetches."
+            description: "Gets all active flight bookings for the user plus a scalar bookingCount. Run once at the router and once after a booking confirms; no subagent re-fetches."
             label: "Get Bookings"
             require_user_confirmation: False
             include_in_progress_indicator: True
@@ -435,7 +435,7 @@ subagent flight_booking:
                 set @variables.Latest_Flight_Search_Results = @outputs.flightSummary
 
             book_flight: @actions.book_flight
-                description: "Selects the flight the visitor agreed to (resolves a flight NUMBER or a Flight Id) and pins the choice. Call when the flight card posts 'Book flight <number>'. Does NOT create a booking — confirmation is deferred. After this succeeds the flow moves to profile collection."
+                description: "Selects the flight (resolves a flight NUMBER or a Flight Id) and pins the choice. Call when the card posts 'Book flight <number>'. Does NOT create a booking; advances to profile."
                 with contactId = @variables.resolved_contact_id
                 with flightId = ...
                 with travelDate = ...
@@ -568,7 +568,7 @@ subagent flight_booking:
                     is_displayable: False
 
         book_flight:
-            description: "Selects (does NOT book) the flight the visitor agreed to. Resolves a flight NUMBER or a Flight__c Id, validates against the live row, computes price + quote DTO, and echoes the inputs back so the agent can pin them. Confirmation is deferred to confirm_booking."
+            description: "Selects (does NOT book) the flight. Resolves a flight NUMBER or a Flight__c Id, validates, computes a price quote, and echoes inputs back to pin. Confirmation deferred to confirm_booking."
             label: "Select Flight"
             require_user_confirmation: False
             include_in_progress_indicator: True
