@@ -1,0 +1,270 @@
+system:
+    instructions: "You are the Skywave Airlines voice agent, speaking with a caller on the phone. Be warm, concise, and natural for spoken conversation. NEVER read long lists aloud — offer at most two concrete options at a time. Keep every reply to one or two short sentences."
+
+    messages:
+        welcome: |
+            Thanks for calling Skywave Airlines. How can I help you today?
+        error: "Sorry, something went wrong on my end. Could you say that again?"
+
+config:
+    developer_name: "Skywave_Voice_Agent"
+    agent_label: "Skywave Voice Agent"
+    description: "Phone voice agent for Skywave Airlines: identifies the caller, reads their bookings, and changes their seat by voice."
+    agent_type: "AgentforceServiceAgent"
+    default_agent_user: "einsteinagent@00dg8000006i9hjeas.ext"
+    additional_parameter__enable_graph_runtime: True
+
+variables:
+    VoiceCallId: linked string
+        source: @VoiceCall.Id
+        description: "The VoiceCall record Id for this inbound call."
+    VoiceContactId: linked string
+        source: @VoiceCall.Contact__c
+        description: "Caller's Contact Id, set by the inbound phone-number-search subflow on call connect."
+
+    resolved_contact_id: mutable string = ""
+        description: "Caller Contact Id, copied from VoiceContactId once present."
+    caller_first_name: mutable string = ""
+        label: "Caller First Name"
+        description: "Caller first name for a personal greeting."
+    seat_preference: mutable string = ""
+        label: "Seat Preference"
+        description: "Declared Window/Aisle/Middle preference from the survey; used to make a relevant seat offer."
+    seat_context_loaded: mutable boolean = False
+        label: "Seat Context Loaded"
+        description: "True once get_seat_context has run for this call."
+    booking_count: mutable number = -1
+        label: "Booking Count"
+        description: "Number of active bookings: -1 not loaded, 0 none, N count."
+    bookings_json: mutable string = ""
+        label: "Bookings JSON"
+        description: "Compact JSON of the caller's bookings: code, flightNumber, route, travelDate, currentSeat, segmentId."
+
+    seat_target_segment_id: mutable string = ""
+        label: "Seat Change: Target Segment Id"
+        description: "The Booking_Segment__c Id the caller is changing a seat on. Set once the caller's booking/flight is resolved."
+    seat_change_done: mutable boolean = False
+        label: "Seat Change Done"
+        description: "True once change_seat has successfully persisted a new seat this call."
+
+language:
+    default_locale: "en_US"
+    additional_locales: ""
+    all_additional_locales: False
+
+knowledge:
+    citations_enabled: False
+
+start_agent agent_router:
+    label: "Voice Router"
+
+    description: "Greets the caller, loads their context once, and routes to the right capability."
+
+    reasoning:
+        instructions: ->
+            # Copy the linked caller contact into a mutable we can gate on.
+            if @variables.resolved_contact_id == "" and @variables.VoiceContactId is not None:
+                set @variables.resolved_contact_id = @variables.VoiceContactId
+
+            # Load caller name, seat preference, and bookings ONCE.
+            if @variables.seat_context_loaded is False and @variables.resolved_contact_id != "":
+                run @actions.get_seat_context
+                    with contactId = @variables.resolved_contact_id
+                    set @variables.caller_first_name = @outputs.firstName
+                    set @variables.seat_preference = @outputs.seatPreference
+                    set @variables.booking_count = @outputs.bookingCount
+                    set @variables.bookings_json = @outputs.bookingsJson
+                    set @variables.seat_context_loaded = @outputs.success
+
+            | You are a voice router. Do NOT answer or help directly — always route with a transition action. Route by intent:
+              - Changing or choosing a seat -> use go_to_seat_change
+              - Hearing about their existing bookings or flights -> use go_to_view_bookings
+              - Asking for a human / live agent -> use go_to_escalation
+              - Anything else / unclear -> use go_to_off_topic
+
+        actions:
+            go_to_seat_change: @utils.transition to @subagent.seat_change
+                description: "Caller wants to change or pick a seat."
+
+            go_to_view_bookings: @utils.transition to @subagent.view_bookings
+                description: "Caller wants to hear about their bookings/flights."
+
+            go_to_escalation: @utils.transition to @subagent.escalation
+                description: "Caller wants a human agent."
+
+            go_to_off_topic: @utils.transition to @subagent.off_topic
+                description: "Off-topic or unclear request."
+
+    actions:
+        get_seat_context:
+            description: "Returns the caller's first name, seat preference, and bookings (each with current seat + segment id) for the voice seat-change flow."
+            label: "Get Seat Context"
+            require_user_confirmation: False
+            include_in_progress_indicator: False
+            target: "apex://Skywave_GetSeatContext"
+
+            inputs:
+                "contactId": string
+                    description: "The caller Contact Id (from VoiceCall.Contact__c)."
+                    label: "Contact Id"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "success": boolean
+                    description: "true if context loaded"
+                    label: "success"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "message": string
+                    description: "status detail"
+                    label: "message"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "firstName": string
+                    description: "caller first name"
+                    label: "first name"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "seatPreference": string
+                    description: "declared seat preference (Window/Aisle/Middle or blank)"
+                    label: "seat preference"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "bookingCount": object
+                    description: "number of active bookings"
+                    label: "booking count"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__integerType"
+                "bookingsJson": string
+                    description: "compact JSON list of bookings with current seat + segmentId"
+                    label: "bookings JSON"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+
+subagent seat_change:
+    label: "Seat Change"
+
+    description: "Changes the caller's seat by voice: states the current seat, makes a concise preference-aware offer, and persists the agreed seat."
+
+    reasoning:
+        instructions: ->
+            if @variables.booking_count == 0:
+                | Tell the caller you don't see a booking on their account to change a seat for, and ask if there's anything else you can help with. Do NOT call any action.
+
+            if @variables.booking_count == 1:
+                | The caller has one booking. From {!@variables.bookings_json}, take that booking's segmentId and currentSeat. Pin the segment by calling {!@actions.set_seat_target} with that segmentId.
+
+            if @variables.booking_count > 1:
+                | The caller has more than one booking. In ONE short sentence, name just the routes (e.g. "your New York to Tokyo trip or your Chicago to Denver trip") and ask which one. Do NOT read codes, dates, or seat numbers aloud. When they choose, take that booking's segmentId from {!@variables.bookings_json} and pin it with {!@actions.set_seat_target}.
+
+            if @variables.seat_target_segment_id != "" and @variables.seat_change_done is False:
+                | You are changing the seat on the chosen flight. Speak naturally and keep it to one or two sentences.
+                  1. State their current seat and acknowledge their preference, then offer TWO specific seats that match their preference ({!@variables.seat_preference}). Invent two plausible, relevant seat codes (the cabin is rows 8-30, letters A-F; A/F are windows, C/D are aisles, B/E are middle). Front-of-cabin seats are nicer — prefer lower row numbers. Example: "You're currently in 14C. I know you like the aisle — I could move you to 9C or 10D, or tell me where you'd like to sit."
+                  2. If the caller names or describes any seat (e.g. "11A", or "a window near the back on the right"), resolve it to a concrete seat code that fits the cabin and their words. Do NOT read a list of options.
+                  3. Once the caller agrees to a specific seat, IMMEDIATELY call {!@actions.change_seat} with that seat as newSeatNumber and the pinned segmentId. Do NOT ask twice.
+
+            if @variables.seat_change_done is True:
+                | The seat change is done. Confirm the new seat in one warm sentence and ask if there's anything else you can help with. Do NOT call change_seat again.
+
+        actions:
+            set_seat_target: @utils.setVariables
+                description: "Pin the Booking_Segment__c Id the caller is changing a seat on, taken from bookings_json once the booking/flight is known."
+                with seat_target_segment_id = ...
+
+            change_seat: @actions.change_seat
+                description: "Persist the agreed seat. Pass the pinned segmentId and the agreed seat as newSeatNumber."
+                with bookingSegmentId = @variables.seat_target_segment_id
+                with newSeatNumber = ...
+                set @variables.seat_change_done = @outputs.success
+
+    actions:
+        change_seat:
+            description: "Changes the seat assignment for a booking segment."
+            label: "Change Seat"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Updating your seat"
+            target: "apex://Skywave_ChangeSeat"
+
+            inputs:
+                "bookingSegmentId": string
+                    description: "The Booking Segment Id to change the seat for."
+                    label: "Booking Segment ID"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "newSeatNumber": string
+                    description: "The agreed seat number (e.g. 12A)."
+                    label: "New Seat Number"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "seatPreference": string
+                    description: "Seat preference if no specific seat: Window, Aisle, or Middle."
+                    label: "Seat Preference"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "success": boolean
+                    description: "true if the seat change succeeded"
+                    label: "success"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "errorMessage": string
+                    description: "details in case of an error"
+                    label: "error message"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "updatedSegment": object
+                    description: "Information about the seat change"
+                    label: "updated segment"
+                    complex_data_type_name: "@apexClassType/c__Skywave_ChangeSeat$SegmentInfo"
+                    is_displayable: False
+                    is_used_by_planner: True
+
+subagent view_bookings:
+    label: "View Bookings"
+
+    description: "Tells the caller about their existing bookings, concisely and by voice."
+
+    reasoning:
+        instructions: ->
+            if @variables.booking_count == 0:
+                | Tell the caller you don't see any active bookings on their account, and ask if there's anything else you can help with.
+
+            if @variables.booking_count > 0:
+                | Summarise the caller's bookings from {!@variables.bookings_json} for the phone: ONE short sentence per booking at most (route and travel date), and only mention the seat if they ask. If there is more than one, briefly list the routes only. Never read codes or segment ids aloud. Then ask if they'd like to change a seat or anything else.
+
+subagent escalation:
+    label: "Escalation"
+    description: "Handles callers who want to be transferred to a live human agent."
+
+    reasoning:
+        instructions: ->
+            | If the caller explicitly asks for a human or live agent, transfer them.
+              If the transfer fails, apologise briefly and offer to keep helping by voice.
+        actions:
+            escalate_to_human: @utils.escalate
+                description: "Transfer the caller to a human agent."
+
+subagent off_topic:
+    label: "Off Topic"
+    description: "Redirects off-topic or unclear requests back to what the voice agent can do."
+
+    reasoning:
+        instructions: ->
+            | Briefly and politely steer back to what you can help with on this call: changing a seat or hearing about their bookings. Do NOT answer general-knowledge questions. Keep it to one short sentence.
+
+modality voice:
+    voice_id: "UgBBYS2sOqTuMpoF3BR0"
+    outbound_speed: 1.0
+    outbound_stability: 0.65
+    outbound_similarity: 0.75
