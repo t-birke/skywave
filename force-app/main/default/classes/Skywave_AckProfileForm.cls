@@ -102,31 +102,17 @@ public with sharing class Skywave_AckProfileForm {
         String key = req.flightId.trim();
 
         try {
-            // Resolve flight by Id or by Flight_Number — see Skywave_BookFlight.
-            List<Flight__c> flights;
-            if (key.length() == 15 || key.length() == 18) {
-                flights = [
-                    SELECT Id, Scheduled_Departure_Time__c, Scheduled_Arrival_Time__c,
-                           Base_Price_Economy__c, Base_Price_Premium_Economy__c,
-                           Base_Price_Business__c, Base_Price_First__c
-                    FROM Flight__c WHERE Id = :key LIMIT 1
-                ];
-            }
-            if (flights == null || flights.isEmpty()) {
-                flights = [
-                    SELECT Id, Scheduled_Departure_Time__c, Scheduled_Arrival_Time__c,
-                           Base_Price_Economy__c, Base_Price_Premium_Economy__c,
-                           Base_Price_Business__c, Base_Price_First__c
-                    FROM Flight__c WHERE Flight_Number__c = :key LIMIT 1
-                ];
-            }
-            if (flights.isEmpty()) {
+            // Resolve the flight key into an itinerary (single leg, or a
+            // compound "A+B" connection through the JFK hub). One
+            // Booking_Segment__c is created per leg.
+            Skywave_Itinerary.Resolved itin =
+                Skywave_Itinerary.resolve(key, canonicalFareClass, travelDateParsed);
+            if (itin.legs.isEmpty()) {
                 out.message = 'Flight not found for: ' + key;
                 return out;
             }
-            Flight__c flight = flights[0];
 
-            Decimal totalAmount = priceFor(flight, canonicalFareClass);
+            Decimal totalAmount = itin.totalPrice();
 
             Booking__c booking = new Booking__c(
                 Contact__c = req.contactId,
@@ -140,47 +126,33 @@ public with sharing class Skywave_AckProfileForm {
             );
             insert booking;
 
-            DateTime departureDT = DateTime.newInstance(travelDateParsed, flight.Scheduled_Departure_Time__c);
-            DateTime arrivalDT = DateTime.newInstance(travelDateParsed, flight.Scheduled_Arrival_Time__c);
-            if (flight.Scheduled_Arrival_Time__c < flight.Scheduled_Departure_Time__c) {
-                arrivalDT = arrivalDT.addDays(1);
+            List<Booking_Segment__c> segments = new List<Booking_Segment__c>();
+            Integer order = 1;
+            for (Skywave_Itinerary.Leg leg : itin.legs) {
+                segments.add(new Booking_Segment__c(
+                    Booking__c = booking.Id,
+                    Flight__c = leg.flight.Id,
+                    Travel_Date__c = leg.departure.date(),
+                    Departure_DateTime__c = leg.departure,
+                    Arrival_DateTime__c = leg.arrival,
+                    Segment_Order__c = order,
+                    Segment_Status__c = 'Scheduled',
+                    Seat_Number__c = assignSeat(req.seatPreference)
+                ));
+                order++;
             }
-
-            Booking_Segment__c segment = new Booking_Segment__c(
-                Booking__c = booking.Id,
-                Flight__c = flight.Id,
-                Travel_Date__c = travelDateParsed,
-                Departure_DateTime__c = departureDT,
-                Arrival_DateTime__c = arrivalDT,
-                Segment_Order__c = 1,
-                Segment_Status__c = 'Scheduled',
-                Seat_Number__c = assignSeat(req.seatPreference)
-            );
-            insert segment;
+            insert segments;
 
             out.success = true;
             out.bookingCode = booking.Confirmation_Code__c;
             out.totalCharged = '$' + totalAmount.setScale(2).toPlainString();
-            out.message = 'Booking created (Pending/Unpaid).';
+            out.message = 'Booking created (Pending/Unpaid), ' + segments.size() + ' segment(s).';
         } catch (Exception e) {
             out.message = 'Booking creation failed: ' + e.getMessage();
             System.debug('Skywave_AckProfileForm error: ' + e.getMessage() +
                 '\n' + e.getStackTraceString());
         }
         return out;
-    }
-
-    private static Decimal priceFor(Flight__c flight, String fareClass) {
-        if (fareClass == Skywave_FareClass.ECONOMY && flight.Base_Price_Economy__c != null) {
-            return flight.Base_Price_Economy__c;
-        } else if (fareClass == Skywave_FareClass.PREMIUM_ECONOMY && flight.Base_Price_Premium_Economy__c != null) {
-            return flight.Base_Price_Premium_Economy__c;
-        } else if (fareClass == Skywave_FareClass.BUSINESS && flight.Base_Price_Business__c != null) {
-            return flight.Base_Price_Business__c;
-        } else if (fareClass == Skywave_FareClass.FIRST && flight.Base_Price_First__c != null) {
-            return flight.Base_Price_First__c;
-        }
-        return flight.Base_Price_Economy__c != null ? flight.Base_Price_Economy__c : 0;
     }
 
     private static String generateConfirmationCode() {

@@ -118,6 +118,34 @@ public with sharing class Skywave_FlightSearch {
             opt.price = getPriceForFareClass(flight, req.fareClass);
             options.add(opt);
         }
+
+        // No direct flight on this O&D? Skywave is a JFK hub carrier — try a
+        // single connection origin -> JFK -> destination and present it as
+        // ONE option with a compound flight key (e.g. SW3001+SW4017). The
+        // card and booking pipeline thread the compound key through unchanged.
+        if (options.isEmpty() && req.origin != Skywave_Itinerary.HUB
+                && req.destination != Skywave_Itinerary.HUB) {
+            Skywave_Itinerary.Resolved conn =
+                Skywave_Itinerary.findConnection(req.origin, req.destination, req.fareClass, travelDate);
+            if (conn != null && conn.isConnection) {
+                Skywave_Itinerary.Leg first = conn.legs[0];
+                Skywave_Itinerary.Leg last = conn.legs[conn.legs.size() - 1];
+
+                FlightOption opt = new FlightOption();
+                opt.flightId = null; // compound — no single Flight__c Id
+                opt.startingAirport = first.flight.Origin__c;
+                opt.arrivingAirport = last.flight.Destination__c;
+                opt.duration = conn.totalDurationMinutes();
+                opt.numberOfFlights = conn.legs.size();
+                opt.stopovers = '1 stop · ' + first.flight.Destination__c;
+                opt.aircraft = first.flight.Aircraft_Type__c;
+                opt.flightNumber = conn.compoundKey();
+                opt.departureTime = first.departure.format('h:mm a');
+                opt.arrivalTime = last.arrival.format('h:mm a');
+                opt.price = '$' + conn.totalPrice().setScale(2).toPlainString();
+                options.add(opt);
+            }
+        }
         return options;
     }
 

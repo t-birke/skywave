@@ -85,44 +85,21 @@ public with sharing class Skywave_BookFlight {
         }
 
         try {
-            // Resolve either a Salesforce Id (15/18 chars) or a flight number
-            // (e.g. "SW1200"). The CLT card book button passes the flight
-            // number via chat ("Book flight SW1200") because the structured
-            // flightResult output is filter_from_agent=True — the planner
-            // can't see Ids. Other call paths (text-only "book flight
-            // a01000000000001") may pass a real Id, so we accept both.
+            // Resolve the flight key into an itinerary. The key is one of:
+            //   - a Flight__c Id (15/18 chars)
+            //   - a single flight number ("SW1200")
+            //   - a COMPOUND connection key ("SW3001+SW4017"), posted by the
+            //     CLT card when the search returned a through-hub connection.
+            // The card passes the flightNumber via chat ("Book flight <key>")
+            // because the structured flightResult output is filter_from_agent.
             String key = req.flightId.trim();
-            List<Flight__c> flights;
-            if (key.length() == 15 || key.length() == 18) {
-                flights = [
-                    SELECT Id, Name, Flight_Number__c, Origin__c, Destination__c,
-                           Scheduled_Departure_Time__c, Scheduled_Arrival_Time__c,
-                           Duration_Minutes__c, Aircraft_Type__c,
-                           Base_Price_Economy__c, Base_Price_Premium_Economy__c,
-                           Base_Price_Business__c, Base_Price_First__c
-                    FROM Flight__c
-                    WHERE Id = :key
-                    LIMIT 1
-                ];
-            }
-            if (flights == null || flights.isEmpty()) {
-                flights = [
-                    SELECT Id, Name, Flight_Number__c, Origin__c, Destination__c,
-                           Scheduled_Departure_Time__c, Scheduled_Arrival_Time__c,
-                           Duration_Minutes__c, Aircraft_Type__c,
-                           Base_Price_Economy__c, Base_Price_Premium_Economy__c,
-                           Base_Price_Business__c, Base_Price_First__c
-                    FROM Flight__c
-                    WHERE Flight_Number__c = :key
-                    LIMIT 1
-                ];
-            }
-            if (flights.isEmpty()) {
+            Skywave_Itinerary.Resolved itin =
+                Skywave_Itinerary.resolve(key, canonicalFareClass, travelDateParsed);
+            if (itin.legs.isEmpty()) {
                 r.success = false;
                 r.errorMessage = 'Flight not found for id or number: ' + key;
                 return r;
             }
-            Flight__c flight = flights[0];
 
             List<Contact> contacts = [
                 SELECT Id, Name, Membership_Tier__c FROM Contact
@@ -137,31 +114,12 @@ public with sharing class Skywave_BookFlight {
             }
             Contact contact = contacts[0];
 
-            Decimal basePrice = getPriceForFareClass(flight, canonicalFareClass);
-
-            // Compute departure/arrival DateTimes for the visible quote,
-            // mirroring what Skywave_ConfirmBooking will write later.
-            DateTime departureDateTime = DateTime.newInstance(
-                travelDateParsed, flight.Scheduled_Departure_Time__c
-            );
-            DateTime arrivalDateTime = DateTime.newInstance(
-                travelDateParsed, flight.Scheduled_Arrival_Time__c
-            );
-            if (flight.Scheduled_Arrival_Time__c < flight.Scheduled_Departure_Time__c) {
-                arrivalDateTime = arrivalDateTime.addDays(1);
-            }
-
             r.success = true;
-            r.booking = buildBookingResponse(
-                flight,
-                contact,
-                canonicalFareClass,
-                basePrice,
-                departureDateTime,
-                arrivalDateTime
-            );
-            // Echo inputs back so the agent can pin them.
-            r.selectedFlightId = req.flightId;
+            r.booking = buildBookingResponse(itin, contact, canonicalFareClass);
+            // Echo inputs back so the agent can pin them. Normalise to the
+            // itinerary's flight-number key so a connection is pinned as its
+            // compound key ("SW3001+SW4017"), which AckProfileForm re-resolves.
+            r.selectedFlightId = itin.compoundKey();
             r.selectedTravelDate = req.travelDate;
             r.selectedFareClass = canonicalFareClass;
             r.selectedCheckedBags = req.checkedBags != null ? req.checkedBags : 0;
@@ -174,32 +132,16 @@ public with sharing class Skywave_BookFlight {
         return r;
     }
 
-    private static Decimal getPriceForFareClass(Flight__c flight, String fareClass) {
-        if (fareClass == Skywave_FareClass.ECONOMY && flight.Base_Price_Economy__c != null) {
-            return flight.Base_Price_Economy__c;
-        } else if (fareClass == Skywave_FareClass.PREMIUM_ECONOMY && flight.Base_Price_Premium_Economy__c != null) {
-            return flight.Base_Price_Premium_Economy__c;
-        } else if (fareClass == Skywave_FareClass.BUSINESS && flight.Base_Price_Business__c != null) {
-            return flight.Base_Price_Business__c;
-        } else if (fareClass == Skywave_FareClass.FIRST && flight.Base_Price_First__c != null) {
-            return flight.Base_Price_First__c;
-        }
-        return flight.Base_Price_Economy__c != null ? flight.Base_Price_Economy__c : 0;
-    }
-
     private static Booking buildBookingResponse(
-        Flight__c flight,
+        Skywave_Itinerary.Resolved itin,
         Contact contact,
-        String canonicalFareClass,
-        Decimal totalAmount,
-        DateTime departureDateTime,
-        DateTime arrivalDateTime
+        String canonicalFareClass
     ) {
         Booking b = new Booking();
         // No confirmation code yet — the booking has not been created.
         // Skywave_ConfirmBooking issues the code at insert time.
         b.bookingReference = '';
-        b.total = '$' + totalAmount.setScale(2).toPlainString();
+        b.total = '$' + itin.totalPrice().setScale(2).toPlainString();
 
         if (canonicalFareClass == Skywave_FareClass.ECONOMY) {
             b.rebookingConditions = 'Change fee $99, plus fare difference';
@@ -226,36 +168,43 @@ public with sharing class Skywave_BookFlight {
             b.checkedBaggageAllowance += ' + ' + additionalBags + ' bonus bag(s)';
         }
 
-        b.flights = new List<Flight>();
+        // One Flight grouping with one Segment per leg. For a connection
+        // (>1 leg) the overall journey runs origin -> ... -> final dest with
+        // the layover airport(s) implied by adjacent segments.
+        Skywave_Itinerary.Leg firstLeg = itin.legs[0];
+        Skywave_Itinerary.Leg lastLeg = itin.legs[itin.legs.size() - 1];
+
         Flight f = new Flight();
-        f.duration = formatDuration(flight.Duration_Minutes__c);
-        f.originDateTime = formatDateTime(departureDateTime);
-        f.destinationDateTime = formatDateTime(arrivalDateTime);
-        f.originCity = getAirportCity(flight.Origin__c);
-        f.destinationCity = getAirportCity(flight.Destination__c);
+        f.duration = formatDuration(itin.totalDurationMinutes());
+        f.originDateTime = formatDateTime(firstLeg.departure);
+        f.destinationDateTime = formatDateTime(lastLeg.arrival);
+        f.originCity = getAirportCity(firstLeg.flight.Origin__c);
+        f.destinationCity = getAirportCity(lastLeg.flight.Destination__c);
         f.bookingClass = canonicalFareClass;
-        f.numberOfFlights = 1;
+        f.numberOfFlights = itin.legs.size();
         f.segments = new List<Segment>();
 
-        Segment s = new Segment();
-        s.segmentType = 'flight';
-        s.duration = formatDuration(flight.Duration_Minutes__c);
-        s.flightNumber = flight.Flight_Number__c;
-        s.departureDateTime = formatDateTime(departureDateTime);
-        s.departureCity = getAirportCity(flight.Origin__c);
-        s.departureAirport = getAirportName(flight.Origin__c);
-        s.departureAirportCode = flight.Origin__c;
-        s.arrivalDateTime = formatDateTime(arrivalDateTime);
-        s.arrivalCity = getAirportCity(flight.Destination__c);
-        s.arrivalAirport = getAirportName(flight.Destination__c);
-        s.arrivalAirportCode = flight.Destination__c;
-        s.bookingClass = canonicalFareClass;
-        s.operatingAircraft = flight.Aircraft_Type__c;
-        s.operatingAirline = 'Skywave Airlines';
+        for (Skywave_Itinerary.Leg leg : itin.legs) {
+            Flight__c flight = leg.flight;
+            Segment s = new Segment();
+            s.segmentType = 'flight';
+            s.duration = formatDuration(flight.Duration_Minutes__c);
+            s.flightNumber = flight.Flight_Number__c;
+            s.departureDateTime = formatDateTime(leg.departure);
+            s.departureCity = getAirportCity(flight.Origin__c);
+            s.departureAirport = getAirportName(flight.Origin__c);
+            s.departureAirportCode = flight.Origin__c;
+            s.arrivalDateTime = formatDateTime(leg.arrival);
+            s.arrivalCity = getAirportCity(flight.Destination__c);
+            s.arrivalAirport = getAirportName(flight.Destination__c);
+            s.arrivalAirportCode = flight.Destination__c;
+            s.bookingClass = canonicalFareClass;
+            s.operatingAircraft = flight.Aircraft_Type__c;
+            s.operatingAirline = 'Skywave Airlines';
+            f.segments.add(s);
+        }
 
-        f.segments.add(s);
-        b.flights.add(f);
-
+        b.flights = new List<Flight>{ f };
         return b;
     }
 
@@ -279,7 +228,13 @@ public with sharing class Skywave_BookFlight {
             'LAS' => 'Las Vegas', 'MCO' => 'Orlando', 'MIA' => 'Miami',
             'SEA' => 'Seattle', 'PHX' => 'Phoenix', 'IAH' => 'Houston',
             'BOS' => 'Boston', 'SFO' => 'San Francisco', 'EWR' => 'Newark',
-            'LHR' => 'London', 'HND' => 'Tokyo', 'SYD' => 'Sydney'
+            'IAD' => 'Washington', 'YYZ' => 'Toronto',
+            'LHR' => 'London', 'CDG' => 'Paris', 'FCO' => 'Rome',
+            'HND' => 'Tokyo', 'BKK' => 'Bangkok', 'SIN' => 'Singapore',
+            'CPT' => 'Cape Town', 'RAK' => 'Marrakesh', 'NBO' => 'Nairobi',
+            'GIG' => 'Rio de Janeiro', 'MEX' => 'Mexico City', 'EZE' => 'Buenos Aires',
+            'SYD' => 'Sydney', 'AKL' => 'Auckland',
+            'DXB' => 'Dubai', 'IST' => 'Istanbul'
         };
         return airportCities.containsKey(airportCode) ? airportCities.get(airportCode) : airportCode;
     }
@@ -301,9 +256,24 @@ public with sharing class Skywave_BookFlight {
             'BOS' => 'Boston Logan International',
             'SFO' => 'San Francisco International',
             'EWR' => 'Newark Liberty International',
+            'IAD' => 'Washington Dulles International',
+            'YYZ' => 'Toronto Pearson International',
             'LHR' => 'London Heathrow',
+            'CDG' => 'Paris Charles de Gaulle',
+            'FCO' => 'Rome Fiumicino',
             'HND' => 'Tokyo Haneda',
-            'SYD' => 'Sydney Kingsford Smith'
+            'BKK' => 'Bangkok Suvarnabhumi',
+            'SIN' => 'Singapore Changi',
+            'CPT' => 'Cape Town International',
+            'RAK' => 'Marrakesh Menara',
+            'NBO' => 'Nairobi Jomo Kenyatta International',
+            'GIG' => 'Rio de Janeiro Galeão International',
+            'MEX' => 'Mexico City International',
+            'EZE' => 'Buenos Aires Ezeiza International',
+            'SYD' => 'Sydney Kingsford Smith',
+            'AKL' => 'Auckland International',
+            'DXB' => 'Dubai International',
+            'IST' => 'Istanbul Airport'
         };
         return airportNames.containsKey(airportCode) ? airportNames.get(airportCode) : airportCode;
     }
