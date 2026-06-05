@@ -83,15 +83,35 @@ public without sharing class Skywave_SaveProfile {
 
         // Optional avatar upload — same recipe as TB_createProfile_endpoint.cls.
         if (String.isNotBlank(avatarBase64)) {
+            // Two-stage avatar upload, decoupled so a failure in stage 2 (the
+            // ContentDocumentLink insert) doesn't prevent stage 1 (the
+            // Shepherd URL on Contact, which is what every read-side
+            // consumer — modernContactCard, demo monitor, chat — depends on).
+            //
+            // Why decouple: the ESW site guest user (which the chat-iframe
+            // LWC runs as, per memory `reference-ecv2-clt-runtime-context`)
+            // can't link a ContentDocument to a Contact even with
+            // Visibility='InternalUsers' — the platform requires the linking
+            // user to see the LinkedEntity, and guest users can't see
+            // Contact records. Without the decouple this throws and the
+            // earlier orphan ContentVersions from this pattern (5 of them
+            // on the running profile when this was diagnosed) prove it.
+            //
+            // The CDL is purely decorative — it makes the file appear in the
+            // Contact page's "Files" related list for users browsing CRM. The
+            // demo doesn't need it. The `Avatar URL on Contact` is the
+            // load-bearing write.
+
+            String b64 = avatarBase64;
+            Integer commaAt = b64.indexOf(',');
+            if (commaAt >= 0) {
+                // Strip "data:image/png;base64," style prefix.
+                b64 = b64.substring(commaAt + 1);
+            }
+
+            // STAGE 1 — must succeed: insert ContentVersion, stamp the URL on Contact.
             try {
                 deletePriorAvatars(contactId);
-
-                String b64 = avatarBase64;
-                Integer commaAt = b64.indexOf(',');
-                if (commaAt >= 0) {
-                    // Strip "data:image/png;base64," style prefix.
-                    b64 = b64.substring(commaAt + 1);
-                }
 
                 ContentVersion cv = new ContentVersion();
                 cv.VersionData = EncodingUtil.base64Decode(b64);
@@ -104,38 +124,33 @@ public without sharing class Skywave_SaveProfile {
                     SELECT ContentDocumentId FROM ContentVersion WHERE Id = :cv.Id LIMIT 1
                 ].ContentDocumentId;
 
-                // Link the file to the Contact. Site Guest users hit
-                // platform-side restrictions on Visibility='AllUsers' (it
-                // requires the linking user to see the LinkedEntity in
-                // every sharing scope), so we use 'InternalUsers' which
-                // works for Guest-user inserts and still lets every
-                // logged-in Salesforce user view the avatar on the Contact
-                // page. AVOIDS the silent-failure pattern where the
-                // ContentVersion insert succeeded but the CDL did not,
-                // leaving the file orphaned on the uploading user.
-                ContentDocumentLink cdl = new ContentDocumentLink();
-                cdl.ContentDocumentId = contentDocId;
-                cdl.LinkedEntityId = contactId;
-                cdl.ShareType = 'V';
-                cdl.Visibility = 'InternalUsers';
-                insert cdl;
-
                 String shepherdUrl = '/sfc/servlet.shepherd/document/download/' + contentDocId;
                 r.avatarUrl = shepherdUrl;
 
-                // Persist on the Contact so the Modern Contact Card LWC has a
-                // stable read-side field. Locks the URL to one specific
-                // ContentVersion — avoids ambiguity if the Contact ever has
-                // multiple historical avatar uploads.
+                // Stamp the Contact NOW, before attempting the CDL. Even if
+                // stage 2 fails, downstream consumers can still resolve and
+                // display the avatar via this URL.
                 update new Contact(Id = contactId, ContactCardPicture__c = shepherdUrl);
+
+                // STAGE 2 — best-effort: link to Contact for the Files
+                // related list. Failure here is logged and swallowed.
+                try {
+                    ContentDocumentLink cdl = new ContentDocumentLink();
+                    cdl.ContentDocumentId = contentDocId;
+                    cdl.LinkedEntityId = contactId;
+                    cdl.ShareType = 'V';
+                    cdl.Visibility = 'InternalUsers';
+                    insert cdl;
+                } catch (Exception cdlErr) {
+                    System.debug(LoggingLevel.WARN,
+                        'Skywave_SaveProfile CDL insert skipped (decorative only): '
+                        + cdlErr.getMessage());
+                }
             } catch (Exception e) {
-                // Avatar upload failed — log it and surface a real error.
-                // The previous "soft-fail with success=true" pattern hid a
-                // silent CDL-insert failure for weeks. Fail loudly instead;
-                // the visitor never sees this anyway because the form has
-                // already cued the agent forward by this point.
-                System.debug('Skywave_SaveProfile avatar error: ' + e.getMessage() +
-                    '\n' + e.getStackTraceString());
+                // Stage 1 failed — the URL was never stamped. Surface as a
+                // real partial success, not silent.
+                System.debug(LoggingLevel.WARN, 'Skywave_SaveProfile avatar error: ' +
+                    e.getMessage() + '\n' + e.getStackTraceString());
                 r.message = 'Profile saved, avatar upload failed: ' + e.getMessage();
                 r.success = true;
                 return r;
