@@ -116,22 +116,32 @@ trigger Skywave_Contact_Update_Trigger on Skywave_Contact_Update__e (after inser
                 if (String.isNotBlank(ev.Survey_Summary__c)) c.Skywave_Survey_Summary__c = ev.Survey_Summary__c;
                 // IP geolocation (best-effort). When we have coordinates,
                 // derive the nearest network airport as the default booking
-                // origin for the chat agent.
+                // origin for the chat agent AND so the monitor can place the
+                // visitor's bubble on the world map.
                 if (String.isNotBlank(ev.Geo_City__c))    c.Geo_City__c    = ev.Geo_City__c;
                 if (String.isNotBlank(ev.Geo_Region__c))  c.Geo_Region__c  = ev.Geo_Region__c;
                 if (String.isNotBlank(ev.Geo_Country__c)) c.Geo_Country__c = ev.Geo_Country__c;
                 if (ev.Geo_Latitude__c != null)  c.Geo_Latitude__c  = ev.Geo_Latitude__c;
                 if (ev.Geo_Longitude__c != null) c.Geo_Longitude__c = ev.Geo_Longitude__c;
+                String homeAirport = null;
                 if (ev.Geo_Latitude__c != null && ev.Geo_Longitude__c != null) {
-                    String airport = Skywave_Airports.nearest(
+                    homeAirport = Skywave_Airports.nearest(
                         ev.Geo_Latitude__c, ev.Geo_Longitude__c);
-                    if (airport != null) c.Home_Airport__c = airport;
+                    if (homeAirport != null) c.Home_Airport__c = homeAirport;
                 }
+                // Carry geo + derived airport into the monitor event so the
+                // map can place the bubble without a Contact requery.
+                Map<String, Object> p = new Map<String, Object>();
+                if (ev.Geo_Latitude__c != null)  p.put('lat',  ev.Geo_Latitude__c);
+                if (ev.Geo_Longitude__c != null) p.put('lon',  ev.Geo_Longitude__c);
+                if (String.isNotBlank(ev.Geo_City__c))    p.put('city',    ev.Geo_City__c);
+                if (String.isNotBlank(ev.Geo_Country__c)) p.put('country', ev.Geo_Country__c);
+                if (homeAirport != null) p.put('homeAirport', homeAirport);
                 demoEventsToPublish.add(new Demo_Event__e(
                     Type__c           = 'survey_complete',
                     Session_Id__c     = deviceId,
                     Demo_Session_Id__c = ev.Demo_Session_Id__c,
-                    Payload_Json__c   = ''
+                    Payload_Json__c   = JSON.serialize(p)
                 ));
             } else if (ev.Update_Type__c == 'chat_start') {
                 if (String.isNotBlank(ev.Conversation_Id__c)) {

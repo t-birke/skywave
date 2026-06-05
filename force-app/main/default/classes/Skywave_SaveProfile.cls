@@ -146,7 +146,37 @@ public without sharing class Skywave_SaveProfile {
         if (String.isBlank(r.message)) {
             r.message = 'Profile saved.';
         }
+        publishProfileCreatedEvent(contactId, fn, ln, r.avatarUrl);
         return r;
+    }
+
+    /**
+     * Live monitor: replace the cookie-id bubble with the visitor's name +
+     * avatar as soon as the profile form is submitted. Best-effort.
+     */
+    private static void publishProfileCreatedEvent(String contactId, String firstName, String lastName, String avatarUrl) {
+        try {
+            List<Contact> cs = [
+                SELECT Session_Id__c, Demo_Session__c
+                FROM Contact WHERE Id = :contactId LIMIT 1
+            ];
+            if (cs.isEmpty() || String.isBlank(cs[0].Session_Id__c)) return;
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'firstName' => firstName,
+                'lastName'  => lastName
+            };
+            if (String.isNotBlank(avatarUrl)) payload.put('avatarUrl', avatarUrl);
+
+            Skywave_RestUtil.publishEvent(
+                'profile_created',
+                cs[0].Session_Id__c,
+                cs[0].Demo_Session__c,
+                payload
+            );
+        } catch (Exception e) {
+            System.debug('profile_created publish skipped: ' + e.getMessage());
+        }
     }
 
     private static void deletePriorAvatars(Id contactId) {

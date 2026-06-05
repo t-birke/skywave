@@ -143,6 +143,11 @@ public with sharing class Skywave_AckProfileForm {
             }
             insert segments;
 
+            // Live monitor: tell the demo map the visitor just booked. Carry
+            // the IATA pairs per leg so the map can draw the route without a
+            // Contact requery (and the connection city for visual emphasis).
+            publishFlightBookedEvent(req.contactId, itin, booking.Confirmation_Code__c);
+
             out.success = true;
             out.bookingCode = booking.Confirmation_Code__c;
             out.totalCharged = '$' + totalAmount.setScale(2).toPlainString();
@@ -153,6 +158,47 @@ public with sharing class Skywave_AckProfileForm {
                 '\n' + e.getStackTraceString());
         }
         return out;
+    }
+
+    /**
+     * Publish a Demo_Event__e(type='flight_booked') so the live demo monitor
+     * can draw the route on its world map and recenter the visitor's avatar.
+     * Best-effort — never blocks the booking. The Contact's Session_Id__c is
+     * the device id the monitor uses as the bubble's stable key.
+     */
+    private static void publishFlightBookedEvent(Id contactId, Skywave_Itinerary.Resolved itin, String bookingCode) {
+        try {
+            List<Contact> cs = [
+                SELECT Session_Id__c, Demo_Session__c
+                FROM Contact WHERE Id = :contactId LIMIT 1
+            ];
+            if (cs.isEmpty() || String.isBlank(cs[0].Session_Id__c)) return;
+
+            List<Map<String, String>> legs = new List<Map<String, String>>();
+            for (Skywave_Itinerary.Leg leg : itin.legs) {
+                legs.add(new Map<String, String>{
+                    'from' => leg.flight.Origin__c,
+                    'to'   => leg.flight.Destination__c,
+                    'flightNumber' => leg.flight.Flight_Number__c
+                });
+            }
+            Map<String, Object> payload = new Map<String, Object>{
+                'legs' => legs,
+                'bookingCode' => bookingCode,
+                'isConnection' => itin.isConnection
+            };
+            if (itin.isConnection) {
+                payload.put('connectionAirport', itin.legs[0].flight.Destination__c);
+            }
+            Skywave_RestUtil.publishEvent(
+                'flight_booked',
+                cs[0].Session_Id__c,
+                cs[0].Demo_Session__c,
+                payload
+            );
+        } catch (Exception e) {
+            System.debug('flight_booked publish skipped: ' + e.getMessage());
+        }
     }
 
     private static String generateConfirmationCode() {

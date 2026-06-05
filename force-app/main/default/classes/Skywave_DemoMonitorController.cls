@@ -103,6 +103,20 @@ public with sharing class Skywave_DemoMonitorController {
         return out;
     }
 
+    /**
+     * IATA -> {lat, lon} for every airport in the Skywave network. Monitor
+     * LWC fetches once at mount so it can plot bubbles + draw routes without
+     * carrying coordinates in every Demo_Event__e payload.
+     */
+    @AuraEnabled(cacheable=true)
+    public static Map<String, Map<String, Double>> getAirportGeo() {
+        Map<String, Map<String, Double>> out = new Map<String, Map<String, Double>>();
+        for (Skywave_Airports.Airport a : Skywave_Airports.ALL) {
+            out.put(a.code, new Map<String, Double>{ 'lat' => a.lat, 'lon' => a.lon });
+        }
+        return out;
+    }
+
     @AuraEnabled
     public static String advanceState(Id sessionId, String newState) {
         Demo_Session__c d = new Demo_Session__c(Id = sessionId, State__c = newState);

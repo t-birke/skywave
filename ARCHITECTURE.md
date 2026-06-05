@@ -121,6 +121,37 @@ ws-fanout.js  → broadcasts to all connected WebSocket clients
 site.js  advances each phone's effectiveStage (capped at moderator stage)
 ```
 
+### 3b'. Visitor activity → demo monitor (web, real time)
+
+A second, *visitor-keyed* event channel feeds the live demo monitor (the
+world map + bubbles seen by the presenter). One PE type, many event types
+identified by `Type__c`:
+
+```
+Skywave_RestUtil.publishEvent(...) ─┐
+                                    │
+  survey_complete  ── Contact-Update trigger (geo + home airport)
+  flight_booked    ── Skywave_AckProfileForm  (per-leg IATA pairs + connection)
+  seat_changed     ── Skywave_ChangeSeat      (new seat + flight #)
+  profile_created  ── Skywave_SaveProfile     (firstName, lastName, avatarUrl)
+                                    │
+                                    ▼
+            Demo_Event__e  (Type__c, Session_Id__c (=deviceId),
+                            Demo_Session_Id__c, Payload_Json__c)
+                                    │
+                                    ▼
+          skywaveDemoMonitor LWC  (empApi subscriber)
+            • places/relocates the visitor's bubble on the world map
+            • draws the route line on flight_booked
+            • appends seat badge on seat_changed
+            • swaps cookie-id for name+avatar on profile_created
+```
+
+All publishes are **best-effort and non-blocking** — a publish failure never
+breaks the booking/seat/profile write. Airport coordinates for route lines
+come from `Skywave_DemoMonitorController.getAirportGeo()` (one fetch on
+mount), so the per-event payloads stay small.
+
 ### 3c. Chat booking pipeline (agent)
 
 The `Skywave_Airlines_Agent` runs a deterministic booking ladder. The flow and

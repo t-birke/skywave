@@ -74,6 +74,8 @@ public class Skywave_ChangeSeat {
             List<Booking_Segment__c> segs = [
                 SELECT Id, Seat_Number__c,
                        Booking__r.Confirmation_Code__c, Booking__r.Status__c,
+                       Booking__r.Contact__c, Booking__r.Contact__r.Session_Id__c,
+                       Booking__r.Contact__r.Demo_Session__c,
                        Flight__r.Flight_Number__c
                 FROM Booking_Segment__c
                 WHERE Id = :segmentId
@@ -88,6 +90,28 @@ public class Skywave_ChangeSeat {
             r.oldSeat = seg.Seat_Number__c;
             seg.Seat_Number__c = newSeat;
             update seg;
+
+            // Live monitor: append a seat badge to the visitor's bubble.
+            // Best-effort — never blocks the seat change.
+            try {
+                String deviceId = seg.Booking__r.Contact__r != null
+                    ? seg.Booking__r.Contact__r.Session_Id__c : null;
+                Id demoSessionId = seg.Booking__r.Contact__r != null
+                    ? seg.Booking__r.Contact__r.Demo_Session__c : null;
+                if (String.isNotBlank(deviceId)) {
+                    Skywave_RestUtil.publishEvent(
+                        'seat_changed',
+                        deviceId,
+                        demoSessionId,
+                        new Map<String, Object>{
+                            'seat'         => newSeat,
+                            'oldSeat'      => r.oldSeat,
+                            'flightNumber' => seg.Flight__r.Flight_Number__c,
+                            'bookingCode'  => seg.Booking__r.Confirmation_Code__c
+                        }
+                    );
+                }
+            } catch (Exception ignore) { /* best-effort */ }
 
             r.success = true;
             r.bookingCode = seg.Booking__r.Confirmation_Code__c;
