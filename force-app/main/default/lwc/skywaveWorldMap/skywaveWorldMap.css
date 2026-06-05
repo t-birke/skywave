@@ -57,14 +57,6 @@
     fill: var(--sw-map-ocean);
 }
 
-.sw-map-grid {
-    stroke: rgba(168, 188, 216, 0.10);
-    stroke-width: 0.25;
-}
-.sw-map-grid-faint {
-    stroke: rgba(168, 188, 216, 0.05);
-}
-
 .sw-map-land path {
     fill: var(--sw-map-land);
     stroke: var(--sw-map-land-edge);
