@@ -90,20 +90,25 @@ export default class SkywaveDemoMonitor extends LightningElement {
     }
 
     _placement(s) {
-        // Once a route exists, plot the avatar at the route midpoint — for a
-        // direct it's the geographic centre, for a connection it's the
-        // hub airport. Falls back to the visitor's IP-geo location, else null.
+        // Once a route exists, plot the avatar somewhere on the trip line.
+        // Direct flights use the geographic centre. Connections use the
+        // midpoint of the SECOND leg (hub → destination) — putting it at
+        // the hub itself stacks every connecting visitor on JFK.
+        // Falls back to the visitor's IP-geo location, else null.
         if (s.route && s.route.legs && s.route.legs.length) {
             const pts = this._routePoints(s.route.legs);
-            if (pts.length >= 2) {
-                if (pts.length === 2) {
-                    return {
-                        lat: (pts[0][1] + pts[1][1]) / 2,
-                        lon: (pts[0][0] + pts[1][0]) / 2
-                    };
-                }
-                // Connection: middle waypoint is the hub.
-                return { lat: pts[1][1], lon: pts[1][0] };
+            if (pts.length === 2) {
+                return {
+                    lat: (pts[0][1] + pts[1][1]) / 2,
+                    lon: (pts[0][0] + pts[1][0]) / 2
+                };
+            }
+            if (pts.length >= 3) {
+                // pts = [origin, hub, dest]; middle of second leg = midpoint(hub, dest).
+                return {
+                    lat: (pts[1][1] + pts[2][1]) / 2,
+                    lon: (pts[1][0] + pts[2][0]) / 2
+                };
             }
         }
         if (typeof s.lat === 'number' && typeof s.lon === 'number') {
