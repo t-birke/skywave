@@ -43,6 +43,9 @@ public with sharing class Skywave_ResolveSession {
 
         @InvocableVariable(label='Resolved Contact Id (for booking actions)')
         public String contactId;
+
+        @InvocableVariable(label='Home airport (IATA) derived from IP geolocation')
+        public String homeAirport;
     }
 
     @InvocableMethod(
@@ -72,7 +75,8 @@ public with sharing class Skywave_ResolveSession {
         }
 
         List<Contact> contacts = [
-            SELECT Id, Skywave_Survey_Json__c, Skywave_Survey_Summary__c
+            SELECT Id, Skywave_Survey_Json__c, Skywave_Survey_Summary__c,
+                   Home_Airport__c, Geo_City__c
             FROM Contact
             WHERE Skywave_Conversation_Id__c = :conversationId
             LIMIT 1
@@ -82,6 +86,7 @@ public with sharing class Skywave_ResolveSession {
         }
         Contact c = contacts[0];
         out.contactId = c.Id;
+        out.homeAirport = c.Home_Airport__c;
 
         if (String.isNotBlank(c.Skywave_Survey_Json__c)) {
             out.responsesJson = c.Skywave_Survey_Json__c;
@@ -94,6 +99,16 @@ public with sharing class Skywave_ResolveSession {
         }
         if (String.isNotBlank(c.Skywave_Survey_Summary__c)) {
             out.summary = c.Skywave_Survey_Summary__c;
+        }
+        // Weave the IP-derived home airport into the summary so the booking
+        // subagent can default the origin without a separate action.
+        if (String.isNotBlank(c.Home_Airport__c)) {
+            String locale = String.isNotBlank(c.Geo_City__c)
+                ? c.Geo_City__c + ' (nearest Skywave airport ' + c.Home_Airport__c + ')'
+                : c.Home_Airport__c;
+            out.summary = (String.isBlank(out.summary) ? '' : out.summary + ' ')
+                + 'The visitor appears to be near ' + locale
+                + '; use ' + c.Home_Airport__c + ' as the default origin airport unless they say otherwise.';
         }
 
         return out;

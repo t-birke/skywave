@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Home_Airport__c</fullName>
+    <label>Home Airport</label>
+    <type>Text</type>
+    <length>3</length>
+    <required>false</required>
+    <description>Nearest Skywave network airport (IATA) derived from geo lat/lon. The chat agent uses it as the default booking origin.</description>
+</CustomField>

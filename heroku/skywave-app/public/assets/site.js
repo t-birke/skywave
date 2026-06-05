@@ -56,6 +56,34 @@ async function loadConfig() {
     } catch (e) { console.warn('config fetch failed', e); }
 }
 
+// Resolve the visitor's approximate location from their IP via ipinfo.io
+// (token served from /api/config, see SECRETS.md). Best-effort: on any
+// failure we leave state.geo null and the booking flow just won't have a
+// pre-filled home airport. ipinfo returns loc as "lat,lon".
+async function loadGeo() {
+    const token = config?.ipinfoToken;
+    if (!token) { console.log('[geo] no ipinfo token; skipping'); return; }
+    try {
+        const res = await fetch(`https://ipinfo.io/json?token=${token}`);
+        const data = await res.json();
+        let lat = null, lon = null;
+        if (typeof data.loc === 'string' && data.loc.includes(',')) {
+            const [la, lo] = data.loc.split(',');
+            lat = parseFloat(la); lon = parseFloat(lo);
+        }
+        state.geo = {
+            city: data.city || null,
+            region: data.region || null,
+            country: data.country || null,
+            lat: Number.isFinite(lat) ? lat : null,
+            lon: Number.isFinite(lon) ? lon : null
+        };
+        console.log('[geo] resolved:', state.geo);
+    } catch (e) {
+        console.warn('[geo] ipinfo lookup failed', e);
+    }
+}
+
 // Load the ECv2 (Enhanced Messaging for Web v2) chat snippet. Idempotent —
 // safe to call multiple times. Wires the deviceId as a hidden prechat
 // parameter (`Session_ID`) and immediately hides the chat button until a
@@ -245,7 +273,8 @@ let state = {
     surveyIndex: 0,      // which question we're showing
     answeredKeys: new Set(), // questionKeys we've already answered (idempotency)
     answers: {},         // questionKey → { questionText, answerText, answerKey }
-    surveyComplete: false // true once we've POSTed the survey summary upstream
+    surveyComplete: false, // true once we've POSTed the survey summary upstream
+    geo: null            // { city, region, country, lat, lon } from ipinfo.io, or null
 };
 
 // Effective stage shown to the visitor.
@@ -721,13 +750,23 @@ function postSurveyComplete() {
         catch (_) { return null; }
     })();
     if (!sdkId) return;
-    postContactUpsert({
+    const payload = {
         type: 'survey_complete',
         deviceId: sdkId,
         demoSessionId: state.demoSessionId,
         responsesJson: JSON.stringify(state.answers),
         summary
-    });
+    };
+    // Attach IP geolocation if we resolved it — lets the backend derive a
+    // home airport and pre-fill the booking origin. Optional.
+    if (state.geo) {
+        if (state.geo.city)    payload.geoCity    = state.geo.city;
+        if (state.geo.region)  payload.geoRegion  = state.geo.region;
+        if (state.geo.country) payload.geoCountry = state.geo.country;
+        if (state.geo.lat != null) payload.geoLat = state.geo.lat;
+        if (state.geo.lon != null) payload.geoLon = state.geo.lon;
+    }
+    postContactUpsert(payload);
 }
 
 function renderThanks() {
@@ -753,5 +792,8 @@ function renderThanks() {
 
 (async () => {
     await loadConfig();
+    // Kick off IP geolocation in the background — don't block the consent
+    // screen on it. It just needs to be resolved by survey-complete.
+    loadGeo();
     renderConsent();
 })();

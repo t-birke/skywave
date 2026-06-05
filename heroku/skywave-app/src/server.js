@@ -34,6 +34,11 @@ app.get('/healthz', (_, res) => {
 app.get('/api/config', (_, res) => {
     res.json({
         interactionsSdkUrl: process.env.SF_INTERACTIONS_SDK_URL || null,
+        // ipinfo.io token for client-side IP geolocation. Free-tier token,
+        // exposed to the browser by design (ipinfo scopes it to a domain),
+        // but served from a Heroku Config Var so it stays out of the repo
+        // per SECRETS.md. Geolocation is skipped if unset.
+        ipinfoToken: process.env.IPINFO_TOKEN || null,
         esw: {
             orgId:    process.env.SF_ESW_ORG_ID    || null,
             escName:  process.env.SF_ESW_ESC_NAME  || null,

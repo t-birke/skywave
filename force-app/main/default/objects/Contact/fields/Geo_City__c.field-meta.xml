@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Geo_City__c</fullName>
+    <label>Geo City</label>
+    <type>Text</type>
+    <length>120</length>
+    <required>false</required>
+    <description>City from IP geolocation at survey time (ipinfo.io).</description>
+</CustomField>

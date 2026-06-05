@@ -62,6 +62,19 @@ global without sharing class Skywave_ContactUpsert {
             }
             ev.Survey_Json__c    = responsesJson;
             ev.Survey_Summary__c = summary;
+
+            // Optional IP-geolocation captured client-side at survey time
+            // (ipinfo.io). Best-effort — absent values just mean the
+            // visitor's home airport can't be pre-filled. lat/lon may
+            // arrive as numbers or numeric strings; coerce defensively.
+            Object city    = body.get('geoCity');
+            Object region  = body.get('geoRegion');
+            Object country = body.get('geoCountry');
+            if (city    != null) ev.Geo_City__c    = String.valueOf(city);
+            if (region  != null) ev.Geo_Region__c  = String.valueOf(region);
+            if (country != null) ev.Geo_Country__c = String.valueOf(country);
+            ev.Geo_Latitude__c  = toDecimal(body.get('geoLat'));
+            ev.Geo_Longitude__c = toDecimal(body.get('geoLon'));
         } else {
             String conversationId = String.valueOf(body.get('conversationId'));
             if (String.isBlank(conversationId)) {
@@ -79,6 +92,15 @@ global without sharing class Skywave_ContactUpsert {
 
         res.statusCode = 202;
         res.responseBody = Blob.valueOf('{"ok":true}');
+    }
+
+    private static Decimal toDecimal(Object v) {
+        if (v == null) return null;
+        if (v instanceof Decimal) return (Decimal) v;
+        if (v instanceof Integer) return (Decimal) (Integer) v;
+        if (v instanceof Double)  return Decimal.valueOf((Double) v);
+        try { return Decimal.valueOf(String.valueOf(v)); }
+        catch (Exception e) { return null; }
     }
 
     private static void errorOut(RestResponse res, Integer status, String code) {

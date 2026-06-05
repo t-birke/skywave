@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Geo_Latitude__c</fullName>
+    <label>Geo_Latitude</label>
+    <description>IP geolocation coordinate carried from the consumer site (survey_complete). Stamped onto Contact.Geo_Latitude__c.</description>
+    <type>Number</type>
+    <precision>9</precision>
+    <scale>6</scale>
+    <required>false</required>
+</CustomField>

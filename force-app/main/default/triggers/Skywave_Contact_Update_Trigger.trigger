@@ -114,6 +114,19 @@ trigger Skywave_Contact_Update_Trigger on Skywave_Contact_Update__e (after inser
             if (ev.Update_Type__c == 'survey_complete') {
                 if (String.isNotBlank(ev.Survey_Json__c))    c.Skywave_Survey_Json__c    = ev.Survey_Json__c;
                 if (String.isNotBlank(ev.Survey_Summary__c)) c.Skywave_Survey_Summary__c = ev.Survey_Summary__c;
+                // IP geolocation (best-effort). When we have coordinates,
+                // derive the nearest network airport as the default booking
+                // origin for the chat agent.
+                if (String.isNotBlank(ev.Geo_City__c))    c.Geo_City__c    = ev.Geo_City__c;
+                if (String.isNotBlank(ev.Geo_Region__c))  c.Geo_Region__c  = ev.Geo_Region__c;
+                if (String.isNotBlank(ev.Geo_Country__c)) c.Geo_Country__c = ev.Geo_Country__c;
+                if (ev.Geo_Latitude__c != null)  c.Geo_Latitude__c  = ev.Geo_Latitude__c;
+                if (ev.Geo_Longitude__c != null) c.Geo_Longitude__c = ev.Geo_Longitude__c;
+                if (ev.Geo_Latitude__c != null && ev.Geo_Longitude__c != null) {
+                    String airport = Skywave_Airports.nearest(
+                        ev.Geo_Latitude__c, ev.Geo_Longitude__c);
+                    if (airport != null) c.Home_Airport__c = airport;
+                }
                 demoEventsToPublish.add(new Demo_Event__e(
                     Type__c           = 'survey_complete',
                     Session_Id__c     = deviceId,
