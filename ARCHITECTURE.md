@@ -147,8 +147,11 @@ Skywave_RestUtil.publishEvent(...) ─┐
                                     │
                                     ▼
           skywaveWorldMap LWC  (presentational; equirectangular SVG map
-                                with continent silhouettes, route polylines,
-                                and absolutely-positioned avatar bubbles)
+                                with continent silhouettes — derived from
+                                Natural Earth 110m world atlas land geometry,
+                                projected and inlined as ./landPath.js — plus
+                                route polylines and absolutely-positioned
+                                avatar bubbles)
             • places/relocates the visitor's bubble on the world map
             • draws the route line on flight_booked
             • appends seat badge on seat_changed

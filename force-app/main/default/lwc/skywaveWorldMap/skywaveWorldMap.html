@@ -13,41 +13,12 @@
             <line x1="0" y1="66.5" x2="360" y2="66.5" class="sw-map-grid sw-map-grid-faint"/>
             <line x1="0" y1="113.5" x2="360" y2="113.5" class="sw-map-grid sw-map-grid-faint"/>
 
-            <!-- Continents (stylised silhouettes; viewBox = lon+180, 90-lat).
-                 Cartographic accuracy intentionally relaxed — the audience
-                 reads "world map" at a glance, and bubble placement is exact
-                 by lat/lon math regardless. -->
+            <!-- Continents — single combined Natural-Earth-derived path
+                 (110m world-atlas land geometry, simplified to drop very
+                 small islands then projected equirectangular). The path
+                 string lives in landPath.js for readability. -->
             <g class="sw-map-land">
-                <!-- North America -->
-                <path d="M 22,40 L 56,30 L 88,28 L 102,38 L 100,52 L 94,62 L 80,74 L 68,86 L 60,86 L 56,76 L 42,72 L 30,68 L 18,58 L 14,46 Z"/>
-                <!-- Greenland -->
-                <path d="M 110,18 L 130,16 L 138,28 L 130,40 L 116,38 L 108,28 Z"/>
-                <!-- Central America strip -->
-                <path d="M 80,80 L 90,82 L 96,90 L 92,96 L 86,92 L 80,86 Z"/>
-                <!-- South America -->
-                <path d="M 96,96 L 116,94 L 124,108 L 122,128 L 114,148 L 104,158 L 98,150 L 96,128 L 94,108 Z"/>
-                <!-- Europe -->
-                <path d="M 168,46 L 200,40 L 212,46 L 210,58 L 196,66 L 180,68 L 170,60 Z"/>
-                <!-- Africa -->
-                <path d="M 174,72 L 210,68 L 222,80 L 224,100 L 216,118 L 204,134 L 194,138 L 184,130 L 178,114 L 172,96 L 168,82 Z"/>
-                <!-- Middle East / Arabian peninsula -->
-                <path d="M 218,72 L 232,68 L 240,80 L 234,92 L 222,90 Z"/>
-                <!-- Asia -->
-                <path d="M 212,38 L 256,30 L 296,32 L 314,46 L 308,60 L 286,68 L 264,72 L 248,68 L 232,62 L 216,56 Z"/>
-                <!-- South Asia (India peninsula) -->
-                <path d="M 250,72 L 264,72 L 268,84 L 262,94 L 254,90 Z"/>
-                <!-- South-East Asia / archipelagos -->
-                <path d="M 282,80 L 304,78 L 316,86 L 310,98 L 296,98 L 286,90 Z"/>
-                <!-- Australia -->
-                <path d="M 304,116 L 332,114 L 344,124 L 340,136 L 322,138 L 308,130 Z"/>
-                <!-- New Zealand -->
-                <path d="M 348,140 L 354,140 L 354,152 L 348,152 Z"/>
-                <!-- UK + Ireland (small) -->
-                <path d="M 174,46 L 180,44 L 182,52 L 178,56 L 172,52 Z"/>
-                <!-- Japan (small) -->
-                <path d="M 314,52 L 320,50 L 322,58 L 318,62 L 314,58 Z"/>
-                <!-- Madagascar -->
-                <path d="M 226,116 L 230,118 L 230,128 L 226,128 Z"/>
+                <path d={landPath}/>
             </g>
 
             <!-- Routes: drawn over land, under bubbles. -->
@@ -85,6 +56,14 @@
                                 <span class="sw-bubble-seat-icon">💺</span>{b.seat}
                             </span>
                         </template>
+                        <template lwc:if={b.hasAnswers}>
+                            <span class="sw-bubble-answers">
+                                <template for:each={b.answers} for:item="a">
+                                    <img key={a.key} class="sw-bubble-answer-thumb"
+                                         src={a.imageUrl} alt={a.answerText} title={a.answerText}/>
+                                </template>
+                            </span>
+                        </template>
                     </div>
                 </div>
             </template>
@@ -111,6 +90,14 @@
                             <template lwc:if={b.seat}>
                                 <span class="sw-bubble-seat">
                                     <span class="sw-bubble-seat-icon">💺</span>{b.seat}
+                                </span>
+                            </template>
+                            <template lwc:if={b.hasAnswers}>
+                                <span class="sw-bubble-answers">
+                                    <template for:each={b.answers} for:item="a">
+                                        <img key={a.key} class="sw-bubble-answer-thumb"
+                                             src={a.imageUrl} alt={a.answerText} title={a.answerText}/>
+                                    </template>
                                 </span>
                             </template>
                         </div>

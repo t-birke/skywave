@@ -16,8 +16,11 @@
  * `bubbles[]` and `routes[]` already shaped for render.
  */
 import { LightningElement, api } from 'lwc';
+import { WORLD_LAND_PATH } from './landPath.js';
 
 export default class SkywaveWorldMap extends LightningElement {
+    landPath = WORLD_LAND_PATH;
+
     /** [{ id, lat, lon, label, avatarUrl, seat, status, hasLocation }] */
     @api bubbles = [];
     /** [{ id, points: [[lon,lat], ...], isConnection }] */
@@ -42,12 +45,20 @@ export default class SkywaveWorldMap extends LightningElement {
 
     _decorate(b, style) {
         const label = b.label || (b.id ? b.id.slice(-6) : '?');
+        // Survey thumbs: ensure each has a stable key + a sane title for hover.
+        const answers = (b.answers || []).filter(a => a && a.imageUrl).map(a => ({
+            key: b.id + ':' + a.questionKey,
+            imageUrl: a.imageUrl,
+            answerText: a.answerText || a.answerKey || ''
+        }));
         return {
             ...b,
             style,
             label,
             initial: (label || '?').charAt(0).toUpperCase(),
-            tooltip: this._tooltip(b)
+            tooltip: this._tooltip(b),
+            answers,
+            hasAnswers: answers.length > 0
         };
     }
 

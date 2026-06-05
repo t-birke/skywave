@@ -58,7 +58,10 @@ export default class SkywaveDemoMonitor extends LightningElement {
                 city: s.city || null,
                 lat: place ? place.lat : null,
                 lon: place ? place.lon : null,
-                hasLocation: !!place
+                hasLocation: !!place,
+                // Survey thumbs the visitor has answered — rendered as a strip
+                // on the bubble. Each is { questionKey, answerKey, answerText, imageUrl }.
+                answers: Array.isArray(s.answers) ? s.answers : []
             };
         });
     }
