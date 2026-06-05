@@ -10,18 +10,21 @@
 # Enable once per clone:   git config core.hooksPath .githooks
 # (README documents this; orgInit.sh could also set it.)
 
-staged="$(git diff --cached --name-only --diff-filter=ACDR)"
-[ -z "$staged" ] && exit 0
+# All staged paths (any change type) — used to detect whether ARCHITECTURE.md
+# itself is part of this commit.
+staged_all="$(git diff --cached --name-only)"
+[ -z "$staged_all" ] && exit 0
 
-# Paths whose addition/removal/rename likely changes the architecture picture.
-structural_re='^(force-app/main/default/(classes|triggers|objects|lwc|aiAuthoringBundles)/|heroku/skywave-app/src/|scripts/)'
-
-structural_changes="$(echo "$staged" | grep -E "$structural_re" || true)"
-[ -z "$structural_changes" ] && exit 0
-
-if echo "$staged" | grep -qx 'ARCHITECTURE.md'; then
+if echo "$staged_all" | grep -qx 'ARCHITECTURE.md'; then
     exit 0   # doc is part of this commit — assume it was reviewed.
 fi
+
+# Structural trigger: added/modified/deleted/renamed code or config whose
+# change likely affects the architecture picture.
+structural_re='^(force-app/main/default/(classes|triggers|objects|lwc|aiAuthoringBundles)/|heroku/skywave-app/src/|scripts/)'
+
+structural_changes="$(echo "$staged_all" | grep -E "$structural_re" || true)"
+[ -z "$structural_changes" ] && exit 0
 
 # New or deleted structural files are the strongest signal the doc may drift.
 added_deleted="$(git diff --cached --name-only --diff-filter=AD | grep -E "$structural_re" || true)"
