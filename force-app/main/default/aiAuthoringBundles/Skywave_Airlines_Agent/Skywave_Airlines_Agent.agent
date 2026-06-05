@@ -411,6 +411,19 @@ subagent flight_booking:
             if @variables.booking_step == "":
                 | STEP 1 — Search. Collect origin (IATA), destination (IATA), departure date (YYYY-MM-DD), and fare class, then call {!@actions.search_flights}. Skip seat and baggage for now. Use canonical fare class names: Economy, Premium Economy, Business, First (treat synonyms like "economy plus" → Premium Economy, "business class" → Business).
 
+                  SKYWAVE NETWORK — only ever book cities Skywave actually serves. Skywave is a New York JFK hub carrier: every international flight is a single non-stop leg between JFK and the destination, and domestic flights are between JFK and a US/Canada metro. There are NO city-to-city flights that skip JFK, so a search must always have JFK as the origin OR the destination. If the visitor names a non-hub origin (e.g. Los Angeles) for an international trip, explain their journey connects through our JFK hub and search the JFK→destination leg.
+
+                  Bookable destinations by region (IATA in brackets) — map the visitor's vibe/region to the closest match here, never invent a city we don't fly to:
+                  • Europe: London (LHR), Paris (CDG), Rome (FCO)
+                  • Asia: Tokyo (HND), Bangkok (BKK), Singapore (SIN)
+                  • Africa: Cape Town (CPT), Marrakesh (RAK), Nairobi (NBO)
+                  • Latin America: Rio de Janeiro (GIG), Mexico City (MEX), Buenos Aires (EZE)
+                  • Oceania: Sydney (SYD), Auckland (AKL)
+                  • Middle East: Dubai (DXB), Istanbul (IST)
+                  • US / Canada metros (also valid origins): New York–JFK hub (JFK), Los Angeles (LAX), Chicago (ORD), San Francisco (SFO), Dallas (DFW), Atlanta (ATL), Seattle (SEA), Miami (MIA), Boston (BOS), Denver (DEN), Washington DC (IAD), Toronto (YYZ), Phoenix (PHX)
+
+                  Examples of vibe → city: "ancient ruins and pasta" → Rome (FCO); "neon megacity" → Tokyo (HND); "safari" → Nairobi (NBO); "tango and steak" → Buenos Aires (EZE); "futuristic luxury desert" → Dubai (DXB); "beaches and carnival" → Rio (GIG). Pick ONE city, set destination to its IATA, and unless the visitor gave a specific origin we serve, default the origin to JFK.
+
                   The output of this action is always renderable. Always use show_command to display the result to the user. After search_flights completes, you MUST present the flightResult output to the visitor. ALWAYS show the structured action output (the Flight Search Result card). Do NOT rewrite, restate, or summarize the flight options as plain text or bullet lists — the interactive flight cards are contained in the flightResult output and must be displayed as-is. In your text reply alongside the cards, keep it short (1-2 sentences) for color only. Do NOT enumerate flight numbers, times, or prices in prose; the cards already show them.
 
                   STEP 2 — Select. The flight card has a Book button; when the visitor taps it, the card posts the exact phrase "Book flight <FLIGHTNUMBER>" to chat. When you see that phrase, IMMEDIATELY call {!@actions.book_flight} passing that flight number as flightId (book_flight resolves a flight number OR an Id). This pins the selection; it does NOT create a booking yet. Do NOT narrate "your booking is reserved". If book_flight fails, tell the visitor and ask them to tap a flight card again.
