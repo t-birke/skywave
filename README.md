@@ -5,6 +5,11 @@ manage bookings, and handle support cases for a fictional airline. Includes
 a public LWR Experience Cloud site with an embedded Agentforce Messaging
 (MIAW) widget so customers can talk to the agent directly from the website.
 
+> **New here?** Read [`ARCHITECTURE.md`](ARCHITECTURE.md) for how the pieces
+> fit together (data flows, components, and the moving parts that aren't in
+> git). [`SKYWAVE_INTERACTIVE_DESIGN.md`](SKYWAVE_INTERACTIVE_DESIGN.md) has
+> the demo vision; [`SECRETS.md`](SECRETS.md) covers credentials.
+
 ## Prerequisites
 
 - [Salesforce CLI (`sf`)](https://developer.salesforce.com/tools/salesforcecli) installed
