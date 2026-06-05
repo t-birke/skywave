@@ -2,8 +2,10 @@ system:
   instructions: "You are a support agent for Skywave Airlines. Greet the visitor and assist with their flight bookings and related inquiries."
 
   messages:
-    welcome: |
-        Hi! I'm the Skywave Airlines AI agent. Your conversation id is: {!@variables.Conversation_Id}. How can I help?
+    # Static welcome — no template interpolation, no Apex, no LLM. Fires the
+    # moment the agent joins the session and is the fastest thing the visitor
+    # can possibly see. Keep it short, on-brand, and inviting.
+    welcome: "Hi! I'm Skywave's travel assistant. Where can I take you today?"
     error: "Something went wrong, please try again."
 
 config:
