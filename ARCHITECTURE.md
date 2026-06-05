@@ -176,7 +176,7 @@ must be redone. Treat this as the operational checklist.
 | Queue routing config | org data | General Voice queue repointed to `skywave_routing` (LeastActive) or transfers drop. Not in metadata. (memory) |
 | Agentforce Voice PSTN toggles 6 + 7 | Setup → Agentforce Voice Setup | "Connect Related Voice Calls" + "Record Voice Calls" — empty transcript without them. |
 | Heroku Config Vars | `skywave-app` dyno | `IPINFO_TOKEN`, `SF_ESW_*`, JWT key, etc. See `.env.example` + SECRETS.md. |
-| `Skywave_Demo_Admin` FLS | permset (in git); generator script is **not** tracked | Every new custom field/object must get full FLS on this permset or the presenter hits phantom INVALID_FIELD. The generator (queries FieldDefinition, injects field/object perms, excludes required + master-detail fields) currently lives in the gitignored `.deploy-tmp/` scratch dir — **TODO: promote it to `scripts/`**. (default rule, memory) |
+| `Skywave_Demo_Admin` FLS | permset (in git); regen via `scripts/regen-demo-admin-fls.py` | Every new custom field/object must get full FLS on this permset or the presenter hits phantom INVALID_FIELD. Add it to the script's `OUR_OBJECTS`/`STD_FIELDS`, run the script, deploy the permset. (default rule, memory) |
 | Inactive BotVersions | org | Can't be deleted — every API path is dep-blocked. Failed iterations stay pinned. (memory) |
 
 ---
@@ -195,3 +195,8 @@ must be redone. Treat this as the operational checklist.
 *Keep this current as the system changes. If an entry here would just mirror
 the code, delete it and let the code speak; if it captures a why or an
 out-of-git fact, it belongs here (or as a `MEMORY.md` entry).*
+
+*A pre-commit hook (`.githooks/pre-commit`, enabled via
+`git config core.hooksPath .githooks`) prints a reminder whenever a commit
+touches structural files but not this doc. It never blocks — it just nudges
+you to check whether a flow, component, path, or moving part changed.*

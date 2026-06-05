@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+#
+# Skywave pre-commit: keep ARCHITECTURE.md honest.
+#
+# When a commit touches structural parts of the repo (Apex, triggers, custom
+# objects/fields, LWCs, agents, the Heroku app source, or scripts) but does
+# NOT also stage ARCHITECTURE.md, print a reminder to review it. This is a
+# nudge, not a gate — it never blocks the commit (exit 0 always).
+#
+# Enable once per clone:   git config core.hooksPath .githooks
+# (README documents this; orgInit.sh could also set it.)
+
+staged="$(git diff --cached --name-only --diff-filter=ACDR)"
+[ -z "$staged" ] && exit 0
+
+# Paths whose addition/removal/rename likely changes the architecture picture.
+structural_re='^(force-app/main/default/(classes|triggers|objects|lwc|aiAuthoringBundles)/|heroku/skywave-app/src/|scripts/)'
+
+structural_changes="$(echo "$staged" | grep -E "$structural_re" || true)"
+[ -z "$structural_changes" ] && exit 0
+
+if echo "$staged" | grep -qx 'ARCHITECTURE.md'; then
+    exit 0   # doc is part of this commit — assume it was reviewed.
+fi
+
+# New or deleted structural files are the strongest signal the doc may drift.
+added_deleted="$(git diff --cached --name-only --diff-filter=AD | grep -E "$structural_re" || true)"
+
+yellow='\033[33m'; reset='\033[0m'
+echo -e "${yellow}"
+echo "┌─ ARCHITECTURE.md check ────────────────────────────────────────────┐"
+echo "│ This commit changes structural files but does not touch            │"
+echo "│ ARCHITECTURE.md. Make sure the doc still reflects reality:          │"
+echo "│   • new/removed data flow, component, or out-of-git moving part?    │"
+echo "│   • a path or script name that changed?                             │"
+echo "│ If nothing in the doc needs updating, this commit is fine as-is.    │"
+if [ -n "$added_deleted" ]; then
+    echo "│                                                                    │"
+    echo "│ Added/deleted structural files in this commit:                     │"
+    echo "$added_deleted" | while IFS= read -r f; do echo "│   • $f"; done
+fi
+echo "└────────────────────────────────────────────────────────────────────┘"
+echo -e "${reset}"
+
+exit 0

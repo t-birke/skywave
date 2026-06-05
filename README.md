@@ -27,6 +27,13 @@ npx playwright install chromium
 chmod +x orgInit.sh scripts/createEmbeddedServiceConfig.sh
 ```
 
+Enable the repo git hooks (once per clone) so commits get the
+ARCHITECTURE.md drift reminder:
+
+```sh
+git config core.hooksPath .githooks
+```
+
 ## Getting Started
 
 Run one script. With Playwright installed it runs end-to-end with zero
