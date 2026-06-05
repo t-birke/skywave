@@ -1,0 +1,410 @@
+/* Skywave Airlines website backdrop.
+ *
+ * Ported from skywave-scratch's skywaveAirlinesHome LWC, stripped of:
+ *   - phone-frame simulator + view toggle (we ARE on a phone in production)
+ *   - fake iPhone call UI (demo distraction)
+ *   - LWC-specific framework hooks (renderMode, etc.)
+ *
+ * Re-tokenised: source's #00C9A7 / #00B594 teal swapped to canonical
+ * #14b8a6 / #0d9488 per docs/STYLE_GUIDE.md so the website matches every
+ * other Skywave surface. All styles live under .skywave-site so they
+ * never leak onto the modal layer above.
+ */
+
+.skywave-site,
+.skywave-site *,
+.skywave-site *::before,
+.skywave-site *::after {
+    box-sizing: border-box;
+}
+
+.skywave-site {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0D1B2A;
+    color: #FFFFFF;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+    display: block;
+    min-height: 100vh;
+}
+
+/* ── NAV ──────────────────────────────────────────────────────────────── */
+.skywave-site .nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(9,20,34,0.92);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    height: 68px;
+    padding: 0 48px;
+    display: flex; align-items: center; justify-content: space-between;
+}
+.skywave-site .nav-logo { display: flex; align-items: center; gap: 10px; cursor: pointer; text-decoration: none; }
+.skywave-site .logo-mark {
+    width: 38px; height: 38px;
+    background: #14b8a6;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.skywave-site .logo-mark svg { width: 22px; height: 22px; }
+.skywave-site .logo-text { font-size: 18px; font-weight: 800; letter-spacing: -0.4px; color: #FFFFFF; }
+.skywave-site .logo-text span { color: #14b8a6; }
+
+.skywave-site .nav-links { display: flex; gap: 32px; }
+.skywave-site .nav-links a {
+    font-size: 14px; font-weight: 500;
+    color: rgba(255,255,255,0.55); text-decoration: none; cursor: pointer;
+    transition: color .2s;
+}
+.skywave-site .nav-links a:hover { color: #FFFFFF; }
+.skywave-site .nav-links a.active { color: #14b8a6; }
+
+.skywave-site .nav-right { display: flex; align-items: center; gap: 14px; }
+.skywave-site .pts-chip {
+    display: flex; align-items: center; gap: 7px;
+    background: rgba(20,184,166,0.10);
+    border: 1px solid rgba(20,184,166,0.22);
+    padding: 6px 14px; border-radius: 100px;
+    font-size: 13px; font-weight: 600; color: #14b8a6;
+}
+.skywave-site .pts-chip svg { width: 13px; height: 13px; }
+.skywave-site .nav-user { font-size: 14px; color: rgba(255,255,255,0.80); }
+.skywave-site .nav-btn {
+    font-size: 13px; font-weight: 600;
+    background: #14b8a6; color: #0D1B2A;
+    border: none; padding: 8px 20px; border-radius: 100px;
+    cursor: pointer; transition: background .2s;
+    font-family: inherit;
+}
+.skywave-site .nav-btn:hover { background: #0d9488; }
+
+.skywave-site .hamburger-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #FFFFFF; width: 36px; height: 36px;
+    border-radius: 10px; cursor: pointer;
+    display: none; align-items: center; justify-content: center;
+    transition: background .2s; flex-shrink: 0;
+}
+.skywave-site .hamburger-btn:hover { background: rgba(255,255,255,0.16); }
+.skywave-site .hamburger-btn svg { width: 20px; height: 20px; }
+
+/* ── MOBILE NAV DRAWER ────────────────────────────────────────────────── */
+.skywave-site .mobile-nav-drawer {
+    background: #132030;
+    border-top: 1px solid rgba(255,255,255,0.07);
+    position: sticky; top: 68px; z-index: 99;
+    overflow: hidden; max-height: 0; transition: max-height .3s ease;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.3);
+}
+.skywave-site .mobile-nav-drawer.open { max-height: 400px; }
+.skywave-site .mob-drawer-inner { padding: 8px 20px 20px; }
+.skywave-site .mob-nav-links { display: flex; flex-direction: column; }
+.skywave-site .mob-nav-links a {
+    color: rgba(255,255,255,0.80); text-decoration: none;
+    font-size: 16px; font-weight: 500;
+    padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+    cursor: pointer; transition: color .15s, padding-left .15s; display: block;
+}
+.skywave-site .mob-nav-links a:last-child { border-bottom: none; }
+.skywave-site .mob-nav-links a:hover { color: #14b8a6; padding-left: 6px; }
+.skywave-site .mob-nav-links a.active { color: #14b8a6; }
+.skywave-site .mob-drawer-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 12px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.07);
+}
+.skywave-site .mob-pts-chip {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(20,184,166,0.10); border: 1px solid rgba(20,184,166,0.22);
+    padding: 5px 12px; border-radius: 100px;
+    font-size: 12px; font-weight: 600; color: #14b8a6;
+}
+.skywave-site .mob-user-links { display: flex; gap: 14px; }
+.skywave-site .mob-user-links a { color: rgba(255,255,255,0.55); font-size: 13px; text-decoration: none; cursor: pointer; }
+.skywave-site .mob-user-links a:hover { color: #FFFFFF; }
+
+/* ── HERO ─────────────────────────────────────────────────────────────── */
+.skywave-site .hero {
+    background: #0D1B2A;
+    color: #FFFFFF;
+    min-height: calc(100vh - 68px);
+    padding: 80px 48px 100px;
+    position: relative; overflow: hidden;
+    display: flex; align-items: center;
+}
+.skywave-site .hero-dots {
+    position: absolute; inset: 0; z-index: 0;
+    background-image: radial-gradient(circle, rgba(20,184,166,0.18) 1px, transparent 1px);
+    background-size: 30px 30px;
+    -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 20%, transparent 100%);
+    mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 20%, transparent 100%);
+}
+.skywave-site .hero-glow {
+    position: absolute; z-index: 0;
+    width: 700px; height: 700px;
+    background: radial-gradient(circle, rgba(20,184,166,0.07) 0%, transparent 70%);
+    top: -200px; right: -100px; pointer-events: none;
+}
+.skywave-site .hero-content {
+    position: relative; z-index: 2;
+    max-width: 1200px; margin: 0 auto; width: 100%;
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 80px; align-items: center;
+}
+.skywave-site .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(20,184,166,0.08);
+    border: 1px solid rgba(20,184,166,0.20);
+    padding: 6px 14px; border-radius: 100px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.8px;
+    text-transform: uppercase; color: #14b8a6;
+    margin-bottom: 24px;
+}
+.skywave-site .hero-title {
+    font-size: clamp(40px, 4.5vw, 62px);
+    font-weight: 900; line-height: 1.08;
+    letter-spacing: -2px; margin-bottom: 20px;
+    color: #FFFFFF;
+}
+.skywave-site .hero-title .accent { color: #14b8a6; }
+.skywave-site .hero-sub {
+    font-size: 16px; color: rgba(255,255,255,0.55); line-height: 1.75;
+    max-width: 400px; margin-bottom: 44px;
+}
+.skywave-site .hero-stats { display: flex; gap: 40px; }
+.skywave-site .stat-num { font-size: 26px; font-weight: 900; color: #FFFFFF; }
+.skywave-site .stat-label { font-size: 12px; color: rgba(255,255,255,0.55); margin-top: 3px; }
+
+.skywave-site .hero-plane {
+    position: absolute; z-index: 1;
+    right: 46%; bottom: -20px;
+    width: 340px; opacity: 0.06;
+    pointer-events: none;
+}
+
+/* ── SEARCH CARD ──────────────────────────────────────────────────────── */
+.skywave-site .search-card {
+    background: #FFFFFF;
+    border-radius: 24px;
+    padding: 28px;
+    box-shadow: 0 28px 80px rgba(0,0,0,0.35);
+    color: #1a1a2e;
+}
+.skywave-site .s-tabs {
+    display: flex; gap: 4px;
+    background: #EEF1F5;
+    border-radius: 100px;
+    padding: 4px; margin-bottom: 22px;
+}
+.skywave-site .s-tab {
+    flex: 1; text-align: center;
+    padding: 9px 16px; border-radius: 100px;
+    font-size: 13px; font-weight: 600; color: #888;
+    cursor: pointer; transition: all .2s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.skywave-site .s-tab.active {
+    background: #FFFFFF;
+    color: #0D1B2A;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+}
+.skywave-site .s-tab.active .tab-pip { background: #14b8a6; }
+.skywave-site .tab-pip { width: 7px; height: 7px; border-radius: 50%; background: #ccc; flex-shrink: 0; }
+
+.skywave-site .s-fields { display: flex; flex-direction: column; gap: 10px; }
+.skywave-site .s-field {
+    display: flex; align-items: center; gap: 12px;
+    border: 1.5px solid #E4E8EF;
+    border-radius: 10px;
+    padding: 13px 16px;
+    background: #F7F9FC;
+    transition: border-color .2s, background .2s;
+}
+.skywave-site .s-field:focus-within { border-color: #14b8a6; background: #FFFFFF; }
+.skywave-site .s-field svg { width: 17px; height: 17px; color: #aaa; flex-shrink: 0; }
+.skywave-site .s-field input,
+.skywave-site .s-field select {
+    flex: 1; border: none; background: transparent;
+    font-size: 14px; font-weight: 500; color: #1a1a2e;
+    outline: none; font-family: inherit;
+}
+.skywave-site .s-field input::placeholder { color: #bbb; font-weight: 400; }
+.skywave-site .s-field select { cursor: pointer; }
+.skywave-site .s-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.skywave-site .btn-search {
+    width: 100%; padding: 15px;
+    background: #14b8a6; color: #FFFFFF;
+    border: none; border-radius: 100px;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    margin-top: 14px; letter-spacing: 0.2px;
+    transition: background .2s, transform .15s;
+    font-family: inherit;
+}
+.skywave-site .btn-search:hover { background: #0d9488; transform: translateY(-1px); }
+
+/* ── MAIN ─────────────────────────────────────────────────────────────── */
+.skywave-site .main { background: #F2F5F9; color: #1a1a2e; padding-bottom: 60px; }
+
+/* ── TICKET ───────────────────────────────────────────────────────────── */
+.skywave-site .ticket-strip { max-width: 1200px; margin: 0 auto; padding: 44px 48px 0; }
+.skywave-site .ticket-card {
+    background: #0D1B2A;
+    border-radius: 16px;
+    padding: 26px 32px;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    border: 1px solid rgba(255,255,255,0.05);
+    color: #FFFFFF;
+}
+.skywave-site .ticket-eyebrow {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: #14b8a6; margin-bottom: 10px;
+}
+.skywave-site .ticket-route { display: flex; align-items: center; gap: 18px; margin-bottom: 8px; }
+.skywave-site .t-code { font-size: 34px; font-weight: 900; color: #FFFFFF; }
+.skywave-site .t-line-wrap {
+    flex: 1; max-width: 120px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.skywave-site .t-line { width: 100%; height: 1px; background: rgba(255,255,255,0.15); position: relative; }
+.skywave-site .t-line::before {
+    content: ''; position: absolute; left: -4px; top: -4px;
+    width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.25);
+}
+.skywave-site .t-line::after {
+    content: ''; position: absolute; right: -4px; top: -4px;
+    width: 8px; height: 8px; border-radius: 50%; background: #14b8a6;
+}
+.skywave-site .t-dur { font-size: 11px; color: rgba(255,255,255,0.55); }
+.skywave-site .ticket-meta { font-size: 13px; color: rgba(255,255,255,0.55); line-height: 1.6; }
+.skywave-site .ticket-meta strong { color: #FFFFFF; }
+.skywave-site .ticket-links { display: flex; gap: 16px; margin-top: 12px; flex-wrap: wrap; }
+.skywave-site .ticket-links a { font-size: 12px; font-weight: 600; color: #14b8a6; text-decoration: none; cursor: pointer; }
+.skywave-site .ticket-links a:hover { text-decoration: underline; }
+.skywave-site .btn-manage {
+    background: #14b8a6; color: #0D1B2A;
+    border: none; padding: 11px 24px; border-radius: 100px;
+    font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+    transition: background .2s; font-family: inherit;
+}
+.skywave-site .btn-manage:hover { background: #0d9488; }
+
+/* ── DEALS ────────────────────────────────────────────────────────────── */
+.skywave-site .section { max-width: 1200px; margin: 0 auto; padding: 48px 48px 0; }
+.skywave-site .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
+.skywave-site .section-title { font-size: 20px; font-weight: 800; color: #0D1B2A; }
+.skywave-site .section-more {
+    font-size: 13px; font-weight: 600; color: #14b8a6;
+    text-decoration: none; cursor: pointer; display: flex; align-items: center; gap: 4px;
+}
+.skywave-site .section-more:hover { text-decoration: underline; }
+.skywave-site .deals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.skywave-site .deal-card {
+    background: #FFFFFF; border-radius: 16px;
+    overflow: hidden; cursor: pointer;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+    border: 1px solid rgba(0,0,0,0.04);
+    transition: transform .2s, box-shadow .2s;
+}
+.skywave-site .deal-card:hover { transform: translateY(-4px); box-shadow: 0 14px 40px rgba(0,0,0,0.11); }
+.skywave-site .deal-img { height: 140px; display: flex; align-items: center; justify-content: center; font-size: 54px; }
+.skywave-site .deal-img.c1 { background: linear-gradient(135deg, #0D1B2A 0%, #1e3a52 100%); }
+.skywave-site .deal-img.c2 { background: linear-gradient(135deg, #003D35 0%, #00695C 100%); }
+.skywave-site .deal-img.c3 { background: linear-gradient(135deg, #1a0533 0%, #4a1278 100%); }
+.skywave-site .deal-body { padding: 18px 20px; }
+.skywave-site .deal-tag {
+    display: inline-block;
+    background: rgba(20,184,166,0.10); color: #14b8a6;
+    font-size: 10px; font-weight: 700; padding: 3px 10px;
+    border-radius: 100px; margin-bottom: 8px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.skywave-site .deal-body h4 { font-size: 15px; font-weight: 800; color: #0D1B2A; margin-bottom: 5px; }
+.skywave-site .deal-body p  { font-size: 13px; color: #777; line-height: 1.55; }
+
+/* ── POINTS BANNER ────────────────────────────────────────────────────── */
+.skywave-site .pts-banner { max-width: 1200px; margin: 0 auto; padding: 32px 48px; }
+.skywave-site .pts-inner {
+    background: #0D1B2A;
+    border-radius: 24px;
+    padding: 44px 48px;
+    display: flex; align-items: center; justify-content: space-between; gap: 40px;
+    position: relative; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.05);
+    color: #FFFFFF;
+}
+.skywave-site .pts-inner::before {
+    content: '';
+    position: absolute; top: -100px; right: -80px;
+    width: 360px; height: 360px;
+    background: radial-gradient(circle, rgba(20,184,166,0.12), transparent 70%);
+    pointer-events: none;
+}
+.skywave-site .pts-inner h3 { font-size: 26px; font-weight: 900; margin-bottom: 10px; position: relative; color: #FFFFFF; }
+.skywave-site .pts-inner p  { font-size: 14px; color: rgba(255,255,255,0.55); max-width: 460px; line-height: 1.75; position: relative; }
+.skywave-site .btn-pts {
+    background: #14b8a6; color: #0D1B2A;
+    border: none; padding: 14px 32px; border-radius: 100px;
+    font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap;
+    transition: background .2s; position: relative; font-family: inherit;
+}
+.skywave-site .btn-pts:hover { background: #0d9488; }
+
+/* ── FOOTER ───────────────────────────────────────────────────────────── */
+.skywave-site .sw-footer { background: #091422; padding: 64px 48px 40px; color: rgba(255,255,255,0.55); font-size: 13px; }
+.skywave-site .footer-inner {
+    max-width: 1200px; margin: 0 auto;
+    display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px;
+    padding-bottom: 44px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    margin-bottom: 32px;
+}
+.skywave-site .footer-brand p { max-width: 260px; line-height: 1.75; margin-top: 14px; }
+.skywave-site .sw-footer h5 { color: #FFFFFF; font-size: 13px; font-weight: 700; margin-bottom: 16px; }
+.skywave-site .sw-footer a { display: block; color: rgba(255,255,255,0.55); text-decoration: none; margin-bottom: 10px; cursor: pointer; transition: color .2s; }
+.skywave-site .sw-footer a:hover { color: #FFFFFF; }
+.skywave-site .footer-bottom {
+    max-width: 1200px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between; font-size: 12px;
+}
+
+/* ── RESPONSIVE ───────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+    .skywave-site .ticket-strip,
+    .skywave-site .section,
+    .skywave-site .pts-banner { padding-left: 28px; padding-right: 28px; }
+    .skywave-site .sw-footer  { padding: 48px 28px 32px; }
+    .skywave-site .pts-inner  { padding: 32px 36px; }
+    .skywave-site .nav        { padding: 0 28px; }
+    .skywave-site .hero       { padding: 60px 28px 80px; }
+    .skywave-site .hero-content { gap: 48px; }
+    .skywave-site .hero-title   { font-size: 44px; }
+}
+@media (max-width: 768px) {
+    .skywave-site .ticket-strip { padding: 32px 20px 0; }
+    .skywave-site .ticket-card  { flex-direction: column; align-items: flex-start; }
+    .skywave-site .section      { padding: 36px 20px 0; }
+    .skywave-site .deals-grid   { grid-template-columns: 1fr; }
+    .skywave-site .pts-banner   { padding: 24px 20px; }
+    .skywave-site .pts-inner    { flex-direction: column; gap: 24px; padding: 28px; }
+    .skywave-site .sw-footer    { padding: 40px 20px 28px; }
+    .skywave-site .footer-inner { grid-template-columns: 1fr 1fr; gap: 32px; }
+    .skywave-site .s-row        { grid-template-columns: 1fr; }
+    .skywave-site .nav-links    { display: none; }
+    .skywave-site .nav          { padding: 0 20px; }
+    .skywave-site .hero         { padding: 48px 20px 64px; min-height: auto; }
+    .skywave-site .hero-content { grid-template-columns: 1fr; gap: 36px; }
+    .skywave-site .hero-title   { font-size: 38px; letter-spacing: -1.5px; }
+    .skywave-site .hero-plane   { display: none; }
+    .skywave-site .hero-stats   { gap: 24px; }
+
+    /* Mobile shows the hamburger; hide desktop-only chrome. */
+    .skywave-site .desktop-item { display: none !important; }
+    .skywave-site .hamburger-btn { display: flex; }
+}
+@media (max-width: 480px) {
+    .skywave-site .footer-inner   { grid-template-columns: 1fr; }
+    .skywave-site .footer-bottom  { flex-direction: column; gap: 8px; text-align: center; }
+    .skywave-site .deals-grid     { grid-template-columns: 1fr; }
+    .skywave-site .hero-title     { font-size: 32px; }
+}

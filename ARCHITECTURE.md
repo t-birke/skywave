@@ -60,6 +60,8 @@ the stage list and the rationale (it replaced a manual "check state" button).
 | ├ `lwc/` | Chat/voice cards (CLT renderers), demo monitor, survey author, contact card |
 | ├ `objects/` | Custom objects + the Platform Events + custom fields on Contact/VoiceCall |
 | `heroku/skywave-app/` | Node app: static consumer site + WebSocket state relay |
+| └ `public/assets/website.css/.js` | Skywave Airlines marketing-site backdrop (nav, hero, search, deals, footer). Visible to every audience phone behind the demo modal. Extensible target for future booking/account features. |
+| └ `public/assets/site.css/.js` | The demo flow itself. Renders into a centered modal (`#modal-content`) overlaid on the website backdrop. Modal is hidden during agent stages so the chat icon takes over. Closable any time via X. |
 | `scripts/` | Org-setup, agent deploy/republish, ESD publish (Playwright), seeders |
 | `scripts/apex/` | Anonymous-Apex seeders (route network, booking data, observability) |
 | `docs/` | Data Cloud mapping, web-connector schema, demo walkthrough |

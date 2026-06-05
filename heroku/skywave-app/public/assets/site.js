@@ -14,8 +14,52 @@
 //
 // The presenter advances stage via the monitor LWC; phones follow via WS.
 
+import { renderWebsite } from './website.js';
+
 const CONSENT_KEY = 'skywave.consent.v1';
-const root = document.getElementById('root');
+// `root` is the modal content container — the demo flow renders INTO the
+// modal that overlays the airline website. The website itself is the page.
+const root = document.getElementById('modal-content');
+const modalRoot = document.getElementById('modal-root');
+const siteRoot = document.getElementById('site-root');
+
+// Modal visibility:
+//   - 'open'   : the modal is shown (consent / survey / thanks / waiting)
+//   - 'hidden' : the modal is gone (agent stages → visitor uses chat icon)
+//
+// `userClosed` lets the visitor dismiss the modal at any time. We re-open it
+// on the next stage transition, since each new stage has fresh content the
+// visitor needs to see.
+let userClosed = false;
+
+function showModal() {
+    if (!modalRoot) return;
+    userClosed = false;
+    modalRoot.dataset.state = 'open';
+    modalRoot.setAttribute('aria-hidden', 'false');
+}
+function hideModal() {
+    if (!modalRoot) return;
+    modalRoot.dataset.state = 'hidden';
+    modalRoot.setAttribute('aria-hidden', 'true');
+}
+function userCloseModal() {
+    userClosed = true;
+    hideModal();
+}
+
+// Wire backdrop + X button to close.
+if (modalRoot) {
+    modalRoot.addEventListener('click', (e) => {
+        const t = e.target;
+        if (t && t.closest && t.closest('[data-action="close-modal"]')) {
+            userCloseModal();
+        }
+    });
+}
+
+// Render the website backdrop once on boot. It never re-renders.
+if (siteRoot) renderWebsite(siteRoot);
 
 // Canonical stage order. The visitor walks down this list at their own
 // pace; the moderator's stage is a *ceiling*, not a teleport target.
@@ -352,15 +396,28 @@ function setBodyStage(stage) {
 // Single render function — picks a screen based on effectiveStage().
 // Called after every stage change from the WS handler, after consent,
 // and after each survey answer.
+//
+// The render fills the MODAL (#modal-content). The website (#site-root)
+// renders once on boot and is never touched here. Stages decide whether the
+// modal is visible at all:
+//
+//   agent_book / agent_seat_fail / agent_seat_pass  → modal HIDDEN, visitor
+//                                                     uses chat icon on the
+//                                                     airline page itself
+//   everything else                                 → modal OPEN with the
+//                                                     stage-appropriate
+//                                                     content
 function render() {
     root.innerHTML = '';
 
-    // Visitor has caught up to (or past) the moderator's ceiling: show
-    // a holding screen until the moderator advances. Don't surface
-    // visitor-side progress they can't act on.
-    if (isWaitingForModerator()) {
-        setBodyStage('waiting');
-        renderHolding();
+    const stage = effectiveStage();
+
+    // Agent stages: hide the modal entirely. The visitor interacts with the
+    // chat icon (made visible by syncEswButtonVisibility below) on the
+    // airline website.
+    if (AGENT_STAGES.has(stage)) {
+        setBodyStage(stage);
+        hideModal();
         try {
             if (sdkReady && window.SalesforceInteractions?.reinit) {
                 window.SalesforceInteractions.reinit();
@@ -370,7 +427,21 @@ function render() {
         return;
     }
 
-    const stage = effectiveStage();
+    // Visitor has caught up to (or past) the moderator's ceiling: show
+    // a holding screen until the moderator advances. Don't surface
+    // visitor-side progress they can't act on.
+    if (isWaitingForModerator()) {
+        setBodyStage('waiting');
+        renderHolding();
+        if (!userClosed) showModal();
+        try {
+            if (sdkReady && window.SalesforceInteractions?.reinit) {
+                window.SalesforceInteractions.reinit();
+            }
+        } catch (e) { /* ignore */ }
+        syncEswButtonVisibility();
+        return;
+    }
 
     if (stage === 'survey' && state.surveyIndex < (state.survey?.questions?.length ?? 0)) {
         setBodyStage('survey');
@@ -385,6 +456,7 @@ function render() {
         setBodyStage(stage || 'waiting');
         renderWaiting();
     }
+    if (!userClosed) showModal();
 
     // After dataset.stage is set, ask the SDK to re-evaluate which sitemap
     // pageType matches. The SDK normally only re-runs isMatch on URL change,
@@ -546,6 +618,9 @@ function connectWs(wsUrl) {
                     // parked on the holding screen; just re-render.
                     // visitorStage is owned entirely by visitor actions
                     // (survey completion etc.) and is never touched here.
+                    // Stage transition wipes any prior 'visitor closed the
+                    // modal' state — new content deserves to be seen.
+                    userClosed = false;
                     render();
                 }
             }
@@ -796,4 +871,5 @@ function renderThanks() {
     // screen on it. It just needs to be resolved by survey-complete.
     loadGeo();
     renderConsent();
+    showModal();
 })();
