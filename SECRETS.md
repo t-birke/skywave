@@ -43,6 +43,7 @@ Check here FIRST before regenerating or re-deriving any credential.
 | Data Cloud app cert + key | `.secrets/dc.crt`, `.secrets/dc.key` | For `Skywave_DataCloud_Integration`. `dc.key` matches the cert deployed in the Connected App. For direct Data Cloud API calls (sf-datacloud-api-auth skill). |
 | Data Cloud ingest cert + key | `.secrets/dc_ingest.crt`, `.secrets/dc_ingest.key` | Second keypair for the ingest scope. |
 | **data360 MCP credentials** | **`.secrets/dc.env`** | Canonical store for the data360 MCP server's auth. The MCP jar supports ONLY static `access_token` or `client_credentials` — **NO JWT/private-key input**. Use client_credentials: consumer key + secret of `Skywave_DataCloud_Integration`. Consumer secret is fetch-once from App Manager → Manage Consumer Details. |
+| **ipinfo.io token** | **Heroku Config Var `IPINFO_TOKEN`** on `skywave-app` | Client-side IP geolocation token (free tier). Served to the browser via `/api/config` → `site.js loadGeo()`; the consumer site calls `https://ipinfo.io/json?token=…` to resolve the visitor's city + lat/lon, which derive `Contact.Home_Airport__c`. The token IS exposed to the browser by design (ipinfo scopes it), so it's low-sensitivity, but it's still kept out of git per this policy. To view/rotate: ipinfo.io dashboard → Token; then `heroku config:set IPINFO_TOKEN="…" -a skywave-app`. Rotated 2026-06-05. If unset, geolocation silently no-ops (no home-airport pre-fill). |
 
 ## Files that look secret-ish but are NOT
 
