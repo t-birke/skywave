@@ -36,12 +36,8 @@ const HTML = `
     </div>
 
     <div class="nav-right">
-        <div class="pts-chip desktop-item">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
-            Elite&nbsp;&nbsp;·&nbsp;&nbsp;42,180 pts
-        </div>
-        <span class="nav-user desktop-item">Hi, Alex</span>
-        <button class="nav-btn desktop-item">My Account</button>
+        <a class="nav-link-text desktop-item">Sign in</a>
+        <button class="nav-btn desktop-item">Join SkyRewards</button>
         <button class="hamburger-btn" data-action="toggle-burger" aria-label="Open menu">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line>
@@ -61,13 +57,9 @@ const HTML = `
             <a>SkyRewards</a>
         </div>
         <div class="mob-drawer-footer">
-            <div class="mob-pts-chip">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
-                Elite&nbsp;·&nbsp;42,180 pts
-            </div>
             <div class="mob-user-links">
-                <a>Hi, Alex</a>
-                <a>My Account</a>
+                <a>Sign in</a>
+                <a>Join SkyRewards</a>
             </div>
         </div>
     </div>
@@ -164,32 +156,6 @@ const HTML = `
 </section>
 
 <div class="main">
-    <div class="ticket-strip">
-        <div class="ticket-card">
-            <div>
-                <div class="ticket-eyebrow">Active Ticket&nbsp;&nbsp;·&nbsp;&nbsp;3 upcoming trips</div>
-                <div class="ticket-route">
-                    <span class="t-code">SEA</span>
-                    <div class="t-line-wrap">
-                        <div class="t-line"></div>
-                        <span class="t-dur">5h 27m</span>
-                    </div>
-                    <span class="t-code">JFK</span>
-                </div>
-                <div class="ticket-meta">
-                    Round trip&nbsp;·&nbsp;Mar 2 – 7&nbsp;·&nbsp;Flight SW 2241&nbsp;·&nbsp;Seat <strong>4A, Window</strong>&nbsp;·&nbsp;Conf. <strong>WK4482</strong>
-                </div>
-                <div class="ticket-links">
-                    <a>Upgrade fare</a>
-                    <a>View flight</a>
-                    <a>Change flight</a>
-                    <a>Cancel flight</a>
-                </div>
-            </div>
-            <button class="btn-manage">Manage trip</button>
-        </div>
-    </div>
-
     <div class="section">
         <div class="section-head">
             <h2 class="section-title">Featured deals</h2>
@@ -226,10 +192,10 @@ const HTML = `
     <div class="pts-banner">
         <div class="pts-inner">
             <div>
-                <h3>You're 7,820 points from free</h3>
-                <p>Book your next trip with the SkyWave Rewards Card and earn enough points for a round-trip flight anywhere we fly.</p>
+                <h3>Earn points on every flight</h3>
+                <p>Join SkyRewards free and start earning toward your next trip. Members fly further on every dollar spent.</p>
             </div>
-            <button class="btn-pts">Explore rewards</button>
+            <button class="btn-pts">Join SkyRewards</button>
         </div>
     </div>
 </div>

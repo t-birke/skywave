@@ -78,6 +78,13 @@
     font-family: inherit;
 }
 .skywave-site .nav-btn:hover { background: #0d9488; }
+.skywave-site .nav-link-text {
+    font-size: 14px; font-weight: 500;
+    color: rgba(255,255,255,0.80);
+    text-decoration: none; cursor: pointer;
+    transition: color .2s;
+}
+.skywave-site .nav-link-text:hover { color: #FFFFFF; }
 
 .skywave-site .hamburger-btn {
     background: rgba(255,255,255,0.08);
