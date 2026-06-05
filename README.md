@@ -8,7 +8,8 @@ a public LWR Experience Cloud site with an embedded Agentforce Messaging
 > **New here?** Read [`ARCHITECTURE.md`](ARCHITECTURE.md) for how the pieces
 > fit together (data flows, components, and the moving parts that aren't in
 > git). [`SKYWAVE_INTERACTIVE_DESIGN.md`](SKYWAVE_INTERACTIVE_DESIGN.md) has
-> the demo vision; [`SECRETS.md`](SECRETS.md) covers credentials.
+> the demo vision; [`docs/STYLE_GUIDE.md`](docs/STYLE_GUIDE.md) the visual
+> language for new UI; [`SECRETS.md`](SECRETS.md) covers credentials.
 
 ## Prerequisites
 

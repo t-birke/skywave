@@ -9,6 +9,8 @@
 > - `SKYWAVE_INTERACTIVE_DESIGN.md` — the *intent*: 10-stage demo vision,
 >   user journey, build-sequence phases, things still "proposed".
 > - `README.md` — how to spin up an org (`orgInit.sh`) and get started.
+> - `docs/STYLE_GUIDE.md` — Skywave visual language (tokens, color, type) for
+>   any new UI component.
 > - `SECRETS.md` — every credential, where it lives, how to rotate it.
 > - `MEMORY.md` (in `…/memory/`) — the **why/gotchas** ledger. Whenever this
 >   doc says "see memory", the non-obvious reason is a one-line entry there.

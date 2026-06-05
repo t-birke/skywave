@@ -1,7 +1,10 @@
 :root {
+    /* Skywave brand tokens — see docs/STYLE_GUIDE.md.
+       Teal is the canonical interactive accent (was blue #2e6df0, now legacy). */
     --skywave-navy: #0b1d3a;
     --skywave-navy-deep: #06122a;
-    --skywave-blue: #2e6df0;
+    --skywave-teal: #14b8a6;
+    --skywave-teal-active: #0f766e;
     --skywave-blue-soft: #12305f;
     --skywave-mute: #a8bcd8;
     --skywave-warn: #ffb84d;
@@ -62,7 +65,7 @@ body {
     padding: 0.85rem 1rem;
     border: none;
     border-radius: 0.5rem;
-    background: var(--skywave-blue);
+    background: var(--skywave-teal);
     color: var(--skywave-text);
     font-size: 1rem;
     font-weight: 500;
@@ -70,7 +73,7 @@ body {
     transition: background 0.15s;
     font-family: inherit;
 }
-.btn:active { background: #1d4791; }
+.btn:active { background: var(--skywave-teal-active); }
 
 .center { text-align: center; }
 .muted { color: var(--skywave-mute); }
@@ -92,7 +95,7 @@ body {
 .stage-pill {
     display: inline-block;
     padding: 0.4rem 0.75rem;
-    background: var(--skywave-blue);
+    background: var(--skywave-teal);
     border-radius: 1rem;
     font-size: 0.8rem;
     font-weight: 500;
@@ -140,9 +143,9 @@ body {
     gap: 0.5rem;
     transition: border-color 0.15s, transform 0.1s, opacity 0.2s;
 }
-.survey-option:hover { border-color: var(--skywave-blue); }
+.survey-option:hover { border-color: var(--skywave-teal); }
 .survey-option:active { transform: scale(0.98); }
-.survey-option.selected { border-color: var(--skywave-blue); background: var(--skywave-blue); }
+.survey-option.selected { border-color: var(--skywave-teal); background: var(--skywave-teal); }
 .survey-option:disabled { cursor: default; }
 .survey-option:disabled:not(.selected) { opacity: 0.4; }
 .survey-option-img {
