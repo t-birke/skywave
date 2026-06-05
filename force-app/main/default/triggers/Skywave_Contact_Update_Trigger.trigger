@@ -143,6 +143,15 @@ trigger Skywave_Contact_Update_Trigger on Skywave_Contact_Update__e (after inser
                     Demo_Session_Id__c = ev.Demo_Session_Id__c,
                     Payload_Json__c   = JSON.serialize(p)
                 ));
+            } else if (ev.Update_Type__c == 'avatar') {
+                // Profile-form avatar upload: the LWC ran in the chat-iframe
+                // ESW guest user context, which can insert ContentVersion but
+                // can't update Contact (no FLS on ContactCardPicture__c). It
+                // publishes this event with the Shepherd URL and we stamp the
+                // Contact here, in System Mode.
+                if (String.isNotBlank(ev.Avatar_Url__c)) {
+                    c.ContactCardPicture__c = ev.Avatar_Url__c;
+                }
             } else if (ev.Update_Type__c == 'chat_start') {
                 if (String.isNotBlank(ev.Conversation_Id__c)) {
                     Id sfConvId = conversationIdByUuid.get(ev.Conversation_Id__c);

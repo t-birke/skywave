@@ -83,24 +83,22 @@ public without sharing class Skywave_SaveProfile {
 
         // Optional avatar upload — same recipe as TB_createProfile_endpoint.cls.
         if (String.isNotBlank(avatarBase64)) {
-            // Two-stage avatar upload, decoupled so a failure in stage 2 (the
-            // ContentDocumentLink insert) doesn't prevent stage 1 (the
-            // Shepherd URL on Contact, which is what every read-side
-            // consumer — modernContactCard, demo monitor, chat — depends on).
+            // Avatar upload pipeline — guest-user-safe.
             //
-            // Why decouple: the ESW site guest user (which the chat-iframe
-            // LWC runs as, per memory `reference-ecv2-clt-runtime-context`)
-            // can't link a ContentDocument to a Contact even with
-            // Visibility='InternalUsers' — the platform requires the linking
-            // user to see the LinkedEntity, and guest users can't see
-            // Contact records. Without the decouple this throws and the
-            // earlier orphan ContentVersions from this pattern (5 of them
-            // on the running profile when this was diagnosed) prove it.
+            // The chat-iframe LWC runs as the ESW site guest user (per memory
+            // `reference-ecv2-clt-runtime-context`). That user can:
+            //   - INSERT ContentVersion  ✓ (file storage is permissive)
+            //   - INSERT ContentDocumentLink against Contact  ✗ (guest can't
+            //     see Contact records → platform rejects)
+            //   - UPDATE Contact.ContactCardPicture__c  ✗ (no FLS row for the
+            //     custom field on the guest profile → write silently fails)
             //
-            // The CDL is purely decorative — it makes the file appear in the
-            // Contact page's "Files" related list for users browsing CRM. The
-            // demo doesn't need it. The `Avatar URL on Contact` is the
-            // load-bearing write.
+            // The fix: do the file upload here (stage 1, succeeds), then
+            // publish a Skywave_Contact_Update__e with the Shepherd URL —
+            // the existing trigger runs in System Mode and stamps the
+            // Contact field for us (stage 2, succeeds). The CDL insert is
+            // skipped entirely; it's purely decorative for the Files
+            // related list and we don't need it for the demo.
 
             String b64 = avatarBase64;
             Integer commaAt = b64.indexOf(',');
@@ -109,7 +107,6 @@ public without sharing class Skywave_SaveProfile {
                 b64 = b64.substring(commaAt + 1);
             }
 
-            // STAGE 1 — must succeed: insert ContentVersion, stamp the URL on Contact.
             try {
                 deletePriorAvatars(contactId);
 
@@ -127,28 +124,25 @@ public without sharing class Skywave_SaveProfile {
                 String shepherdUrl = '/sfc/servlet.shepherd/document/download/' + contentDocId;
                 r.avatarUrl = shepherdUrl;
 
-                // Stamp the Contact NOW, before attempting the CDL. Even if
-                // stage 2 fails, downstream consumers can still resolve and
-                // display the avatar via this URL.
-                update new Contact(Id = contactId, ContactCardPicture__c = shepherdUrl);
-
-                // STAGE 2 — best-effort: link to Contact for the Files
-                // related list. Failure here is logged and swallowed.
-                try {
-                    ContentDocumentLink cdl = new ContentDocumentLink();
-                    cdl.ContentDocumentId = contentDocId;
-                    cdl.LinkedEntityId = contactId;
-                    cdl.ShareType = 'V';
-                    cdl.Visibility = 'InternalUsers';
-                    insert cdl;
-                } catch (Exception cdlErr) {
+                // Look up the visitor's deviceId so the trigger can route
+                // the update to the right Contact via Session_Id__c.
+                List<Contact> cs = [
+                    SELECT Session_Id__c, Demo_Session__c
+                    FROM Contact WHERE Id = :contactId LIMIT 1
+                ];
+                if (cs.isEmpty() || String.isBlank(cs[0].Session_Id__c)) {
                     System.debug(LoggingLevel.WARN,
-                        'Skywave_SaveProfile CDL insert skipped (decorative only): '
-                        + cdlErr.getMessage());
+                        'Skywave_SaveProfile: contact ' + contactId +
+                        ' has no Session_Id__c; cannot route avatar PE');
+                } else {
+                    EventBus.publish(new Skywave_Contact_Update__e(
+                        Update_Type__c     = 'avatar',
+                        Device_Id__c       = cs[0].Session_Id__c,
+                        Demo_Session_Id__c = cs[0].Demo_Session__c,
+                        Avatar_Url__c      = shepherdUrl
+                    ));
                 }
             } catch (Exception e) {
-                // Stage 1 failed — the URL was never stamped. Surface as a
-                // real partial success, not silent.
                 System.debug(LoggingLevel.WARN, 'Skywave_SaveProfile avatar error: ' +
                     e.getMessage() + '\n' + e.getStackTraceString());
                 r.message = 'Profile saved, avatar upload failed: ' + e.getMessage();
