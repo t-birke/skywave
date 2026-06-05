@@ -140,7 +140,12 @@ Skywave_RestUtil.publishEvent(...) ─┐
                             Demo_Session_Id__c, Payload_Json__c)
                                     │
                                     ▼
-          skywaveDemoMonitor LWC  (empApi subscriber)
+          skywaveDemoMonitor LWC  (empApi subscriber + session state)
+                                    │
+                                    ▼
+          skywaveWorldMap LWC  (presentational; equirectangular SVG map
+                                with continent silhouettes, route polylines,
+                                and absolutely-positioned avatar bubbles)
             • places/relocates the visitor's bubble on the world map
             • draws the route line on flight_booked
             • appends seat badge on seat_changed
@@ -150,7 +155,11 @@ Skywave_RestUtil.publishEvent(...) ─┐
 All publishes are **best-effort and non-blocking** — a publish failure never
 breaks the booking/seat/profile write. Airport coordinates for route lines
 come from `Skywave_DemoMonitorController.getAirportGeo()` (one fetch on
-mount), so the per-event payloads stay small.
+mount), so the per-event payloads stay small. Bubble placement uses pure
+lat/lon math (`x = lon + 180`, `y = 90 − lat`).
+
+The `Skywave_Agent_User` permset grants `Demo_Event__e` Create (= publish
+on a Platform Event) so the bot user's monitor publishes go through.
 
 ### 3c. Chat booking pipeline (agent)
 

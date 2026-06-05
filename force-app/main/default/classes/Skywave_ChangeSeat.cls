@@ -98,7 +98,7 @@ public class Skywave_ChangeSeat {
                     ? seg.Booking__r.Contact__r.Session_Id__c : null;
                 Id demoSessionId = seg.Booking__r.Contact__r != null
                     ? seg.Booking__r.Contact__r.Demo_Session__c : null;
-                if (String.isNotBlank(deviceId)) {
+                if (String.isNotBlank(deviceId) && demoSessionId != null) {
                     Skywave_RestUtil.publishEvent(
                         'seat_changed',
                         deviceId,
@@ -111,7 +111,9 @@ public class Skywave_ChangeSeat {
                         }
                     );
                 }
-            } catch (Exception ignore) { /* best-effort */ }
+            } catch (Exception e) {
+                System.debug(LoggingLevel.WARN, 'seat_changed publish skipped: ' + e.getMessage());
+            }
 
             r.success = true;
             r.bookingCode = seg.Booking__r.Confirmation_Code__c;

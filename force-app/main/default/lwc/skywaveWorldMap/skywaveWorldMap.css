@@ -1,0 +1,213 @@
+/* Skywave tokens — see docs/STYLE_GUIDE.md.
+   Light theme (Lightning console) — but the MAP itself is the dark navy
+   ocean from the brand, since a navy map on a white card reads strongest. */
+:host {
+    --sw-navy: #0b1d3a;
+    --sw-navy-deep: #06122a;
+    --sw-blue-soft: #12305f;
+    --sw-teal: #14b8a6;
+    --sw-teal-hover: #0d9488;
+    --sw-teal-active: #0f766e;
+    --sw-gold: #f3c14a;
+    --sw-success: #15803d;
+    --sw-radius: 0.75rem;
+    --sw-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+    --sw-card-bg: #ffffff;
+    --sw-bg-alt: #f5f7fb;
+    --sw-card-border: #d8dee8;
+    --sw-card-divider: #e6e9f0;
+    --sw-text: #0b1d3a;
+    --sw-text-mute: #4f5a73;
+    --sw-mute: #6e7993;
+
+    /* Map-specific */
+    --sw-map-ocean: var(--sw-navy);
+    --sw-map-ocean-deep: var(--sw-navy-deep);
+    --sw-map-land: rgba(168, 188, 216, 0.18);     /* slate landmasses on navy */
+    --sw-map-land-edge: rgba(168, 188, 216, 0.32);
+
+    display: block;
+    font-family: var(--sw-font);
+    color: var(--sw-text);
+}
+
+/* MAP CONTAINER */
+.sw-map-host {
+    position: relative;
+    width: 100%;
+    /* Equirectangular = 2:1 aspect. Don't constrain — let it flex with width. */
+    aspect-ratio: 2 / 1;
+    background: var(--sw-navy);
+    border-radius: var(--sw-radius);
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(11, 29, 58, 0.08);
+    border: 1px solid var(--sw-card-border);
+}
+
+.sw-map-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.sw-map-ocean {
+    fill: var(--sw-map-ocean);
+}
+
+.sw-map-grid {
+    stroke: rgba(168, 188, 216, 0.10);
+    stroke-width: 0.25;
+}
+.sw-map-grid-faint {
+    stroke: rgba(168, 188, 216, 0.05);
+}
+
+.sw-map-land path {
+    fill: var(--sw-map-land);
+    stroke: var(--sw-map-land-edge);
+    stroke-width: 0.3;
+    stroke-linejoin: round;
+}
+
+/* ROUTES */
+.sw-route {
+    stroke: var(--sw-teal);
+    stroke-width: 0.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.95;
+    filter: drop-shadow(0 0 1px rgba(20, 184, 166, 0.55));
+}
+.sw-route-connection {
+    /* Slight dash on connection legs to read as "via stop" — 2 short, 1 long */
+    stroke-dasharray: 1.4 1.0;
+}
+.sw-route-mid {
+    fill: var(--sw-teal);
+    stroke: #ffffff;
+    stroke-width: 0.4;
+    filter: drop-shadow(0 0 2px rgba(20, 184, 166, 0.7));
+}
+
+/* BUBBLE LAYER (HTML over SVG) */
+.sw-bubble-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.sw-bubble {
+    /* Bubbles are pill-shaped: avatar circle + label. Pointer-events none
+       on the layer turn back on per-bubble so the title tooltip works. */
+    pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.2rem 0.55rem 0.2rem 0.2rem;
+    background: rgba(255, 255, 255, 0.96);
+    color: var(--sw-text);
+    border: 1px solid var(--sw-card-border);
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25),
+                0 0 0 2px rgba(20, 184, 166, 0.18);
+    font-size: 0.72rem;
+    line-height: 1.1;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    white-space: nowrap;
+}
+
+.sw-bubble-placed {
+    position: absolute;
+    /* The (left%, top%) point is the bubble's center. */
+    transform: translate(-50%, -50%);
+    z-index: 2;
+}
+.sw-bubble-placed:hover {
+    transform: translate(-50%, -50%) scale(1.06);
+    z-index: 5;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35),
+                0 0 0 2px rgba(20, 184, 166, 0.4);
+}
+
+.sw-bubble-avatar {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    overflow: hidden;
+    flex: 0 0 1.5rem;
+    background: var(--sw-teal);
+    color: #ffffff;
+    display: grid;
+    place-items: center;
+    font-weight: 600;
+    font-size: 0.75rem;
+}
+.sw-bubble-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.sw-bubble-initial {
+    /* Center the letter when no avatar is present */
+    line-height: 1;
+}
+
+.sw-bubble-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.sw-bubble-label {
+    font-weight: 500;
+    color: var(--sw-text);
+}
+.sw-bubble-seat {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.05rem 0.4rem;
+    background: var(--sw-teal);
+    color: #ffffff;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 600;
+}
+.sw-bubble-seat-icon {
+    /* Replace with a real seat glyph later — emoji is a placeholder */
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+/* UNPLACED ROW */
+.sw-unplaced-row {
+    margin-top: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--sw-bg-alt);
+    border: 1px solid var(--sw-card-border);
+    border-radius: var(--sw-radius);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+.sw-unplaced-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--sw-text-mute);
+    font-weight: 500;
+}
+.sw-unplaced-bubbles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+.sw-bubble-unplaced {
+    /* Same pill style; sits in normal flow under the map. */
+    position: static;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}

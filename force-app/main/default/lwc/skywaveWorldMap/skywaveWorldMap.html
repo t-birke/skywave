@@ -1,0 +1,122 @@
+<template>
+    <div class="sw-map-host">
+        <!-- Map layer: stylized continent silhouettes on a navy ocean. -->
+        <svg class="sw-map-svg"
+             viewBox="0 0 360 180"
+             preserveAspectRatio="none"
+             xmlns="http://www.w3.org/2000/svg">
+            <!-- Ocean background -->
+            <rect x="0" y="0" width="360" height="180" class="sw-map-ocean"/>
+
+            <!-- Subtle equator + tropic guides -->
+            <line x1="0" y1="90" x2="360" y2="90" class="sw-map-grid"/>
+            <line x1="0" y1="66.5" x2="360" y2="66.5" class="sw-map-grid sw-map-grid-faint"/>
+            <line x1="0" y1="113.5" x2="360" y2="113.5" class="sw-map-grid sw-map-grid-faint"/>
+
+            <!-- Continents (stylised silhouettes; viewBox = lon+180, 90-lat).
+                 Cartographic accuracy intentionally relaxed — the audience
+                 reads "world map" at a glance, and bubble placement is exact
+                 by lat/lon math regardless. -->
+            <g class="sw-map-land">
+                <!-- North America -->
+                <path d="M 22,40 L 56,30 L 88,28 L 102,38 L 100,52 L 94,62 L 80,74 L 68,86 L 60,86 L 56,76 L 42,72 L 30,68 L 18,58 L 14,46 Z"/>
+                <!-- Greenland -->
+                <path d="M 110,18 L 130,16 L 138,28 L 130,40 L 116,38 L 108,28 Z"/>
+                <!-- Central America strip -->
+                <path d="M 80,80 L 90,82 L 96,90 L 92,96 L 86,92 L 80,86 Z"/>
+                <!-- South America -->
+                <path d="M 96,96 L 116,94 L 124,108 L 122,128 L 114,148 L 104,158 L 98,150 L 96,128 L 94,108 Z"/>
+                <!-- Europe -->
+                <path d="M 168,46 L 200,40 L 212,46 L 210,58 L 196,66 L 180,68 L 170,60 Z"/>
+                <!-- Africa -->
+                <path d="M 174,72 L 210,68 L 222,80 L 224,100 L 216,118 L 204,134 L 194,138 L 184,130 L 178,114 L 172,96 L 168,82 Z"/>
+                <!-- Middle East / Arabian peninsula -->
+                <path d="M 218,72 L 232,68 L 240,80 L 234,92 L 222,90 Z"/>
+                <!-- Asia -->
+                <path d="M 212,38 L 256,30 L 296,32 L 314,46 L 308,60 L 286,68 L 264,72 L 248,68 L 232,62 L 216,56 Z"/>
+                <!-- South Asia (India peninsula) -->
+                <path d="M 250,72 L 264,72 L 268,84 L 262,94 L 254,90 Z"/>
+                <!-- South-East Asia / archipelagos -->
+                <path d="M 282,80 L 304,78 L 316,86 L 310,98 L 296,98 L 286,90 Z"/>
+                <!-- Australia -->
+                <path d="M 304,116 L 332,114 L 344,124 L 340,136 L 322,138 L 308,130 Z"/>
+                <!-- New Zealand -->
+                <path d="M 348,140 L 354,140 L 354,152 L 348,152 Z"/>
+                <!-- UK + Ireland (small) -->
+                <path d="M 174,46 L 180,44 L 182,52 L 178,56 L 172,52 Z"/>
+                <!-- Japan (small) -->
+                <path d="M 314,52 L 320,50 L 322,58 L 318,62 L 314,58 Z"/>
+                <!-- Madagascar -->
+                <path d="M 226,116 L 230,118 L 230,128 L 226,128 Z"/>
+            </g>
+
+            <!-- Routes: drawn over land, under bubbles. -->
+            <g class="sw-routes">
+                <template for:each={routeShapes} for:item="r">
+                    <path key={r.id} d={r.d}
+                          class={r.routeClass}
+                          fill="none"></path>
+                    <circle key={r.id} cx={r.midX} cy={r.midY} r="1.5"
+                            class="sw-route-mid"></circle>
+                </template>
+            </g>
+        </svg>
+
+        <!-- Bubble overlay (HTML, not SVG, so we get crisp avatars + text).
+             Each bubble is absolutely positioned at percent of the host. -->
+        <div class="sw-bubble-layer">
+            <template for:each={placedBubbles} for:item="b">
+                <div key={b.id}
+                     class="sw-bubble sw-bubble-placed"
+                     style={b.style}
+                     title={b.tooltip}>
+                    <div class="sw-bubble-avatar">
+                        <template lwc:if={b.avatarUrl}>
+                            <img src={b.avatarUrl} alt={b.label}/>
+                        </template>
+                        <template lwc:else>
+                            <span class="sw-bubble-initial">{b.initial}</span>
+                        </template>
+                    </div>
+                    <div class="sw-bubble-meta">
+                        <span class="sw-bubble-label">{b.label}</span>
+                        <template lwc:if={b.seat}>
+                            <span class="sw-bubble-seat" title="Selected seat">
+                                <span class="sw-bubble-seat-icon">💺</span>{b.seat}
+                            </span>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- Sessions without resolvable coordinates render in a strip below the map. -->
+    <template lwc:if={hasUnplaced}>
+        <div class="sw-unplaced-row">
+            <span class="sw-unplaced-label">No location yet</span>
+            <div class="sw-unplaced-bubbles">
+                <template for:each={unplacedBubbles} for:item="b">
+                    <div key={b.id} class="sw-bubble sw-bubble-unplaced" title={b.tooltip}>
+                        <div class="sw-bubble-avatar">
+                            <template lwc:if={b.avatarUrl}>
+                                <img src={b.avatarUrl} alt={b.label}/>
+                            </template>
+                            <template lwc:else>
+                                <span class="sw-bubble-initial">{b.initial}</span>
+                            </template>
+                        </div>
+                        <div class="sw-bubble-meta">
+                            <span class="sw-bubble-label">{b.label}</span>
+                            <template lwc:if={b.seat}>
+                                <span class="sw-bubble-seat">
+                                    <span class="sw-bubble-seat-icon">💺</span>{b.seat}
+                                </span>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </template>
+</template>

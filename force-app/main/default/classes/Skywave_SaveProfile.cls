@@ -161,6 +161,7 @@ public without sharing class Skywave_SaveProfile {
                 FROM Contact WHERE Id = :contactId LIMIT 1
             ];
             if (cs.isEmpty() || String.isBlank(cs[0].Session_Id__c)) return;
+            if (cs[0].Demo_Session__c == null) return;  // PE field is required
 
             Map<String, Object> payload = new Map<String, Object>{
                 'firstName' => firstName,
@@ -175,7 +176,7 @@ public without sharing class Skywave_SaveProfile {
                 payload
             );
         } catch (Exception e) {
-            System.debug('profile_created publish skipped: ' + e.getMessage());
+            System.debug(LoggingLevel.WARN, 'profile_created publish skipped: ' + e.getMessage());
         }
     }
 

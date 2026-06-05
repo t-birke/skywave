@@ -173,6 +173,7 @@ public with sharing class Skywave_AckProfileForm {
                 FROM Contact WHERE Id = :contactId LIMIT 1
             ];
             if (cs.isEmpty() || String.isBlank(cs[0].Session_Id__c)) return;
+            if (cs[0].Demo_Session__c == null) return;  // PE field is required
 
             List<Map<String, String>> legs = new List<Map<String, String>>();
             for (Skywave_Itinerary.Leg leg : itin.legs) {
@@ -196,8 +197,9 @@ public with sharing class Skywave_AckProfileForm {
                 cs[0].Demo_Session__c,
                 payload
             );
+            System.debug('flight_booked published for session=' + cs[0].Session_Id__c);
         } catch (Exception e) {
-            System.debug('flight_booked publish skipped: ' + e.getMessage());
+            System.debug(LoggingLevel.WARN, 'flight_booked publish skipped: ' + e.getMessage());
         }
     }
 

@@ -159,6 +159,18 @@
         <field>MessagingSession.Session_ID__c</field>
         <readable>true</readable>
     </fieldPermissions>
+    <!-- Needed to read Contact.Session_Id__c when resolving the visitor's
+         deviceId for monitor events. -->
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Contact.Session_Id__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Contact.Demo_Session__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
     <objectPermissions>
         <allowCreate>true</allowCreate>
         <allowDelete>false</allowDelete>
@@ -185,5 +197,17 @@
         <modifyAllRecords>false</modifyAllRecords>
         <object>Booking_Segment__c</object>
         <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
+    <!-- Publish-only on the demo monitor PE so AckProfileForm/SaveProfile/ChangeSeat
+         can emit flight_booked / profile_created / seat_changed events. Platform
+         Events use 'Create' to mean 'publish'. -->
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>false</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>Demo_Event__e</object>
+        <viewAllRecords>false</viewAllRecords>
     </objectPermissions>
 </PermissionSet>

@@ -7,6 +7,7 @@ import setActive from '@salesforce/apex/Skywave_DemoMonitorController.setActive'
 import advanceState from '@salesforce/apex/Skywave_DemoMonitorController.advanceState';
 import searchSessions from '@salesforce/apex/Skywave_DemoMonitorController.searchSessions';
 import getOptionImageMap from '@salesforce/apex/Skywave_DemoMonitorController.getOptionImageMap';
+import getAirportGeo from '@salesforce/apex/Skywave_DemoMonitorController.getAirportGeo';
 
 const CONSUMER_SITE_URL = 'https://skywave-app-bb0e8666933b.herokuapp.com/';
 const STATE_CHANNEL = '/event/Demo_State_Change__e';
@@ -39,8 +40,87 @@ export default class SkywaveDemoMonitor extends LightningElement {
     @track currentState = 'idle';
     @track sessions = []; // [{ sessionId, shortId, lastSeen, answers: [{questionKey, answerKey, imageUrl, answerText}] }]
     optionImageMap = {};  // "<questionKey>:<answerKey>" -> Image_Url__c, loaded once on mount
+    airportGeo = {};      // "IATA" -> { lat, lon }, loaded once on mount
 
     get activeCount() { return this.sessions.length; }
+
+    /** Bubbles fed to <c-skywave-world-map>. Each visitor maps to one bubble.
+     *  Placement priority: route midpoint > geo location > unplaced. */
+    get mapBubbles() {
+        return this.sessions.map(s => {
+            const label = this._bubbleLabel(s);
+            const place = this._placement(s);
+            return {
+                id: s.sessionId,
+                label,
+                avatarUrl: s.avatarUrl || null,
+                seat: s.seat || null,
+                city: s.city || null,
+                lat: place ? place.lat : null,
+                lon: place ? place.lon : null,
+                hasLocation: !!place
+            };
+        });
+    }
+
+    /** Route polylines fed to <c-skywave-world-map>. */
+    get mapRoutes() {
+        const routes = [];
+        for (const s of this.sessions) {
+            if (!s.route || !s.route.legs || !s.route.legs.length) continue;
+            const points = this._routePoints(s.route.legs);
+            if (points.length < 2) continue;
+            routes.push({
+                id: s.sessionId + ':route',
+                points,
+                isConnection: !!s.route.isConnection
+            });
+        }
+        return routes;
+    }
+
+    _bubbleLabel(s) {
+        if (s.firstName) {
+            return s.lastName ? `${s.firstName} ${s.lastName.charAt(0)}.` : s.firstName;
+        }
+        return s.shortId;
+    }
+
+    _placement(s) {
+        // Once a route exists, plot the avatar at the route midpoint — for a
+        // direct it's the geographic centre, for a connection it's the
+        // hub airport. Falls back to the visitor's IP-geo location, else null.
+        if (s.route && s.route.legs && s.route.legs.length) {
+            const pts = this._routePoints(s.route.legs);
+            if (pts.length >= 2) {
+                if (pts.length === 2) {
+                    return {
+                        lat: (pts[0][1] + pts[1][1]) / 2,
+                        lon: (pts[0][0] + pts[1][0]) / 2
+                    };
+                }
+                // Connection: middle waypoint is the hub.
+                return { lat: pts[1][1], lon: pts[1][0] };
+            }
+        }
+        if (typeof s.lat === 'number' && typeof s.lon === 'number') {
+            return { lat: s.lat, lon: s.lon };
+        }
+        return null;
+    }
+
+    _routePoints(legs) {
+        // legs = [{from:'LAX', to:'JFK'}, {from:'JFK', to:'NBO'}]
+        // -> [[lon,lat] for LAX, JFK, NBO] (deduped at the seam)
+        const pts = [];
+        for (let i = 0; i < legs.length; i++) {
+            const from = this.airportGeo[legs[i].from];
+            if (i === 0 && from) pts.push([from.lon, from.lat]);
+            const to = this.airportGeo[legs[i].to];
+            if (to) pts.push([to.lon, to.lat]);
+        }
+        return pts;
+    }
 
     qrCodeVisible = true;
     qrCodeGenerated = false;
@@ -86,6 +166,12 @@ export default class SkywaveDemoMonitor extends LightningElement {
             this.optionImageMap = await getOptionImageMap();
         } catch (e) {
             console.error('getOptionImageMap failed', e);
+        }
+
+        try {
+            this.airportGeo = await getAirportGeo();
+        } catch (e) {
+            console.error('getAirportGeo failed', e);
         }
 
         await this.loadActiveSession();
@@ -183,26 +269,90 @@ export default class SkywaveDemoMonitor extends LightningElement {
         const sessionId = payload.Session_Id__c;
         if (!sessionId) return;
         const now = Date.now();
-        const existing = this.sessions.find(s => s.sessionId === sessionId);
+        let existing = this.sessions.find(s => s.sessionId === sessionId);
 
         if (!existing) {
+            existing = {
+                sessionId,
+                shortId: sessionId.slice(-8),
+                lastSeen: now,
+                answers: [],
+                surveyComplete: false,
+                // Map-related state. All optional; absent = bubble lives in
+                // the "no location" row beneath the map.
+                lat: null,
+                lon: null,
+                city: null,
+                homeAirport: null,
+                route: null,        // { legs:[{from,to}], isConnection }
+                seat: null,
+                firstName: null,
+                lastName: null,
+                avatarUrl: null
+            };
             this.sessions = [
                 ...this.sessions.filter(s => now - s.lastSeen < SESSION_TTL_MS),
-                { sessionId, shortId: sessionId.slice(-8), lastSeen: now, answers: [], surveyComplete: false }
+                existing
             ];
-            return;
         }
 
         existing.lastSeen = now;
+        const inner = this._parseInner(payload.Payload_Json__c);
 
-        if (payload.Type__c === 'survey_answer') {
-            this.appendSurveyAnswer(existing, payload);
-        } else if (payload.Type__c === 'survey_complete') {
-            existing.surveyComplete = true;
+        switch (payload.Type__c) {
+            case 'survey_answer':
+                this.appendSurveyAnswer(existing, payload);
+                break;
+            case 'survey_complete':
+                existing.surveyComplete = true;
+                {
+                    const lat = this._toNumber(inner.lat);
+                    const lon = this._toNumber(inner.lon);
+                    if (lat !== null) existing.lat = lat;
+                    if (lon !== null) existing.lon = lon;
+                }
+                if (inner.city) existing.city = inner.city;
+                if (inner.homeAirport) existing.homeAirport = inner.homeAirport;
+                break;
+            case 'flight_booked':
+                // Once a route is set, the bubble's plotted position is the
+                // route midpoint (handled in mapBubbles getter), so the avatar
+                // visually "moves" onto the trip line.
+                existing.route = {
+                    legs: Array.isArray(inner.legs) ? inner.legs : [],
+                    isConnection: !!inner.isConnection,
+                    bookingCode: inner.bookingCode || null
+                };
+                break;
+            case 'seat_changed':
+                existing.seat = inner.seat || null;
+                break;
+            case 'profile_created':
+                existing.firstName = inner.firstName || null;
+                existing.lastName = inner.lastName || null;
+                existing.avatarUrl = inner.avatarUrl || null;
+                break;
+            default:
+                break;
         }
 
         // Force tracked-array refresh
         this.sessions = [...this.sessions];
+    }
+
+    _parseInner(jsonStr) {
+        if (!jsonStr) return {};
+        try { return JSON.parse(jsonStr); }
+        catch (e) { return {}; }
+    }
+
+    /** Apex Decimal -> JSON sometimes serializes as a number, sometimes a
+     *  string. Both shapes need to land as JS Number. Returns null on garbage. */
+    _toNumber(v) {
+        if (v === null || v === undefined) return null;
+        if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+        const n = parseFloat(v);
+        return Number.isFinite(n) ? n : null;
     }
 
     appendSurveyAnswer(session, payload) {
