@@ -25,6 +25,29 @@ export default class SkywaveWorldMap extends LightningElement {
     @api bubbles = [];
     /** [{ id, points: [[lon,lat], ...], isConnection }] */
     @api routes = [];
+    /** Skywave network airports keyed by IATA → {lat, lon}. Renders as
+     *  small dots with subtle IATA labels under the continent layer. */
+    @api airports = {};
+
+    /** Network airports flattened for SVG render, in viewBox coords. */
+    get airportPins() {
+        const map = this.airports || {};
+        const out = [];
+        for (const code of Object.keys(map)) {
+            const a = map[code];
+            if (!a || typeof a.lat !== 'number' || typeof a.lon !== 'number') continue;
+            out.push({
+                code,
+                cx: this._x(a.lon),
+                cy: this._y(a.lat),
+                // Label sits just to the right of the dot. Width approx by
+                // viewBox units (1 unit ≈ 1 degree).
+                lx: this._x(a.lon) + 0.9,
+                ly: this._y(a.lat) + 0.4
+            });
+        }
+        return out;
+    }
 
     /** Equirectangular helpers — x and y are SVG units (also % when scaled). */
     _x(lon) { return Number(lon) + 180; }

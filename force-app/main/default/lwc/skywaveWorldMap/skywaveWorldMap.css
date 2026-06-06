@@ -64,6 +64,24 @@
     stroke-linejoin: round;
 }
 
+/* AIRPORT PINS */
+.sw-airport-dot {
+    fill: var(--sw-teal);
+    opacity: 0.55;
+}
+.sw-airport-label {
+    /* viewBox unit ≈ 1° → font-size in viewBox units. SVG scales it with
+       the host width, so it stays proportional on any screen. */
+    font-size: 1.6px;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    fill: rgba(168, 188, 216, 0.55);
+    pointer-events: none;
+    /* Don't crisp-edge: keeps tiny text readable. */
+    text-rendering: geometricPrecision;
+}
+
 /* ROUTES */
 .sw-route {
     stroke: var(--sw-teal);

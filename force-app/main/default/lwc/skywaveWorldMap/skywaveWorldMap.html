@@ -16,6 +16,19 @@
                 <path d={landPath}/>
             </g>
 
+            <!-- Network airports: small dots with subtle IATA codes.
+                 Drawn over continents, under routes + bubbles. -->
+            <g class="sw-airports">
+                <template for:each={airportPins} for:item="a">
+                    <g key={a.code}>
+                        <circle cx={a.cx} cy={a.cy} r="0.6"
+                                class="sw-airport-dot"></circle>
+                        <text x={a.lx} y={a.ly}
+                              class="sw-airport-label">{a.code}</text>
+                    </g>
+                </template>
+            </g>
+
             <!-- Routes: drawn over land, under bubbles. -->
             <g class="sw-routes">
                 <template for:each={routeShapes} for:item="r">
