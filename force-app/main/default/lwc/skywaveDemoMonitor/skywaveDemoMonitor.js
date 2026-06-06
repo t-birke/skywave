@@ -308,6 +308,21 @@ export default class SkywaveDemoMonitor extends LightningElement {
         const inner = this._parseInner(payload.Payload_Json__c);
 
         switch (payload.Type__c) {
+            case 'session_started':
+                // Earliest event — fired right after the visitor accepts
+                // consent. If the consumer site already resolved IP geo by
+                // then, we get coordinates here and the bubble appears on
+                // the map immediately. If not, we'll get them on
+                // survey_complete instead (no regression).
+                {
+                    const lat = this._toNumber(inner.lat);
+                    const lon = this._toNumber(inner.lon);
+                    if (lat !== null) existing.lat = lat;
+                    if (lon !== null) existing.lon = lon;
+                }
+                if (inner.city) existing.city = inner.city;
+                if (inner.homeAirport) existing.homeAirport = inner.homeAirport;
+                break;
             case 'survey_answer':
                 this.appendSurveyAnswer(existing, payload);
                 break;

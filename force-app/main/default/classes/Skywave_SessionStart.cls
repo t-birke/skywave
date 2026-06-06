@@ -48,11 +48,32 @@ global without sharing class Skywave_SessionStart {
             ? providedId
             : newSessionId();
 
+        // If the consumer site has already resolved IP geolocation, carry it
+        // on the session_started event so the demo monitor can place the
+        // visitor's bubble on the world map immediately — no need to wait
+        // for survey_complete. Best-effort: missing values are simply not
+        // included.
+        Map<String, Object> startPayload = new Map<String, Object>{ 'userAgent' => userAgent };
+        Decimal geoLat = toDecimal(body.get('geoLat'));
+        Decimal geoLon = toDecimal(body.get('geoLon'));
+        if (geoLat != null) startPayload.put('lat', geoLat);
+        if (geoLon != null) startPayload.put('lon', geoLon);
+        Object geoCity    = body.get('geoCity');
+        Object geoRegion  = body.get('geoRegion');
+        Object geoCountry = body.get('geoCountry');
+        if (geoCity    != null) startPayload.put('city',    String.valueOf(geoCity));
+        if (geoRegion  != null) startPayload.put('region',  String.valueOf(geoRegion));
+        if (geoCountry != null) startPayload.put('country', String.valueOf(geoCountry));
+        if (geoLat != null && geoLon != null) {
+            String homeAirport = Skywave_Airports.nearest(geoLat, geoLon);
+            if (homeAirport != null) startPayload.put('homeAirport', homeAirport);
+        }
+
         Skywave_RestUtil.publishEvent(
             'session_started',
             sessionId,
             demoSessionId,
-            new Map<String, Object>{ 'userAgent' => userAgent }
+            startPayload
         );
 
         Map<String, Object> response = new Map<String, Object>{
@@ -63,6 +84,15 @@ global without sharing class Skywave_SessionStart {
         };
         res.statusCode = 200;
         res.responseBody = Blob.valueOf(JSON.serialize(response));
+    }
+
+    private static Decimal toDecimal(Object v) {
+        if (v == null) return null;
+        if (v instanceof Decimal) return (Decimal) v;
+        if (v instanceof Integer) return Decimal.valueOf((Integer) v);
+        if (v instanceof Double)  return Decimal.valueOf((Double) v);
+        try { return Decimal.valueOf(String.valueOf(v)); }
+        catch (Exception e) { return null; }
     }
 
     private static String newSessionId() {

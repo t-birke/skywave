@@ -111,27 +111,37 @@ trigger Skywave_Contact_Update_Trigger on Skywave_Contact_Update__e (after inser
                     }
                 }
             }
+            // IP geolocation: applied uniformly whenever the event carries
+            // it. Both chat_start and survey_complete branches send geo, so
+            // whichever fires first populates the Contact (and the rest are
+            // no-ops since values match). Derives Home_Airport__c too — used
+            // by the chat agent as the default booking origin.
+            if (String.isNotBlank(ev.Geo_City__c))    c.Geo_City__c    = ev.Geo_City__c;
+            if (String.isNotBlank(ev.Geo_Region__c))  c.Geo_Region__c  = ev.Geo_Region__c;
+            if (String.isNotBlank(ev.Geo_Country__c)) c.Geo_Country__c = ev.Geo_Country__c;
+            if (ev.Geo_Latitude__c != null)  c.Geo_Latitude__c  = ev.Geo_Latitude__c;
+            if (ev.Geo_Longitude__c != null) c.Geo_Longitude__c = ev.Geo_Longitude__c;
+            if (ev.Geo_Latitude__c != null && ev.Geo_Longitude__c != null) {
+                String homeAirport = Skywave_Airports.nearest(
+                    ev.Geo_Latitude__c, ev.Geo_Longitude__c);
+                if (homeAirport != null) c.Home_Airport__c = homeAirport;
+            }
+
             if (ev.Update_Type__c == 'survey_complete') {
                 if (String.isNotBlank(ev.Survey_Json__c))    c.Skywave_Survey_Json__c    = ev.Survey_Json__c;
                 if (String.isNotBlank(ev.Survey_Summary__c)) c.Skywave_Survey_Summary__c = ev.Survey_Summary__c;
-                // IP geolocation (best-effort). When we have coordinates,
-                // derive the nearest network airport as the default booking
-                // origin for the chat agent AND so the monitor can place the
-                // visitor's bubble on the world map.
-                if (String.isNotBlank(ev.Geo_City__c))    c.Geo_City__c    = ev.Geo_City__c;
-                if (String.isNotBlank(ev.Geo_Region__c))  c.Geo_Region__c  = ev.Geo_Region__c;
-                if (String.isNotBlank(ev.Geo_Country__c)) c.Geo_Country__c = ev.Geo_Country__c;
-                if (ev.Geo_Latitude__c != null)  c.Geo_Latitude__c  = ev.Geo_Latitude__c;
-                if (ev.Geo_Longitude__c != null) c.Geo_Longitude__c = ev.Geo_Longitude__c;
+                // The monitor's earliest geo placement comes from the
+                // session_started event (Skywave_SessionStart). The
+                // survey_complete monitor event keeps its existing role of
+                // signalling 'done with survey' (drives the bubble's status
+                // chip in the monitor) — geo on the bubble is already there
+                // by the time this fires, so no need to re-broadcast it.
+                Map<String, Object> p = new Map<String, Object>();
                 String homeAirport = null;
                 if (ev.Geo_Latitude__c != null && ev.Geo_Longitude__c != null) {
                     homeAirport = Skywave_Airports.nearest(
                         ev.Geo_Latitude__c, ev.Geo_Longitude__c);
-                    if (homeAirport != null) c.Home_Airport__c = homeAirport;
                 }
-                // Carry geo + derived airport into the monitor event so the
-                // map can place the bubble without a Contact requery.
-                Map<String, Object> p = new Map<String, Object>();
                 if (ev.Geo_Latitude__c != null)  p.put('lat',  ev.Geo_Latitude__c);
                 if (ev.Geo_Longitude__c != null) p.put('lon',  ev.Geo_Longitude__c);
                 if (String.isNotBlank(ev.Geo_City__c))    p.put('city',    ev.Geo_City__c);

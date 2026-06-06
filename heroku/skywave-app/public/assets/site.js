@@ -223,12 +223,24 @@ async function loadEswSnippet(deviceId) {
                 { conversationId, deviceId });
             return;
         }
-        postContactUpsert({
+        const csPayload = {
             type: 'chat_start',
             deviceId,
             demoSessionId: state.demoSessionId,
             conversationId
-        });
+        };
+        // Carry IP geo on chat_start too. The trigger writes it onto the
+        // (possibly brand-new) Contact record, so the visitor's geo lands
+        // on the Contact early — independent of whether they finish the
+        // survey. Best-effort.
+        if (state.geo) {
+            if (state.geo.city)        csPayload.geoCity    = state.geo.city;
+            if (state.geo.region)      csPayload.geoRegion  = state.geo.region;
+            if (state.geo.country)     csPayload.geoCountry = state.geo.country;
+            if (state.geo.lat != null) csPayload.geoLat     = state.geo.lat;
+            if (state.geo.lon != null) csPayload.geoLon     = state.geo.lon;
+        }
+        postContactUpsert(csPayload);
     }, { once: true });
     const ready = Promise.resolve();
 
@@ -551,10 +563,22 @@ async function handleConsent() {
     }
 
     try {
+        // Attach IP geolocation if we already have it (loadGeo runs in
+        // parallel with consent; might be ready or not). If absent, the
+        // session_started event still publishes — the monitor will get
+        // geo on the later survey_complete event instead.
+        const startBody = { userAgent: navigator.userAgent, sessionId: sdkId };
+        if (state.geo) {
+            if (state.geo.lat != null) startBody.geoLat = state.geo.lat;
+            if (state.geo.lon != null) startBody.geoLon = state.geo.lon;
+            if (state.geo.city)        startBody.geoCity = state.geo.city;
+            if (state.geo.region)      startBody.geoRegion = state.geo.region;
+            if (state.geo.country)     startBody.geoCountry = state.geo.country;
+        }
         const res = await fetch('/api/session/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userAgent: navigator.userAgent, sessionId: sdkId })
+            body: JSON.stringify(startBody)
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
