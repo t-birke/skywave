@@ -86,19 +86,30 @@ public without sharing class Skywave_SaveProfile {
             // Avatar upload pipeline — guest-user-safe.
             //
             // The chat-iframe LWC runs as the ESW site guest user (per memory
-            // `reference-ecv2-clt-runtime-context`). That user can:
-            //   - INSERT ContentVersion  ✓ (file storage is permissive)
-            //   - INSERT ContentDocumentLink against Contact  ✗ (guest can't
-            //     see Contact records → platform rejects)
-            //   - UPDATE Contact.ContactCardPicture__c  ✗ (no FLS row for the
-            //     custom field on the guest profile → write silently fails)
+            // reference-ecv2-clt-runtime-context). Two non-obvious limits:
             //
-            // The fix: do the file upload here (stage 1, succeeds), then
-            // publish a Skywave_Contact_Update__e with the Shepherd URL —
-            // the existing trigger runs in System Mode and stamps the
-            // Contact field for us (stage 2, succeeds). The CDL insert is
-            // skipped entirely; it's purely decorative for the Files
-            // related list and we don't need it for the demo.
+            // 1. The guest can INSERT a ContentVersion, but cannot read back
+            //    its parent ContentDocumentId in the same transaction — even
+            //    via Database.queryWithBinds(... SYSTEM_MODE). The platform
+            //    reassigns ownership of guest-uploaded files to a different
+            //    user, and the resulting ContentDocument / link rows aren't
+            //    visible in the guest's sharing scope. Net: any code that
+            //    needs the docId crashes or silently sees null. WORKAROUND:
+            //    use the /sfc/servlet.shepherd/version/download/<cvId>
+            //    Shepherd URL (which references the ContentVersion directly,
+            //    no docId lookup needed). It serves the file content the
+            //    same way as /document/download/<docId>.
+            //
+            // 2. The guest cannot UPDATE Contact.ContactCardPicture__c
+            //    directly — the write silently fails. WORKAROUND: publish a
+            //    Skywave_Contact_Update__e (guests CAN publish PEs) and let
+            //    the existing trigger run in System Mode and stamp the
+            //    Contact field for us.
+            //
+            // Both workarounds combined give a fully guest-safe pipeline.
+            // The legacy ContentDocumentLink insert is skipped — it was
+            // decorative (Files related list on the Contact page in CRM)
+            // and the guest can't insert one against a Contact anyway.
 
             String b64 = avatarBase64;
             Integer commaAt = b64.indexOf(',');
@@ -117,24 +128,22 @@ public without sharing class Skywave_SaveProfile {
                 cv.PathOnClient = String.isBlank(avatarFileName) ? 'avatar.png' : avatarFileName;
                 insert cv;
 
-                Id contentDocId = [
-                    SELECT ContentDocumentId FROM ContentVersion WHERE Id = :cv.Id LIMIT 1
-                ].ContentDocumentId;
-
-                String shepherdUrl = '/sfc/servlet.shepherd/document/download/' + contentDocId;
+                // Version-download URL — see header comment for why we
+                // can't resolve the document Id as the guest user.
+                String shepherdUrl = '/sfc/servlet.shepherd/version/download/' + cv.Id;
                 r.avatarUrl = shepherdUrl;
 
-                // Look up the visitor's deviceId so the trigger can route
-                // the update to the right Contact via Session_Id__c.
+                // Route the Contact stamp through the System-Mode trigger
+                // via a Skywave_Contact_Update__e. Look up the visitor's
+                // deviceId from Contact (this query DOES work for the guest
+                // — Contact reads are permitted, only writes to the custom
+                // field aren't).
                 List<Contact> cs = [
                     SELECT Session_Id__c, Demo_Session__c
                     FROM Contact WHERE Id = :contactId LIMIT 1
                 ];
-                if (cs.isEmpty() || String.isBlank(cs[0].Session_Id__c)) {
-                    System.debug(LoggingLevel.WARN,
-                        'Skywave_SaveProfile: contact ' + contactId +
-                        ' has no Session_Id__c; cannot route avatar PE');
-                } else {
+                if (!cs.isEmpty() && String.isNotBlank(cs[0].Session_Id__c)
+                    && cs[0].Demo_Session__c != null) {
                     EventBus.publish(new Skywave_Contact_Update__e(
                         Update_Type__c     = 'avatar',
                         Device_Id__c       = cs[0].Session_Id__c,
