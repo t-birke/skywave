@@ -5,5 +5,5 @@
     <type>Text</type>
     <length>80</length>
     <required>false</required>
-    <description>Country code from IP geolocation at survey time (ipinfo.io).</description>
+    <description>DEPRECATED 2026-06-07 — IP-derived country now lands on the standard Contact.MailingCountry field. Field kept in source so existing values remain queryable; nothing writes to it anymore.</description>
 </CustomField>

@@ -117,13 +117,14 @@ trigger Skywave_Contact_Update_Trigger on Skywave_Contact_Update__e (after inser
             // no-ops since values match). Derives Home_Airport__c too — used
             // by the chat agent as the default booking origin.
             //
-            // City lands on the standard Contact.MailingCity field (no
-            // separate Geo_City__c). Lat/lon/country still on dedicated geo
-            // fields since there's no perfect standard equivalent for
-            // IP-derived precision.
-            if (String.isNotBlank(ev.Geo_City__c))    c.MailingCity     = ev.Geo_City__c;
-            if (String.isNotBlank(ev.Geo_Region__c))  c.Geo_Region__c   = ev.Geo_Region__c;
-            if (String.isNotBlank(ev.Geo_Country__c)) c.Geo_Country__c  = ev.Geo_Country__c;
+            // City + country land on the standard Contact.MailingCity /
+            // MailingCountry fields. Lat/lon stay on dedicated Geo fields
+            // since there's no perfect standard equivalent for IP-derived
+            // precision. Region kept on Geo_Region__c — the standard
+            // MailingState field is too presumptuous for IP-derived data.
+            if (String.isNotBlank(ev.Geo_City__c))    c.MailingCity    = ev.Geo_City__c;
+            if (String.isNotBlank(ev.Geo_Country__c)) c.MailingCountry = ev.Geo_Country__c;
+            if (String.isNotBlank(ev.Geo_Region__c))  c.Geo_Region__c  = ev.Geo_Region__c;
             if (ev.Geo_Latitude__c != null)  c.Geo_Latitude__c  = ev.Geo_Latitude__c;
             if (ev.Geo_Longitude__c != null) c.Geo_Longitude__c = ev.Geo_Longitude__c;
             if (ev.Geo_Latitude__c != null && ev.Geo_Longitude__c != null) {
