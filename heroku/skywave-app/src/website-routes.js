@@ -106,6 +106,59 @@ export function buildWebsiteRouter({ allowedOrigin }) {
         }
     });
 
+    // ------- /bookings: visitor's active bookings -------
+    //
+    // Re-resolves the contactId from the proof cookie (never trusts the
+    // body) before calling the bookings endpoint. The Apex layer also
+    // re-checks ownership by querying Booking__c WHERE Contact__c =
+    // contactId, so a tampered request can't reveal another user's data.
+    router.get('/bookings', requireProof, async (req, res) => {
+        try {
+            const me = await apexInvoke('POST', '/skywave/website/resolve', {
+                deviceId: req.deviceId,
+                trackingStatus: 'websdk'
+            });
+            req.contactId = me.contactId;
+            const data = await apexInvoke('POST', '/skywave/website/bookings/list', {
+                contactId: me.contactId
+            });
+            res.json(data);
+        } catch (err) {
+            const status = err.response?.status ?? 500;
+            console.error('/bookings failed', status, err.response?.data ?? err.message);
+            res.status(status).json({ error: 'bookings_failed' });
+        }
+    });
+
+    // ------- PUT /profile: write profile fields -------
+    const profileSchema = z.object({
+        firstName: z.string().min(2).max(80),
+        lastName:  z.string().min(2).max(80),
+        email:     z.string().email().max(200),
+        phone:     z.string().max(40).optional()
+    });
+    router.put('/profile', requireProof, validate(profileSchema), async (req, res) => {
+        try {
+            const me = await apexInvoke('POST', '/skywave/website/resolve', {
+                deviceId: req.deviceId,
+                trackingStatus: 'websdk'
+            });
+            req.contactId = me.contactId;
+            const r = await apexInvoke('POST', '/skywave/website/profile/save', {
+                contactId: me.contactId,
+                firstName: req.body.firstName,
+                lastName: req.body.lastName,
+                email: req.body.email,
+                phone: req.body.phone || ''
+            });
+            res.json(r);
+        } catch (err) {
+            const status = err.response?.status ?? 500;
+            console.error('PUT /profile failed', status, err.response?.data ?? err.message);
+            res.status(status).json({ error: 'profile_save_failed' });
+        }
+    });
+
     // ------- /me: smoke test for the proof cookie + Apex round-trip -------
     //
     // Resolves the visitor's full profile from the deviceId in the proof

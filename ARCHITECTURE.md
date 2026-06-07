@@ -235,6 +235,15 @@ bookings, booking creation/management) with public-demo-grade hardening:
 - **Smoke**: `/api/website/session/init` mints/refreshes proof + returns
   Contact profile; `/api/website/me` reads it back. Cross-origin → 403,
   tampered cookie → 401.
+- **Read paths** (Phase 2): `GET /api/website/bookings` (re-resolves
+  contactId from proof, then `Skywave_WebsiteBookings.cls` calls the same
+  `Skywave_GetFlightBookings` invocable the chat agent uses — single
+  source of truth for booking shape). `PUT /api/website/profile` writes
+  via `Skywave_WebsiteSaveProfile.cls` (zod-validated). The customer
+  area UI lives at hash routes `#/profile`, `#/bookings`, `#/booking/:code`
+  and overlays the website backdrop via `skywave-account.js` /
+  `skywave-account.css`. Phone-demo flow runs in the modal layer
+  unchanged — both flows share the same site, no conflicts.
 
 ### 3f. Observability
 
