@@ -86,7 +86,8 @@ public with sharing class Skywave_UpdateContact {
                 Id = req.contactId,
                 FirstName = firstName,
                 LastName = lastName,
-                Email = email
+                Email = email,
+                Profile_Completed__c = true
             );
             // Phone is optional in the text-fallback path; only set when supplied.
             if (String.isNotBlank(phone)) {

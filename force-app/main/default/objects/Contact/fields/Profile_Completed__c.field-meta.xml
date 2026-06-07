@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Profile_Completed__c</fullName>
+    <label>Profile Completed</label>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+    <description>True once the visitor's profile (FirstName, LastName, Email) has been written via the Skywave profile-form pipeline. Persists across chat sessions so a returning visitor skips the form on subsequent bookings.</description>
+</CustomField>

@@ -178,6 +178,7 @@ start_agent agent_router:
                     set @variables.survey_summary = @outputs.summary
                     set @variables.survey_responses_json = @outputs.responsesJson
                     set @variables.resolved_contact_id = @outputs.contactId
+                    set @variables.profile_ever_collected = @outputs.profileEverCollected
                     set @variables.survey_resolved = True
 
             # Central booking load — runs exactly ONCE (active_booking_count starts
@@ -207,16 +208,19 @@ start_agent agent_router:
                 transition to @subagent.flight_booking
 
             | You are a router only. Do NOT answer questions or provide help directly. Always use a transition action.
+
+              The visitor came to Skywave Airlines — assume travel intent by default. When the request is travel-flavoured but vague ("surprise me", "I want to go somewhere", "take me on a trip", "anywhere warm", "somewhere exciting"), route to go_to_flight_booking. The booking subagent has the visitor's survey preferences and the bookable-city catalogue, and will propose a destination. Do NOT route those to off_topic or ambiguous_question.
+
               Route by intent:
-              - Booking a NEW flight (search, choose, pay for a new ticket) -> use go_to_flight_booking
+              - Booking a NEW flight (search, choose, pay) OR vague travel intent ("surprise me", "somewhere warm", "I want to travel") -> use go_to_flight_booking
               - Viewing, canceling, or changing an EXISTING booking or flight -> use go_to_flight_management
               - Seat selection or seat changes on an existing booking -> use go_to_seat_selection
               - Correcting or updating the traveler's first or last name on a booking -> use go_to_name_change
               - Questions about mileage balance, tier points, loyalty points, or frequent flyer miles -> use go_to_mileage_account
               - Support cases, complaints, case status, creating a case -> use go_to_case_management
               - Request to speak to a human agent or live agent -> use go_to_escalation
-              - Ambiguous or unclear requests -> use go_to_ambiguous_question
-              - Off-topic or unrelated questions -> use go_to_off_topic
+              - Ambiguous within an airline context (visitor wants something but isn't clear which booking/case/etc.) -> use go_to_ambiguous_question
+              - Genuinely off-topic and unrelated to travel/airlines (weather chitchat, news, jokes, code help, general knowledge) -> use go_to_off_topic
               Never attempt to help the customer yourself. Always route.
 
         actions:
@@ -337,6 +341,12 @@ start_agent agent_router:
                     is_displayable: False
                     is_used_by_planner: True
                     complex_data_type_name: "lightning__textType"
+                "profileEverCollected": boolean
+                    description: "True if the visitor has previously completed the profile form (Contact.Profile_Completed__c). Pinned into profile_ever_collected so a returning visitor skips the form on subsequent bookings."
+                    label: "Profile Ever Collected"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__booleanType"
 
         get_bookings:
             description: "Gets all active flight bookings for the user plus a scalar bookingCount. Run once at the router and once after a booking confirms; no subagent re-fetches."
@@ -412,6 +422,8 @@ subagent flight_booking:
 
             if @variables.booking_step == "":
                 | STEP 1 — Search. Collect origin (IATA), destination (IATA), departure date (YYYY-MM-DD), and fare class, then call {!@actions.search_flights}. Skip seat and baggage for now. Use canonical fare class names: Economy, Premium Economy, Business, First (treat synonyms like "economy plus" → Premium Economy, "business class" → Business).
+
+                  VAGUE REQUESTS — when the visitor's intent is travel-flavoured but unspecific ("surprise me", "anywhere warm", "I want to go somewhere", "take me on a trip"), DO NOT ask for clarification. PROPOSE a destination yourself, derived from their survey preferences (vibe + region) plus their home airport. Example: "Sure — I see you like beaches and Latin America. How about a flight to Rio de Janeiro? Tell me a date and I'll show you your options." Then wait for the date and fare class. If you have NO survey preferences (visitor skipped survey or had no cookie), pick a popular Skywave destination as the suggestion and explicitly invite them to suggest a different one ("…or somewhere else if you have a place in mind"). Never refuse to suggest.
 
                   SKYWAVE NETWORK — only ever book cities Skywave actually serves. Skywave is a New York JFK hub carrier. search_flights handles routing for you: if there is no direct flight between the requested origin and destination, it automatically returns a single connecting itinerary through the JFK hub (shown on the card as "1 stop · JFK") with the through-fare and total duration. So you do NOT need to force JFK as origin — pass the visitor's real origin and the engine will connect them. Just make sure BOTH the origin and the destination are airports in the list below; never invent a city we don't fly to.
 

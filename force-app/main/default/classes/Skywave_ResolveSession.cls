@@ -46,6 +46,9 @@ public with sharing class Skywave_ResolveSession {
 
         @InvocableVariable(label='Home airport (IATA) derived from IP geolocation')
         public String homeAirport;
+
+        @InvocableVariable(label='Profile ever collected')
+        public Boolean profileEverCollected;
     }
 
     @InvocableMethod(
@@ -69,6 +72,7 @@ public with sharing class Skywave_ResolveSession {
         out.answerCount = 0;
         out.responsesJson = '{}';
         out.summary = '';
+        out.profileEverCollected = false;
 
         if (String.isBlank(conversationId)) {
             return out;
@@ -76,17 +80,30 @@ public with sharing class Skywave_ResolveSession {
 
         List<Contact> contacts = [
             SELECT Id, Skywave_Survey_Json__c, Skywave_Survey_Summary__c,
-                   Home_Airport__c, MailingCity
+                   Home_Airport__c, MailingCity, Profile_Completed__c
             FROM Contact
             WHERE Skywave_Conversation_Id__c = :conversationId
             LIMIT 1
         ];
+        Contact c;
         if (contacts.isEmpty()) {
-            return out;
+            // No Contact for this conversation yet — common when the visitor
+            // skipped/blocked the SDK cookie OR opens chat without finishing
+            // the survey first. Mint a placeholder Contact so downstream
+            // booking actions always have a real Id to write against. The
+            // anonymous-survey path's trigger does the same thing on
+            // chat_start; this is the agent-side mirror.
+            c = new Contact(
+                LastName = conversationId,
+                Skywave_Conversation_Id__c = conversationId
+            );
+            insert c;
+        } else {
+            c = contacts[0];
         }
-        Contact c = contacts[0];
         out.contactId = c.Id;
         out.homeAirport = c.Home_Airport__c;
+        out.profileEverCollected = (c.Profile_Completed__c == true);
 
         if (String.isNotBlank(c.Skywave_Survey_Json__c)) {
             out.responsesJson = c.Skywave_Survey_Json__c;

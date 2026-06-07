@@ -72,7 +72,8 @@ public without sharing class Skywave_SaveProfile {
                 FirstName = fn,
                 LastName = ln,
                 Email = em,
-                Phone = ph
+                Phone = ph,
+                Profile_Completed__c = true
             );
             update c;
             r.contactId = contactId;
