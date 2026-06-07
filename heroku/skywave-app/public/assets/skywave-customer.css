@@ -303,6 +303,48 @@
     margin: 8px 0 0;
 }
 
+/* ---- airport autocomplete ---- */
+
+.skywave-site .cust-ac-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 8px 28px rgba(13, 27, 42, 0.18);
+    z-index: 50;
+    overflow: hidden;
+    max-height: 280px;
+    overflow-y: auto;
+}
+.skywave-site .cust-ac-opt {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    cursor: pointer;
+    color: #0D1B2A;
+    font-size: 14px;
+    transition: background 100ms;
+}
+.skywave-site .cust-ac-opt:hover,
+.skywave-site .cust-ac-opt.active {
+    background: rgba(20, 184, 166, 0.1);
+}
+.skywave-site .cust-ac-city {
+    font-weight: 500;
+}
+.skywave-site .cust-ac-code {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: #0d9488;
+    background: rgba(20, 184, 166, 0.12);
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+
 /* ---- search results (book page) ---- */
 
 .skywave-site .cust-results {

@@ -159,6 +159,32 @@ export function buildWebsiteRouter({ allowedOrigin }) {
         }
     });
 
+    // ------- /airports: static airport network for autocomplete -------
+    //
+    // Cached process-wide for the lifetime of the dyno. The network is
+    // small (~30 airports) and static, so we don't round-trip to SF on
+    // every keystroke. Refresh on dyno restart is fine — schedule
+    // changes are rare and require a redeploy anyway.
+    let airportsCache = null;
+    let airportsCachedAt = 0;
+    const AIRPORTS_TTL_MS = 60 * 60 * 1000;
+    router.get('/airports', async (req, res) => {
+        const now = Date.now();
+        if (airportsCache && (now - airportsCachedAt) < AIRPORTS_TTL_MS) {
+            return res.json(airportsCache);
+        }
+        try {
+            const data = await apexInvoke('GET', '/skywave/website/airports');
+            airportsCache = data;
+            airportsCachedAt = now;
+            res.json(data);
+        } catch (err) {
+            const status = err.response?.status ?? 500;
+            console.error('/airports failed', status, err.response?.data ?? err.message);
+            res.status(status).json({ error: 'airports_failed' });
+        }
+    });
+
     // ------- /flights/search: multi-fare-class flight search -------
     //
     // Read-only (no proof required: search is browseable while

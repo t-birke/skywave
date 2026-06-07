@@ -670,13 +670,19 @@ function wireNavInteractions() {
         const form = e.target.closest('[data-search-form]');
         if (!form) return;
         e.preventDefault();
+        const originField = form.querySelector('input[name="origin"]');
+        const destField = form.querySelector('input[name="destination"]');
+        // Prefer the canonical IATA stamped on the input by the
+        // autocomplete picker; fall back to extracting a 3-letter code
+        // from the visible text if the user typed it themselves
+        // ("(SEA)" or just "SEA").
+        const origin = resolveAirportInput(originField);
+        const destination = resolveAirportInput(destField);
         const fd = new FormData(form);
-        const origin = (fd.get('origin') || '').toString().trim().toUpperCase();
-        const destination = (fd.get('destination') || '').toString().trim().toUpperCase();
         const date = (fd.get('date') || '').toString().trim();
         const fareClass = (fd.get('fareClass') || 'Economy').toString();
-        if (origin.length !== 3 || destination.length !== 3 || !date) {
-            alert('Enter origin and destination IATA codes (3 letters each) and a date.');
+        if (!origin || !destination || !date) {
+            alert('Pick an origin, a destination, and a date.');
             return;
         }
         const params = new URLSearchParams({ origin, destination, date, fareClass });
@@ -695,6 +701,145 @@ function prefillSearchDefaults() {
         d.setDate(d.getDate() + 14);
         dateField.value = d.toISOString().slice(0, 10);
     }
+    // Wire the origin/destination inputs for autocomplete. Loads the
+    // airport list lazily on first focus so we don't pay for it on
+    // pages where the visitor never opens the search form.
+    document.querySelectorAll('[data-search-form] input[name="origin"], [data-search-form] input[name="destination"]')
+        .forEach(input => attachAirportAutocomplete(input));
+}
+
+function resolveAirportInput(input) {
+    if (!input) return null;
+    if (input.dataset.iata) return input.dataset.iata.toUpperCase();
+    const v = (input.value || '').trim();
+    // Accept "City (CODE)" or bare "CODE" the user typed manually.
+    const paren = v.match(/\(([A-Z]{3})\)$/i);
+    if (paren) return paren[1].toUpperCase();
+    if (/^[A-Za-z]{3}$/.test(v)) return v.toUpperCase();
+    return null;
+}
+
+// ---------- airport autocomplete ----------
+//
+// Two parallel filters: matches anything whose city OR code starts with
+// (or contains) the typed string. Display is "City (CODE)". Keyboard
+// navigation (↑/↓/Enter/Esc) plus mouse click. Selecting an option fills
+// the input with "City (CODE)" and stores the IATA on the input's
+// dataset so the form submit reads the canonical code, not whatever
+// the user typed.
+
+let airportListPromise = null;
+
+function loadAirports() {
+    if (!airportListPromise) {
+        airportListPromise = fetch('/api/website/airports', { credentials: 'same-origin' })
+            .then(r => r.ok ? r.json() : { airports: [] })
+            .then(d => d.airports || [])
+            .catch(() => []);
+    }
+    return airportListPromise;
+}
+
+function attachAirportAutocomplete(input) {
+    if (input.dataset.acAttached === '1') return;
+    input.dataset.acAttached = '1';
+    input.setAttribute('autocomplete', 'off');
+    input.setAttribute('spellcheck', 'false');
+
+    let airports = [];
+    let menu = null;
+    let activeIdx = -1;
+    let currentMatches = [];
+
+    loadAirports().then(list => { airports = list; });
+
+    function ensureMenu() {
+        if (menu) return menu;
+        menu = document.createElement('div');
+        menu.className = 'cust-ac-menu';
+        // Position relative to the parent .s-field so we ride along even
+        // when the page reflows.
+        const wrap = input.closest('.s-field') || input.parentElement;
+        wrap.style.position = 'relative';
+        wrap.appendChild(menu);
+        return menu;
+    }
+
+    function closeMenu() {
+        if (menu) menu.style.display = 'none';
+        activeIdx = -1;
+    }
+
+    function filter(q) {
+        q = (q || '').trim().toLowerCase();
+        if (!q) return airports.slice(0, 8);
+        // Two parallel filters: code starts-with, or city contains.
+        // Code-startsWith ranks higher (so typing "S" → SEA, SFO, SIN, SYD
+        // bubble above "Singapore" / "Sydney" matches).
+        const codeMatches = airports.filter(a => a.code.toLowerCase().startsWith(q));
+        const cityMatches = airports.filter(a =>
+            a.city.toLowerCase().includes(q) && !codeMatches.includes(a)
+        );
+        return codeMatches.concat(cityMatches).slice(0, 8);
+    }
+
+    function render(matches) {
+        const m = ensureMenu();
+        m.innerHTML = '';
+        if (!matches.length) { closeMenu(); return; }
+        m.style.display = '';
+        matches.forEach((a, i) => {
+            const opt = document.createElement('div');
+            opt.className = 'cust-ac-opt' + (i === activeIdx ? ' active' : '');
+            opt.dataset.code = a.code;
+            opt.innerHTML = `<span class="cust-ac-city">${a.city}</span>` +
+                `<span class="cust-ac-code">${a.code}</span>`;
+            opt.addEventListener('mousedown', (e) => {
+                e.preventDefault();  // prevent input blur before click registers
+                pick(a);
+            });
+            m.appendChild(opt);
+        });
+        currentMatches = matches;
+    }
+
+    function pick(a) {
+        input.value = `${a.city} (${a.code})`;
+        input.dataset.iata = a.code;
+        closeMenu();
+    }
+
+    input.addEventListener('focus', () => {
+        render(filter(input.value));
+    });
+    input.addEventListener('input', () => {
+        delete input.dataset.iata;  // user is typing — clear committed selection
+        activeIdx = -1;
+        render(filter(input.value));
+    });
+    input.addEventListener('blur', () => {
+        // Delay so click on a menu option fires first.
+        setTimeout(closeMenu, 120);
+    });
+    input.addEventListener('keydown', (e) => {
+        if (!menu || menu.style.display === 'none') return;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            activeIdx = Math.min(currentMatches.length - 1, activeIdx + 1);
+            render(currentMatches);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            activeIdx = Math.max(0, activeIdx - 1);
+            render(currentMatches);
+        } else if (e.key === 'Enter') {
+            if (activeIdx >= 0 && currentMatches[activeIdx]) {
+                e.preventDefault();
+                pick(currentMatches[activeIdx]);
+            }
+        } else if (e.key === 'Escape') {
+            closeMenu();
+        }
+    });
 }
 
 export async function startCustomer() {
