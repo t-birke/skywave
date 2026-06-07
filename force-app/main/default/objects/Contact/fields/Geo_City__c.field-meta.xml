@@ -5,5 +5,5 @@
     <type>Text</type>
     <length>120</length>
     <required>false</required>
-    <description>City from IP geolocation at survey time (ipinfo.io).</description>
+    <description>DEPRECATED 2026-06-07 — IP-derived city now lands on the standard Contact.MailingCity field. Field kept in source so existing values remain queryable; nothing writes to it anymore.</description>
 </CustomField>

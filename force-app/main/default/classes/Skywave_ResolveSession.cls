@@ -76,7 +76,7 @@ public with sharing class Skywave_ResolveSession {
 
         List<Contact> contacts = [
             SELECT Id, Skywave_Survey_Json__c, Skywave_Survey_Summary__c,
-                   Home_Airport__c, Geo_City__c
+                   Home_Airport__c, MailingCity
             FROM Contact
             WHERE Skywave_Conversation_Id__c = :conversationId
             LIMIT 1
@@ -103,8 +103,8 @@ public with sharing class Skywave_ResolveSession {
         // Weave the IP-derived home airport into the summary so the booking
         // subagent can default the origin without a separate action.
         if (String.isNotBlank(c.Home_Airport__c)) {
-            String locale = String.isNotBlank(c.Geo_City__c)
-                ? c.Geo_City__c + ' (nearest Skywave airport ' + c.Home_Airport__c + ')'
+            String locale = String.isNotBlank(c.MailingCity)
+                ? c.MailingCity + ' (nearest Skywave airport ' + c.Home_Airport__c + ')'
                 : c.Home_Airport__c;
             out.summary = (String.isBlank(out.summary) ? '' : out.summary + ' ')
                 + 'The visitor appears to be near ' + locale
