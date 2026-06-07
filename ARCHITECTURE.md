@@ -265,6 +265,16 @@ bookings, booking creation/management) with public-demo-grade hardening:
   as the chat path, so segment shape and connection routing (JFK hub)
   are identical. Engine wart still applies (PAR→JFK→ROM gives a 40h
   itinerary), exposed when destination has no direct route.
+- **Booking management** (Phase 4): per-booking actions on
+  `#booking/:code` via `Skywave_WebsiteManageBooking.cls`. Cancel
+  flips `Booking__c.Status__c='Cancelled'` + `Payment_Status__c=
+  'Refunded'`; change seat updates `Booking_Segment__c.Seat_Number__c`
+  by segment order. Both re-verify ownership server-side (Booking__c
+  must belong to the proof-cookie's contactId, 404 otherwise — defense
+  in depth on top of the relay's already-resolved contactId). Both
+  publish a `Demo_Event__e` so the live monitor can react. Name change
+  links to the existing profile-edit page since names live on Contact,
+  not per-booking.
 
 ### 3f. Observability
 

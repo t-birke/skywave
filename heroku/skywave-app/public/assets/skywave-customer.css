@@ -303,6 +303,54 @@
     margin: 8px 0 0;
 }
 
+/* ---- booking detail actions ---- */
+
+.skywave-site .cust-detail-actions {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 16px 0 0;
+    border-top: 1px solid #eef2f6;
+    margin-top: 8px;
+}
+.skywave-site .cust-action-link {
+    background: none;
+    border: none;
+    color: #0d9488;
+    font: inherit;
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: none;
+    cursor: pointer;
+    padding: 6px 0;
+}
+.skywave-site .cust-action-link:hover { text-decoration: underline; }
+.skywave-site .cust-action-link.danger { color: #dc2626; }
+.skywave-site .cust-action-link.small { font-size: 13px; }
+
+.skywave-site .cust-segment-foot {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #eef2f6;
+    grid-column: 1 / -1;
+    text-align: right;
+}
+.skywave-site .cust-segment-toast {
+    grid-column: 1 / -1;
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: rgba(20, 184, 166, 0.1);
+    border-radius: 8px;
+    color: #0d9488;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.skywave-site .cust-booked-icon.cancelled {
+    background: #dc2626;
+}
+
 /* ---- airport autocomplete ---- */
 
 .skywave-site .cust-ac-menu {

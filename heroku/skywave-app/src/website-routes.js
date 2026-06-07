@@ -245,6 +245,56 @@ export function buildWebsiteRouter({ allowedOrigin }) {
         }
     });
 
+    // ------- POST /bookings/:code/cancel: cancel a booking -------
+    router.post('/bookings/:code/cancel', requireProof, async (req, res) => {
+        const code = req.params.code;
+        if (!/^[A-Z0-9]{4,12}$/.test(code)) {
+            return res.status(400).json({ error: 'invalid_code' });
+        }
+        try {
+            const me = await apexInvoke('POST', '/skywave/website/resolve', {
+                deviceId: req.deviceId, trackingStatus: 'websdk'
+            });
+            req.contactId = me.contactId;
+            const data = await apexInvoke('POST', '/skywave/website/bookings/manage/cancel', {
+                contactId: me.contactId, bookingCode: code
+            });
+            res.json(data);
+        } catch (err) {
+            const status = err.response?.status ?? 500;
+            console.error('cancel booking failed', status, err.response?.data ?? err.message);
+            res.status(status).json(err.response?.data ?? { error: 'cancel_failed' });
+        }
+    });
+
+    // ------- POST /bookings/:code/seat: change seat on a segment -------
+    const seatSchema = z.object({
+        segmentOrder: z.number().int().min(1).max(10),
+        newSeat: z.string().regex(/^\d{1,2}[A-Z]$/i)
+    });
+    router.post('/bookings/:code/seat', requireProof, validate(seatSchema), async (req, res) => {
+        const code = req.params.code;
+        if (!/^[A-Z0-9]{4,12}$/.test(code)) {
+            return res.status(400).json({ error: 'invalid_code' });
+        }
+        try {
+            const me = await apexInvoke('POST', '/skywave/website/resolve', {
+                deviceId: req.deviceId, trackingStatus: 'websdk'
+            });
+            req.contactId = me.contactId;
+            const data = await apexInvoke('POST', '/skywave/website/bookings/manage/seat', {
+                contactId: me.contactId, bookingCode: code,
+                segmentOrder: req.body.segmentOrder,
+                newSeat: req.body.newSeat
+            });
+            res.json(data);
+        } catch (err) {
+            const status = err.response?.status ?? 500;
+            console.error('change seat failed', status, err.response?.data ?? err.message);
+            res.status(status).json(err.response?.data ?? { error: 'seat_change_failed' });
+        }
+    });
+
     // ------- /me: smoke test for the proof cookie + Apex round-trip -------
     //
     // Resolves the visitor's full profile from the deviceId in the proof
