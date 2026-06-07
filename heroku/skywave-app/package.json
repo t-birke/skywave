@@ -17,9 +17,13 @@
         "@grpc/proto-loader": "^0.7.13",
         "avro-js": "^1.12.0",
         "axios": "^1.7.7",
+        "cookie-parser": "^1.4.7",
         "dotenv": "^16.4.5",
         "express": "^4.21.0",
+        "express-rate-limit": "^7.4.1",
+        "helmet": "^8.0.0",
         "jsonwebtoken": "^9.0.2",
-        "ws": "^8.18.0"
+        "ws": "^8.18.0",
+        "zod": "^3.23.8"
     }
 }

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Tracking_Status__c</fullName>
+    <label>Tracking Status</label>
+    <description>Provenance of the deviceId sealed into the visitor's Heroku skywave_proof cookie. websdk = real WebSDK anonymous Id (datagraph-linked). synthetic = Heroku-minted UUID because WebSDK was blocked or unavailable. opted_out = visitor explicitly opted out; downstream Data Cloud streaming should skip them. Used by Data Cloud segments to filter to the trackable population.</description>
+    <type>Picklist</type>
+    <required>false</required>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>websdk</fullName>
+                <default>false</default>
+                <label>WebSDK</label>
+            </value>
+            <value>
+                <fullName>synthetic</fullName>
+                <default>false</default>
+                <label>Synthetic</label>
+            </value>
+            <value>
+                <fullName>opted_out</fullName>
+                <default>false</default>
+                <label>Opted Out</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

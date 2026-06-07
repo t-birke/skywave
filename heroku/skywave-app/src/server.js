@@ -2,20 +2,23 @@
 // One Node process, one Heroku dyno.
 
 import express from 'express';
-import axios from 'axios';
+import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { startPubSubSubscriber } from './pubsub-client.js';
 import { register, fanOut, activeCount } from './ws-fanout.js';
-import { getSalesforceToken } from './sf-auth.js';
+import { forwardToApex } from './sf-api.js';
+import { buildWebsiteRouter } from './website-routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
 
 const app = express();
-app.use(express.json());
+app.set('trust proxy', 1);  // Heroku terminates TLS one hop in front
+app.use(express.json({ limit: '256kb' }));
+app.use(cookieParser());
 app.use(express.static(path.resolve(__dirname, '../public')));
 
 app.get('/healthz', (_, res) => {
@@ -48,24 +51,17 @@ app.get('/api/config', (_, res) => {
     });
 });
 
-// Phones call the relay; the relay forwards to Apex with the integration
-// user's JWT-bearer token. Phones stay anonymous to Salesforce.
-async function forwardToApex(method, apexPath, body, res, label) {
-    try {
-        const { accessToken, instanceUrl } = await getSalesforceToken();
-        const url = `${instanceUrl}/services/apexrest${apexPath}`;
-        const cfg = { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } };
-        const sf = method === 'GET'
-            ? await axios.get(url, cfg)
-            : await axios.post(url, body || {}, cfg);
-        res.json(sf.data);
-    } catch (err) {
-        const status = err.response?.status ?? 500;
-        const data = err.response?.data ?? { error: err.message };
-        console.error(`${label} failed`, status, data);
-        res.status(status).json(data);
-    }
-}
+// Phones call the relay; the relay forwards to Apex via the shared sfApi
+// module (keep-alive HTTPS, JWT-bearer cached). Phones stay anonymous to
+// Salesforce. forwardToApex is the legacy helper kept for the phone-demo
+// surface; new website routes use apexInvoke / query / apexInvocable
+// directly so handlers can shape responses and audit-log outcomes.
+//
+// Hardened website surface — proof cookie, helmet, CORS, rate limits,
+// audit log, zod validation. Mounted under /api/website/* so the legacy
+// /api/* phone-demo routes are untouched.
+const allowedOrigin = process.env.SKYWAVE_PUBLIC_ORIGIN || 'http://localhost:3000';
+app.use('/api/website', buildWebsiteRouter({ allowedOrigin }));
 
 app.post('/api/session/start',     (req, res) => forwardToApex('POST', '/skywave/session/start',    req.body, res, 'session/start'));
 // Note: /api/session/identify is NOT a Heroku route — phones POST

@@ -203,6 +203,39 @@ name fields for a personalized greeting. Escalation is single-hop to a queue
 via routing flow. Setup specifics live in the `voice-agent-demo` skill and
 memory `skywave-voice-agent`.
 
+### 3e'. Hardened website surface (`/api/website/*`)
+
+A separate, cookie-identified API layer for the Skywave website (profile,
+bookings, booking creation/management) with public-demo-grade hardening:
+
+- **JWT identity**: `skywave.website@skywave-interactive.demo` user, scoped
+  to the `Skywave_Heroku_Website` permset (Contact CRUD only). Pre-authorized
+  on the existing `Skywave_Heroku_Relay` Connected App via UI permset assignment.
+  The phone-demo `Skywave_Heroku_Relay_Integration` permset stays read-only.
+- **Identity boundary**: visitor's WebSDK deviceId is sealed into a separate
+  Heroku-minted `skywave_proof` cookie (HMAC-SHA256, httpOnly, SameSite=Strict).
+  WebSDK cookie is left untouched so Data Cloud datagraph continuity is
+  preserved. JS can read the WebSDK Id; only the server can mint or verify
+  the proof. XSS exfiltrating the WebSDK Id can't act on it without the
+  matching httpOnly proof. Endpoint identity is ALWAYS the proof's deviceId
+  → `Skywave_WebsiteResolveSession.cls` looks up `Contact.Session_Id__c`,
+  mints a placeholder Contact when absent.
+- **Tracking provenance**: `Contact.Tracking_Status__c` = `websdk` |
+  `synthetic` | `opted_out`. Stamped on first sight by ResolveSession.
+  Data Cloud segments filter on `websdk` for datagraph-linked populations.
+  `opted_out` is sticky once set.
+- **Hardening stack** (in `src/api-middleware.js`): helmet (CSP + HSTS +
+  X-Frame-Options), strict same-origin CORS, dual-bucket rate limit (60
+  req/min IP + 30 req/min cookie), zod schema validation per route,
+  single-line JSON audit log per request (cookie + IP + route + outcome).
+- **Performance**: shared HTTPS keep-alive agent (`src/sf-api.js`) pools
+  every SF call, eliminating ~100ms TCP+TLS per request after first. JWT
+  cached 2h, refreshed silently. Cold-start total ~500-1000ms (JWT mint +
+  first SF roundtrip); warm calls ~150-300ms (SF roundtrip dominates).
+- **Smoke**: `/api/website/session/init` mints/refreshes proof + returns
+  Contact profile; `/api/website/me` reads it back. Cross-origin → 403,
+  tampered cookie → 401.
+
 ### 3f. Observability
 
 Agentforce session traces land in Data Cloud STDM DMOs; `AgentforceOptimize‑
