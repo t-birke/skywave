@@ -1,67 +1,42 @@
 // skywave-session.js — establishes the website's hardened session context.
 //
 // Lifecycle:
-//   1. Wait briefly for the WebSDK to attach window.SalesforceInteractions.
-//   2. Read its anonymousId (this is the deviceId Data Cloud already knows
-//      about — preserve it). If the SDK is absent / blocked, send no
-//      deviceId and let the server mint a synthetic UUID.
-//   3. POST /api/website/session/init. Server responds with { contactId,
-//      profile, ... } and Set-Cookie: skywave_proof (httpOnly, server-bound).
-//   4. Cache the resolved profile in memory under window.skywaveSession for
-//      the page modules (profile, bookings, etc.) to read.
+//   1. Load the Salesforce Interactions Web SDK (shared loader, see
+//      skywave-sdk.js). Wait for SDK init to settle and resolve the
+//      anonymous deviceId. This is the deviceId Data Cloud already
+//      knows about — preserve it across the website + chat surfaces.
+//   2. POST /api/website/session/init with the resolved deviceId (or
+//      empty body if SDK is unavailable / blocked). Server responds
+//      with { contactId, profile, ... } and Set-Cookie: skywave_proof
+//      (httpOnly, server-bound).
+//   3. Cache the resolved profile under window.skywaveSession for
+//      page modules to read.
 //
-// Subsequent pages use the proof cookie automatically — they don't need to
-// re-read the WebSDK Id, the Heroku side is now the source of truth for
-// identity. The WebSDK cookie continues serving Data Cloud event streaming.
+// Subsequent API calls use the proof cookie automatically — they don't
+// re-read the WebSDK Id, the Heroku side is now the source of truth
+// for identity. The WebSDK cookie keeps serving Data Cloud event
+// streaming.
 //
-// On any error (network down, SF down, blocked by privacy mode), we degrade
-// to "anonymous browsing" — pages that need identity render a "sign-in
-// required" affordance instead of crashing.
+// On any error (SDK absent, network down, SF down) we degrade to
+// "anonymous browsing" — pages that need identity render a friendly
+// affordance instead of crashing.
 
-const SDK_WAIT_MS = 2000;
-
-async function waitForSdk(maxMs = SDK_WAIT_MS) {
-    if (window.SalesforceInteractions?.getAnonymousId) {
-        return window.SalesforceInteractions;
-    }
-    return new Promise(resolve => {
-        let elapsed = 0;
-        const step = 100;
-        const t = setInterval(() => {
-            if (window.SalesforceInteractions?.getAnonymousId) {
-                clearInterval(t);
-                resolve(window.SalesforceInteractions);
-                return;
-            }
-            elapsed += step;
-            if (elapsed >= maxMs) {
-                clearInterval(t);
-                resolve(null);
-            }
-        }, step);
-    });
-}
-
-function readSdkDeviceId() {
-    try {
-        const sdk = window.SalesforceInteractions;
-        const id = sdk?.getAnonymousId?.();
-        return id && /^[A-Za-z0-9_-]{8,64}$/.test(id) ? id : null;
-    } catch (_) {
-        return null;
-    }
-}
+import { loadSdk } from './skywave-sdk.js';
 
 let sessionPromise = null;
 
-export function initSession({ optedOut = false } = {}) {
-    if (sessionPromise) return sessionPromise;
+export function initSession({ optedOut = false, force = false } = {}) {
+    if (sessionPromise && !force) return sessionPromise;
     sessionPromise = (async () => {
-        await waitForSdk();
-        const deviceId = readSdkDeviceId();
+        const { deviceId, source } = await loadSdk();
         const body = {};
         if (deviceId) body.deviceId = deviceId;
         if (optedOut) body.optedOut = true;
+        // Stamp the source on console for visibility — useful when the
+        // demo is being debugged. Server logs the same outcome via the
+        // Tracking_Status__c stamp.
+        console.log('[skywave] session/init source=' + source +
+            (deviceId ? ' deviceId=' + deviceId.slice(0, 6) + '…' : ' (no deviceId)'));
         const res = await fetch('/api/website/session/init', {
             method: 'POST',
             credentials: 'same-origin',
@@ -72,6 +47,8 @@ export function initSession({ optedOut = false } = {}) {
             throw new Error(`session/init failed: HTTP ${res.status}`);
         }
         const data = await res.json();
+        console.log('[skywave] session/init resolved contactId=' + data.contactId +
+            ' tracking=' + data.trackingStatus);
         window.skywaveSession = data;
         return data;
     })();

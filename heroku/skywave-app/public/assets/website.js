@@ -27,17 +27,22 @@ const HTML = `
     </div>
 
     <div class="nav-links">
-        <a class="active">Flights</a>
+        <a class="active" data-route="#book">Flights</a>
         <a>Hotels</a>
         <a>Cars</a>
         <a>Vacations</a>
         <a>Deals</a>
+        <a data-route="#bookings">My bookings</a>
         <a>SkyRewards</a>
     </div>
 
-    <div class="nav-right">
-        <a class="nav-link-text desktop-item">Sign in</a>
-        <button class="nav-btn desktop-item">Join SkyRewards</button>
+    <div class="nav-right" data-identity-slot>
+        <a class="nav-link-text desktop-item" data-action="signin" data-when="anonymous">Sign in</a>
+        <button class="nav-btn desktop-item" data-when="anonymous">Join SkyRewards</button>
+        <a class="nav-greeting desktop-item" data-when="identified" data-route="#profile" hidden>
+            <span class="nav-greeting-avatar"></span>
+            <span class="nav-greeting-text"></span>
+        </a>
         <button class="hamburger-btn" data-action="toggle-burger" aria-label="Open menu">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line>
@@ -49,17 +54,22 @@ const HTML = `
 <div class="mobile-nav-drawer" data-burger-drawer>
     <div class="mob-drawer-inner">
         <div class="mob-nav-links">
-            <a class="active">Flights</a>
+            <a class="active" data-route="#book">Flights</a>
             <a>Hotels</a>
             <a>Cars</a>
             <a>Vacations</a>
             <a>Deals</a>
+            <a data-route="#bookings">My bookings</a>
             <a>SkyRewards</a>
         </div>
         <div class="mob-drawer-footer">
-            <div class="mob-user-links">
-                <a>Sign in</a>
-                <a>Join SkyRewards</a>
+            <div class="mob-user-links" data-identity-slot>
+                <a data-when="anonymous" data-action="signin">Sign in</a>
+                <a data-when="anonymous">Join SkyRewards</a>
+                <a data-when="identified" data-route="#profile" hidden>
+                    <span class="nav-greeting-avatar"></span>
+                    <span class="nav-greeting-text"></span>
+                </a>
             </div>
         </div>
     </div>
@@ -155,7 +165,18 @@ const HTML = `
     </div>
 </section>
 
-<div class="main">
+<!-- Customer-area sections render inline with the rest of the website,
+     replacing nothing. They're hidden by default and shown when the
+     visitor follows a hash route (e.g. clicks "My bookings"). The hero
+     stays visible above; the rest of the page (deals, points banner)
+     hides while a customer route is active so the page reads as
+     "you're now in your account" without removing the website
+     surrounding chrome. -->
+<section id="customer-area" class="customer-area" data-state="hidden">
+    <div class="customer-inner"></div>
+</section>
+
+<div class="main" data-customer-aware>
     <div class="section">
         <div class="section-head">
             <h2 class="section-title">Featured deals</h2>

@@ -240,10 +240,18 @@ bookings, booking creation/management) with public-demo-grade hardening:
   `Skywave_GetFlightBookings` invocable the chat agent uses — single
   source of truth for booking shape). `PUT /api/website/profile` writes
   via `Skywave_WebsiteSaveProfile.cls` (zod-validated). The customer
-  area UI lives at hash routes `#/profile`, `#/bookings`, `#/booking/:code`
-  and overlays the website backdrop via `skywave-account.js` /
-  `skywave-account.css`. Phone-demo flow runs in the modal layer
-  unchanged — both flows share the same site, no conflicts.
+  area UI is **integrated directly into the airline website** (not a
+  separate console): the existing nav grows a "My bookings" link and an
+  identity slot that swaps "Sign in" for the visitor's name + tier when
+  they have a profile. Hash routes `#bookings`, `#booking/:code`,
+  `#profile`, `#book` render inline into a `<section id="customer-area">`
+  between the hero and the deals grid; the deals/points content hides
+  while a customer route is active so the page reads as "you're in your
+  account" but the hero, nav, and footer all stay visible. Identity is
+  always-on: `skywave-customer.js` calls `initSession()` on page load
+  (after the WebSDK resolves the deviceId via the shared
+  `skywave-sdk.js` loader) so the nav greeting reflects identity
+  reactively. Phone-demo flow runs in the modal layer unchanged.
 
 ### 3f. Observability
 

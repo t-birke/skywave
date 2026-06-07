@@ -15,7 +15,7 @@
 // The presenter advances stage via the monitor LWC; phones follow via WS.
 
 import { renderWebsite } from './website.js';
-import { startAccount } from './skywave-account.js';
+import { startCustomer } from './skywave-customer.js';
 
 const CONSENT_KEY = 'skywave.consent.v1';
 // `root` is the modal content container — the demo flow renders INTO the
@@ -62,11 +62,15 @@ if (modalRoot) {
 // Render the website backdrop once on boot. It never re-renders.
 if (siteRoot) renderWebsite(siteRoot);
 
-// Wire the customer-area hash routes (#/profile, #/bookings, #/booking/:code).
-// Renders into a panel inside #site-root that overlays the website hero
-// when an account route is active. Stays dormant otherwise so the phone
-// demo flow is untouched.
-startAccount();
+// Customer-area features (always-on identity + #profile / #bookings /
+// #book hash routes). Boots in parallel with the phone-demo flow:
+//   - kicks off /api/website/session/init in the background after the
+//     WebSDK is ready, so the nav greeting can update reactively
+//   - renders into the inline <section id="customer-area"> when a
+//     customer hash route is active, hiding the .main promo content but
+//     keeping hero + nav + footer visible
+// Phone-demo modal is independent — runs in #modal-root above all this.
+startCustomer();
 
 // Canonical stage order. The visitor walks down this list at their own
 // pace; the moderator's stage is a *ceiling*, not a teleport target.
