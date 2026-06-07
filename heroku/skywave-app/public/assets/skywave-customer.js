@@ -177,20 +177,197 @@ function ensureIdentified(action) {
     return false;
 }
 
-// ---------- /book ----------
+// ---------- /book (search results page) ----------
+//
+// Reads the query params off location.hash (#book?origin=...&destination=
+// ...&date=...&fareClass=...). The hero search-card form posts to this
+// hash, so the URL is shareable and the back button works as expected.
 
 async function renderBook() {
     setActiveNav('#book');
     const ca = customerInner();
     ca.innerHTML = '';
+
+    const params = parseHashParams();
+    if (!params.origin || !params.destination || !params.date) {
+        ca.appendChild(header('Search flights', 'Use the search box at the top of the page to find a flight.'));
+        return;
+    }
+
     ca.appendChild(header(
-        'Book a flight',
-        'Search live availability across our network. Booking opens up after Phase 3 ships — for now, this is a preview.'
+        `${params.origin} → ${params.destination}`,
+        formatDateLong(params.date) + ' · ' + (params.fareClass || 'Economy')
     ));
-    ca.appendChild(emptyCard(
-        'Coming with Phase 3',
-        'Real flight search + booking land here next. The hero search card will become live, and you’ll see fare classes, times, and a one-click confirm.'
+
+    const resultsBox = el('div', { class: 'cust-results' });
+    resultsBox.appendChild(loadingCard());
+    ca.appendChild(resultsBox);
+
+    try {
+        const r = await fetch('/api/website/flights/search', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                origin: params.origin.toUpperCase(),
+                destination: params.destination.toUpperCase(),
+                date: params.date
+            })
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data?.error || ('HTTP ' + r.status));
+        resultsBox.innerHTML = '';
+        if (!data.options?.length) {
+            resultsBox.appendChild(emptyCard(
+                'No flights match this search',
+                'We don’t fly that route on this date. Try a different date or destination.'
+            ));
+            return;
+        }
+        const fareClass = params.fareClass || 'Economy';
+        data.options.forEach((opt, i) => {
+            resultsBox.appendChild(flightOptionCard(opt, fareClass, params.date, i));
+        });
+    } catch (err) {
+        resultsBox.innerHTML = '';
+        resultsBox.appendChild(errorCard(err));
+    }
+}
+
+const FARE_CLASSES = ['Economy', 'Premium Economy', 'Business', 'First'];
+
+function flightOptionCard(opt, defaultFare, travelDate, idx) {
+    const card = el('div', { class: 'cust-flight' });
+    const fareState = { selected: defaultFare };
+
+    // top: route + times
+    card.appendChild(el('div', { class: 'cust-flight-top' },
+        el('div', { class: 'cust-segment-side' },
+            el('div', { class: 'cust-iata' }, opt.origin || '?'),
+            el('div', { class: 'cust-segment-time' }, opt.departure)
+        ),
+        el('div', { class: 'cust-flight-mid' },
+            el('div', { class: 'cust-segment-line' }),
+            el('div', { class: 'cust-segment-duration' }, opt.duration),
+            opt.stops > 0
+                ? el('div', { class: 'cust-segment-meta' },
+                    `${opt.stops} stop · ${opt.stopVia}`)
+                : el('div', { class: 'cust-segment-meta' }, 'Non-stop'),
+            el('div', { class: 'cust-segment-meta' },
+                (opt.flightNumbers || []).join(' · ') + ' · ' + (opt.aircraft || ''))
+        ),
+        el('div', { class: 'cust-segment-side right' },
+            el('div', { class: 'cust-iata' }, opt.destination || '?'),
+            el('div', { class: 'cust-segment-time' }, opt.arrival)
+        )
     ));
+
+    // bottom: fare-class chips + price + book button
+    const fareChips = el('div', { class: 'cust-fares' });
+    const priceLabel = el('div', { class: 'cust-flight-price' });
+    const bookBtn = el('button', {
+        class: 'btn-pts cust-btn',
+        type: 'button',
+        onclick: () => bookFlight(opt, fareState.selected, travelDate, bookBtn, card)
+    }, 'Book');
+
+    function refreshSelection() {
+        fareChips.querySelectorAll('.cust-fare-chip').forEach(c => {
+            c.classList.toggle('active', c.dataset.fare === fareState.selected);
+        });
+        const fare = opt.fares?.[fareState.selected];
+        priceLabel.textContent = fare?.display || 'Unavailable';
+        bookBtn.disabled = !fare;
+    }
+
+    FARE_CLASSES.forEach(fc => {
+        const fare = opt.fares?.[fc];
+        const chip = el('button', {
+            class: 'cust-fare-chip' + (fare ? '' : ' disabled'),
+            type: 'button',
+            'data-fare': fc,
+            disabled: fare ? false : true,
+            onclick: () => { if (fare) { fareState.selected = fc; refreshSelection(); } }
+        },
+            el('span', { class: 'cust-fare-chip-name' }, fc),
+            el('span', { class: 'cust-fare-chip-price' }, fare?.display || '—')
+        );
+        fareChips.appendChild(chip);
+    });
+
+    card.appendChild(el('div', { class: 'cust-flight-bottom' },
+        fareChips,
+        el('div', { class: 'cust-flight-cta' }, priceLabel, bookBtn)
+    ));
+    refreshSelection();
+    return card;
+}
+
+async function bookFlight(opt, fareClass, travelDate, btn, card) {
+    if (!session?.contactId) {
+        try {
+            session = await initSession({ force: true });
+            updateNavIdentity();
+        } catch (e) {
+            alert('Sign-in failed: ' + e.message);
+            return;
+        }
+    }
+    btn.disabled = true;
+    btn.textContent = 'Booking…';
+    try {
+        const r = await fetch('/api/website/bookings', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                flightKey: opt.flightKey,
+                travelDate: travelDate,
+                fareClass: fareClass,
+                checkedBags: 0,
+                seatPreference: 'No preference'
+            })
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data?.error || 'Booking failed');
+        bookingsCache = null;  // invalidate
+        // Replace the card with a confirmation panel.
+        const confirm = el('div', { class: 'cust-booked' },
+            el('div', { class: 'cust-booked-icon' }, '✓'),
+            el('h3', {}, 'Booking confirmed'),
+            el('p', {},
+                'Confirmation code ',
+                el('strong', {}, data.bookingCode),
+                ' · Total ',
+                el('strong', {}, data.totalCharged)
+            ),
+            el('a', { class: 'btn-pts cust-btn', href: '#booking/' + encodeURIComponent(data.bookingCode) },
+                'View booking')
+        );
+        card.replaceWith(confirm);
+    } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Book';
+        alert('Could not book: ' + err.message);
+    }
+}
+
+function parseHashParams() {
+    const h = location.hash || '';
+    const q = h.indexOf('?');
+    if (q < 0) return {};
+    const out = {};
+    new URLSearchParams(h.slice(q + 1)).forEach((v, k) => { out[k] = v; });
+    return out;
+}
+
+function formatDateLong(d) {
+    try {
+        const [y, m, day] = d.split('-').map(Number);
+        return new Date(Date.UTC(y, m - 1, day)).toLocaleDateString(undefined, {
+            weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+        });
+    } catch (_) { return d; }
 }
 
 // ---------- /bookings ----------
@@ -446,20 +623,22 @@ async function submitProfile(ev, form) {
 
 function currentRouteKey() {
     const h = location.hash || '';
-    if (h === '#book' || h === '#bookings' || h === '#profile') return h;
-    if (BOOKING_RE.test(h)) return '#bookings';
+    const base = h.split('?')[0];
+    if (base === '#book' || base === '#bookings' || base === '#profile') return base;
+    if (BOOKING_RE.test(base)) return '#bookings';
     return '';
 }
 
 function router() {
     const h = location.hash || '';
-    const renderer = ROUTES[h];
+    const base = h.split('?')[0];
+    const renderer = ROUTES[base];
     if (renderer) {
         setCustomerVisible(true);
         renderer();
         return;
     }
-    const m = h.match(BOOKING_RE);
+    const m = base.match(BOOKING_RE);
     if (m) {
         setCustomerVisible(true);
         renderBookingDetail(m[1]);
@@ -486,7 +665,36 @@ function wireNavInteractions() {
             location.hash = '#profile';
         }
     });
+    // Hero search form: prefill date if blank, submit -> #book?... route.
+    document.addEventListener('submit', (e) => {
+        const form = e.target.closest('[data-search-form]');
+        if (!form) return;
+        e.preventDefault();
+        const fd = new FormData(form);
+        const origin = (fd.get('origin') || '').toString().trim().toUpperCase();
+        const destination = (fd.get('destination') || '').toString().trim().toUpperCase();
+        const date = (fd.get('date') || '').toString().trim();
+        const fareClass = (fd.get('fareClass') || 'Economy').toString();
+        if (origin.length !== 3 || destination.length !== 3 || !date) {
+            alert('Enter origin and destination IATA codes (3 letters each) and a date.');
+            return;
+        }
+        const params = new URLSearchParams({ origin, destination, date, fareClass });
+        location.hash = '#book?' + params.toString();
+    });
+    // Default date prefill on render.
+    document.addEventListener('DOMContentLoaded', prefillSearchDefaults);
+    setTimeout(prefillSearchDefaults, 0);  // also run if DOMContentLoaded already fired
     window.addEventListener('hashchange', router);
+}
+
+function prefillSearchDefaults() {
+    const dateField = document.querySelector('[data-search-form] input[name="date"]');
+    if (dateField && !dateField.value) {
+        const d = new Date();
+        d.setDate(d.getDate() + 14);
+        dateField.value = d.toISOString().slice(0, 10);
+    }
 }
 
 export async function startCustomer() {

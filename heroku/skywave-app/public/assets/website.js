@@ -124,7 +124,7 @@ const HTML = `
         </div>
 
         <div class="hero-right">
-            <div class="search-card">
+            <form class="search-card" data-search-form>
                 <div class="s-tabs">
                     <div class="s-tab active"><span class="tab-pip"></span>One‑Way</div>
                     <div class="s-tab"><span class="tab-pip"></span>Round Trip</div>
@@ -132,35 +132,30 @@ const HTML = `
                 <div class="s-fields">
                     <div class="s-field">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21 4 19.5 2.5S18 2 16.5 3.5L13 7 4.8 5.2l-1.1 1L9 10l-2 2H4l-1 1 3 2 2 3 1-1v-3l2-2 3.2 5.3z"></path></svg>
-                        <input type="text" placeholder="Where from?" value="Seattle, WA (SEA)"/>
+                        <input type="text" placeholder="From (e.g. SEA)" name="origin" autocomplete="off" maxlength="20"/>
                     </div>
                     <div class="s-field">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21 4 19.5 2.5S18 2 16.5 3.5L13 7 4.8 5.2l-1.1 1L9 10l-2 2H4l-1 1 3 2 2 3 1-1v-3l2-2 3.2 5.3z" transform="rotate(180 12 12)"></path></svg>
-                        <input type="text" placeholder="Where to?"/>
+                        <input type="text" placeholder="To (e.g. JFK)" name="destination" autocomplete="off" maxlength="20"/>
                     </div>
                     <div class="s-row">
                         <div class="s-field">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                            <input type="date" value="2026-03-15"/>
+                            <input type="date" name="date"/>
                         </div>
                         <div class="s-field">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                            <select><option>Economy</option><option>Business</option><option>First Class</option></select>
-                        </div>
-                    </div>
-                    <div class="s-row">
-                        <div class="s-field">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                            <input type="date" value="2026-03-22"/>
-                        </div>
-                        <div class="s-field">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                            <select><option>1 Passenger</option><option>2 Passengers</option><option>3 Passengers</option><option>4+ Passengers</option></select>
+                            <select name="fareClass">
+                                <option>Economy</option>
+                                <option>Premium Economy</option>
+                                <option>Business</option>
+                                <option>First</option>
+                            </select>
                         </div>
                     </div>
                 </div>
-                <button class="btn-search">Search Flights</button>
-            </div>
+                <button class="btn-search" type="submit">Search Flights</button>
+            </form>
         </div>
     </div>
 </section>

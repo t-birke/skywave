@@ -159,6 +159,66 @@ export function buildWebsiteRouter({ allowedOrigin }) {
         }
     });
 
+    // ------- /flights/search: multi-fare-class flight search -------
+    //
+    // Read-only (no proof required: search is browseable while
+    // anonymous, identity is only enforced at booking time). Returns
+    // multiple options per O&D, each with all four fare-class prices
+    // so the UI can show a price grid without re-searching.
+    const searchSchema = z.object({
+        origin: z.string().length(3),
+        destination: z.string().length(3),
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+    });
+    router.post('/flights/search', validate(searchSchema), async (req, res) => {
+        try {
+            const data = await apexInvoke('POST', '/skywave/website/flights/search', req.body);
+            res.json(data);
+        } catch (err) {
+            const status = err.response?.status ?? 500;
+            console.error('flights/search failed', status, err.response?.data ?? err.message);
+            res.status(status).json(err.response?.data ?? { error: 'search_failed' });
+        }
+    });
+
+    // ------- POST /bookings: create a confirmed booking -------
+    //
+    // Identity-bound. Resolves contactId from the proof cookie BEFORE
+    // calling the Apex create endpoint — body never carries contactId
+    // from the client. The Apex layer creates Booking__c +
+    // Booking_Segment__c, marked Confirmed/Paid (website skips the
+    // chat path's Pending->Confirmed two-step because there's no
+    // payment-widget animation here — clicking "Book" IS the payment).
+    const createBookingSchema = z.object({
+        flightKey: z.string().min(3).max(40),
+        travelDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        fareClass: z.enum(['Economy', 'Premium Economy', 'Business', 'First']),
+        checkedBags: z.number().int().min(0).max(5).optional(),
+        seatPreference: z.enum(['Window', 'Aisle', 'No preference']).optional()
+    });
+    router.post('/bookings', requireProof, validate(createBookingSchema), async (req, res) => {
+        try {
+            const me = await apexInvoke('POST', '/skywave/website/resolve', {
+                deviceId: req.deviceId,
+                trackingStatus: 'websdk'
+            });
+            req.contactId = me.contactId;
+            const data = await apexInvoke('POST', '/skywave/website/bookings/create', {
+                contactId: me.contactId,
+                flightKey: req.body.flightKey,
+                travelDate: req.body.travelDate,
+                fareClass: req.body.fareClass,
+                checkedBags: req.body.checkedBags ?? 0,
+                seatPreference: req.body.seatPreference || 'No preference'
+            });
+            res.json(data);
+        } catch (err) {
+            const status = err.response?.status ?? 500;
+            console.error('POST /bookings failed', status, err.response?.data ?? err.message);
+            res.status(status).json(err.response?.data ?? { error: 'create_booking_failed' });
+        }
+    });
+
     // ------- /me: smoke test for the proof cookie + Apex round-trip -------
     //
     // Resolves the visitor's full profile from the deviceId in the proof

@@ -252,6 +252,19 @@ bookings, booking creation/management) with public-demo-grade hardening:
   (after the WebSDK resolves the deviceId via the shared
   `skywave-sdk.js` loader) so the nav greeting reflects identity
   reactively. Phone-demo flow runs in the modal layer unchanged.
+- **Booking creation** (Phase 3): hero search-card is wired to a real
+  search via `Skywave_WebsiteFlightSearch.cls` (multi-fare-class — each
+  flight returns Economy/Premium/Business/First prices in one
+  response). Results render inline on `#book?origin=...&destination=...
+  &date=...&fareClass=...` with per-card fare-class chips and a Book
+  button. Booking goes through `Skywave_WebsiteCreateBooking.cls`,
+  which inserts Booking__c + Booking_Segment__c marked Confirmed/Paid
+  in one transaction (website skips the chat path's Pending/Unpaid
+  intermediate state because there's no payment-widget animation —
+  clicking Book is the payment cue). Same `Skywave_Itinerary` helper
+  as the chat path, so segment shape and connection routing (JFK hub)
+  are identical. Engine wart still applies (PAR→JFK→ROM gives a 40h
+  itinerary), exposed when destination has no direct route.
 
 ### 3f. Observability
 
