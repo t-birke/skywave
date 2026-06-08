@@ -165,14 +165,20 @@ global with sharing class Skywave_WebsiteCreateBooking {
         Skywave_Itinerary.Resolved itin, String canonicalFareClass
     ) {
         Map<Id, ClassZone> out = new Map<Id, ClassZone>();
-        // Collect Product2 ids per leg (via Asset → Product2 or text fallback).
+        // Collect leg Flight ids and re-query Aircraft__c + Aircraft_Type__c
+        // — Skywave_Itinerary's FLIGHT_FIELDS doesn't include Aircraft__c,
+        // and accessing it on the Itinerary's Flight rows throws.
+        Set<Id> flightIds = new Set<Id>();
+        for (Skywave_Itinerary.Leg leg : itin.legs) flightIds.add(leg.flight.Id);
+        Map<Id, Flight__c> flightById = new Map<Id, Flight__c>([
+            SELECT Id, Aircraft__c, Aircraft_Type__c FROM Flight__c WHERE Id IN :flightIds
+        ]);
+
         Set<Id> assetIds = new Set<Id>();
         Set<String> typeTexts = new Set<String>();
-        for (Skywave_Itinerary.Leg leg : itin.legs) {
-            if (leg.flight.Aircraft__c != null) assetIds.add(leg.flight.Aircraft__c);
-            else if (String.isNotBlank(leg.flight.Aircraft_Type__c)) {
-                typeTexts.add(leg.flight.Aircraft_Type__c);
-            }
+        for (Flight__c f : flightById.values()) {
+            if (f.Aircraft__c != null) assetIds.add(f.Aircraft__c);
+            else if (String.isNotBlank(f.Aircraft_Type__c)) typeTexts.add(f.Aircraft_Type__c);
         }
         Map<Id, Id> productByAsset = new Map<Id, Id>();
         if (!assetIds.isEmpty()) {
@@ -202,9 +208,11 @@ global with sharing class Skywave_WebsiteCreateBooking {
 
         // Fan zones back out per leg.
         for (Skywave_Itinerary.Leg leg : itin.legs) {
-            Id pid = (leg.flight.Aircraft__c != null)
-                ? productByAsset.get(leg.flight.Aircraft__c)
-                : productByName.get(leg.flight.Aircraft_Type__c);
+            Flight__c f = flightById.get(leg.flight.Id);
+            if (f == null) continue;
+            Id pid = (f.Aircraft__c != null)
+                ? productByAsset.get(f.Aircraft__c)
+                : productByName.get(f.Aircraft_Type__c);
             if (pid != null && zoneByProduct.containsKey(pid)) {
                 out.put(leg.flight.Id, zoneByProduct.get(pid));
             }
