@@ -267,6 +267,36 @@ export function buildWebsiteRouter({ allowedOrigin }) {
         }
     });
 
+    // ------- GET /bookings/:code/seatmap?segmentOrder=N: layout + occupancy -------
+    //
+    // Returns the aircraft's seat layout JSON + the seats already taken by
+    // other passengers on the same flight + travel date. Used by the
+    // hi-fi seatmap UI on the booking detail page.
+    router.get('/bookings/:code/seatmap', requireProof, async (req, res) => {
+        const code = req.params.code;
+        if (!/^[A-Z0-9]{4,12}$/.test(code)) {
+            return res.status(400).json({ error: 'invalid_code' });
+        }
+        const segmentOrder = parseInt(req.query.segmentOrder, 10);
+        if (!Number.isInteger(segmentOrder) || segmentOrder < 1 || segmentOrder > 10) {
+            return res.status(400).json({ error: 'invalid_segmentOrder' });
+        }
+        try {
+            const me = await apexInvoke('POST', '/skywave/website/resolve', {
+                deviceId: req.deviceId, trackingStatus: 'websdk'
+            });
+            req.contactId = me.contactId;
+            const data = await apexInvoke('POST', '/skywave/website/seatmap', {
+                contactId: me.contactId, bookingCode: code, segmentOrder
+            });
+            res.json(data);
+        } catch (err) {
+            const status = err.response?.status ?? 500;
+            console.error('seatmap fetch failed', status, err.response?.data ?? err.message);
+            res.status(status).json(err.response?.data ?? { error: 'seatmap_failed' });
+        }
+    });
+
     // ------- POST /bookings/:code/seat: change seat on a segment -------
     const seatSchema = z.object({
         segmentOrder: z.number().int().min(1).max(10),

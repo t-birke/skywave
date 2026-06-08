@@ -20,6 +20,7 @@
 // on top.
 
 import { initSession } from './skywave-session.js';
+import { openSeatMap } from './skywave-seatmap.js';
 
 let session = null;
 let bookingsCache = null;
@@ -501,45 +502,28 @@ function bookingDetail(b) {
     );
 }
 
-function segmentCardWithSeat(f, segmentOrder, bookingCode) {
+function segmentCardWithSeat(f, _segmentOrderUnused, bookingCode) {
     const card = segmentCard(f);
-    // Find the seat row to surface a "Change seat" button per segment.
-    // The Apex bookings endpoint doesn't ship the seat number on the
-    // segment; for now we just expose the change action — the new seat
-    // is shown on confirmation.
-    card.appendChild(el('div', { class: 'cust-segment-foot' },
-        el('button', {
-            class: 'cust-action-link small',
-            type: 'button',
-            onclick: () => promptSeatChange(bookingCode, segmentOrder, card)
-        }, 'Change seat')
-    ));
+    const segmentOrder = f.segmentOrder;
+    const seatRow = el('div', { class: 'cust-segment-foot' });
+    if (f.seatNumber) {
+        seatRow.appendChild(el('span', { class: 'cust-seat-pill' },
+            el('span', { class: 'cust-seat-pill-label' }, 'Seat'),
+            el('span', { class: 'cust-seat-pill-value' }, f.seatNumber)
+        ));
+    }
+    seatRow.appendChild(el('button', {
+        class: 'cust-action-link small',
+        type: 'button',
+        onclick: () => openSeatMap(bookingCode, { segmentOrder }, ({ newSeat, oldSeat }) => {
+            const note = el('div', { class: 'cust-segment-toast' },
+                `Seat changed${oldSeat ? ' from ' + oldSeat : ''} to ${newSeat}.`);
+            card.appendChild(note);
+            bookingsCache = null;
+        })
+    }, f.seatNumber ? 'Change seat' : 'Choose seat'));
+    card.appendChild(seatRow);
     return card;
-}
-
-async function promptSeatChange(bookingCode, segmentOrder, card) {
-    const newSeat = prompt('Enter new seat number (e.g. 12C):');
-    if (!newSeat) return;
-    if (!/^\d{1,2}[A-Z]$/i.test(newSeat.trim())) {
-        alert('Invalid seat — use format like 12C.');
-        return;
-    }
-    try {
-        const r = await fetch(`/api/website/bookings/${encodeURIComponent(bookingCode)}/seat`, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ segmentOrder, newSeat: newSeat.trim().toUpperCase() })
-        });
-        const data = await r.json();
-        if (!r.ok) throw new Error(data?.error || 'Seat change failed');
-        const note = el('div', { class: 'cust-segment-toast' },
-            `Seat changed${data.oldSeat ? ' from ' + data.oldSeat : ''} to ${data.newSeat}.`);
-        card.appendChild(note);
-        bookingsCache = null;
-    } catch (err) {
-        alert('Could not change seat: ' + err.message);
-    }
 }
 
 async function confirmCancel(bookingCode) {

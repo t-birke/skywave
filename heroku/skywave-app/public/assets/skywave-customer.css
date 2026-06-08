@@ -334,7 +334,34 @@
     padding-top: 12px;
     border-top: 1px solid #eef2f6;
     grid-column: 1 / -1;
-    text-align: right;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.skywave-site .cust-seat-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #F2F5F9;
+    border-radius: 999px;
+    padding: 4px 12px 4px 6px;
+    font-size: 13px;
+}
+.skywave-site .cust-seat-pill-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    color: #fff;
+    background: #14b8a6;
+    border-radius: 999px;
+    padding: 3px 8px;
+}
+.skywave-site .cust-seat-pill-value {
+    font-weight: 700;
+    color: #0D1B2A;
+    letter-spacing: 0.04em;
 }
 .skywave-site .cust-segment-toast {
     grid-column: 1 / -1;

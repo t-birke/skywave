@@ -61,8 +61,10 @@ global with sharing class Skywave_WebsiteBookings {
         // strips status because the agent only surfaces active bookings; the
         // website wants both Confirmed and Pending so a returning visitor
         // sees their just-booked itinerary).
-        // The status & fareClass aren't carried on the invocable's Booking
-        // class; re-fetch in the same query window so we can include them.
+        // The status & fareClass + per-segment seat aren't carried on the
+        // invocable's Booking class; re-fetch in the same query window so we
+        // can include them. Seat is keyed by (bookingCode, segmentOrder) so
+        // we can decorate the right per-leg slot.
         Map<String, Booking__c> rawById = new Map<String, Booking__c>();
         for (Booking__c bk : [
             SELECT Id, Confirmation_Code__c, Status__c, Fare_Class__c
@@ -73,9 +75,37 @@ global with sharing class Skywave_WebsiteBookings {
             rawById.put(bk.Confirmation_Code__c, bk);
         }
 
+        // Per-segment lookup: confirmation code -> segmentOrder -> {seat, id, flightKey}
+        Map<String, Map<Decimal, Map<String, Object>>> segByCodeOrder =
+            new Map<String, Map<Decimal, Map<String, Object>>>();
+        for (Booking_Segment__c seg : [
+            SELECT Id, Segment_Order__c, Seat_Number__c,
+                   Booking__r.Confirmation_Code__c,
+                   Flight__r.Flight_Number__c, Flight__r.Aircraft__c,
+                   Travel_Date__c
+            FROM Booking_Segment__c
+            WHERE Booking__r.Contact__c = :contactId
+              AND Booking__r.Status__c IN ('Confirmed', 'Pending Confirmation')
+        ]) {
+            String code = seg.Booking__r.Confirmation_Code__c;
+            if (!segByCodeOrder.containsKey(code)) {
+                segByCodeOrder.put(code, new Map<Decimal, Map<String, Object>>());
+            }
+            segByCodeOrder.get(code).put(seg.Segment_Order__c,
+                new Map<String, Object>{
+                    'segmentId' => seg.Id,
+                    'segmentOrder' => seg.Segment_Order__c,
+                    'seatNumber' => seg.Seat_Number__c,
+                    'flightNumber' => seg.Flight__r.Flight_Number__c,
+                    'aircraftId' => seg.Flight__r.Aircraft__c,
+                    'travelDate' => String.valueOf(seg.Travel_Date__c)
+                });
+        }
+
         List<Map<String, Object>> shaped = new List<Map<String, Object>>();
         for (Skywave_GetFlightBookings.Booking b : r.bookings) {
             Booking__c raw = rawById.get(b.bookingReference);
+            Map<Decimal, Map<String, Object>> orderMap = segByCodeOrder.get(b.bookingReference);
             Map<String, Object> bm = new Map<String, Object>{
                 'bookingReference' => b.bookingReference,
                 'status'  => raw != null ? raw.Status__c : null,
@@ -84,7 +114,7 @@ global with sharing class Skywave_WebsiteBookings {
                 'rebookingConditions'    => b.rebookingConditions,
                 'cancellationConditions' => b.cancellationConditions,
                 'checkedBaggageAllowance' => b.checkedBaggageAllowance,
-                'flights' => flattenFlights(b.flights)
+                'flights' => flattenFlights(b.flights, orderMap)
             };
             shaped.add(bm);
         }
@@ -96,10 +126,18 @@ global with sharing class Skywave_WebsiteBookings {
         }));
     }
 
-    private static List<Map<String, Object>> flattenFlights(List<Skywave_GetFlightBookings.Flight> fs) {
+    private static List<Map<String, Object>> flattenFlights(
+        List<Skywave_GetFlightBookings.Flight> fs,
+        Map<Decimal, Map<String, Object>> segByOrder
+    ) {
         List<Map<String, Object>> out = new List<Map<String, Object>>();
         if (fs == null) return out;
+        // The invocable returns one Flight wrapper per leg (numberOfFlights=1),
+        // so positional index aligns with Segment_Order__c starting at 1. Use
+        // the segment lookup to decorate each leg with seat + ids.
+        Integer order = 1;
         for (Skywave_GetFlightBookings.Flight f : fs) {
+            Map<String, Object> meta = (segByOrder != null) ? segByOrder.get(order) : null;
             Map<String, Object> seg = new Map<String, Object>{
                 'duration'             => f.duration,
                 'originDateTime'       => f.originDateTime,
@@ -112,9 +150,15 @@ global with sharing class Skywave_WebsiteBookings {
                                             ? f.segments[f.segments.size()-1].arrivalAirportCode : null,
                 'bookingClass'         => f.bookingClass,
                 'numberOfFlights'      => f.numberOfFlights,
-                'flightNumbers'        => collectFlightNumbers(f.segments)
+                'flightNumbers'        => collectFlightNumbers(f.segments),
+                'segmentOrder'         => order,
+                'segmentId'            => meta != null ? meta.get('segmentId') : null,
+                'seatNumber'           => meta != null ? meta.get('seatNumber') : null,
+                'aircraftId'           => meta != null ? meta.get('aircraftId') : null,
+                'travelDate'           => meta != null ? meta.get('travelDate') : null
             };
             out.add(seg);
+            order++;
         }
         return out;
     }

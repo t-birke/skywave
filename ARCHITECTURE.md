@@ -275,6 +275,19 @@ bookings, booking creation/management) with public-demo-grade hardening:
   publish a `Demo_Event__e` so the live monitor can react. Name change
   links to the existing profile-edit page since names live on Contact,
   not per-booking.
+- **Hi-fi seatmap** (Phase 4 polish): per-aircraft stylized SVG renderer
+  on the booking detail. `Flight__c.Aircraft__c → Asset → Product2 →
+  Skywave_Seat_Map__c` resolves the layout JSON. Layout shape extended
+  with `premium`/`exitRows`/`galleyAfter` per class band; Premium
+  Economy added to the 777-300ER. `GET /api/website/bookings/:code/
+  seatmap?segmentOrder=N` returns layout + occupancy (other passengers'
+  seats on same flight + travel date). Renderer is pure SVG: stadium
+  fuselage, narrow vs wide derived from abreast string (1 aisle vs 2),
+  class-band tinting, only the booked-class rows interactive (other
+  classes greyed for context), exit-row red bars, galley/lavatory
+  strips. Tap → confirm bar → reuses the existing `/seat` POST.
+  `Skywave_WebsiteBookings.cls` now surfaces seatNumber + segmentId
+  per leg so the bookings list/detail can show "Seat 27D" pills.
 
 ### 3f. Observability
 
