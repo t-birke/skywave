@@ -49,10 +49,13 @@ global with sharing class Skywave_WebsiteSeatMap {
         catch (Exception e) { errorOut(res, 400, 'invalid_segmentOrder'); return; }
 
         // Resolve segment + ownership in one query.
+        // Pull both the Asset lookup (preferred) AND the legacy text field
+        // — most seeded flights only have the text. We resolve via Product2
+        // either way.
         List<Booking_Segment__c> segs = [
             SELECT Id, Seat_Number__c, Travel_Date__c,
                    Booking__r.Fare_Class__c,
-                   Flight__c, Flight__r.Aircraft__c
+                   Flight__c, Flight__r.Aircraft__c, Flight__r.Aircraft_Type__c
             FROM Booking_Segment__c
             WHERE Booking__r.Confirmation_Code__c = :bookingCode
               AND Booking__r.Contact__c = :contactId
@@ -62,20 +65,38 @@ global with sharing class Skywave_WebsiteSeatMap {
         if (segs.isEmpty()) { errorOut(res, 404, 'segment_not_found'); return; }
         Booking_Segment__c seg = segs[0];
 
-        // Resolve the seat-map record via Asset → Product2 (aircraft type).
+        // Resolve aircraft type:
+        //   1. preferred — Flight__c.Aircraft__c (Asset) → Product2
+        //   2. fallback  — Flight__c.Aircraft_Type__c (text) → Product2 by Name
+        // Most seeded flights only have the text field set.
+        Id productId = null;
+        String productName = null;
         Id aircraftAssetId = seg.Flight__r.Aircraft__c;
-        if (aircraftAssetId == null) { errorOut(res, 404, 'aircraft_not_set'); return; }
-        Asset aircraft = [
-            SELECT Id, Product2Id, Product2.Name FROM Asset WHERE Id = :aircraftAssetId LIMIT 1
-        ];
-        if (aircraft == null || aircraft.Product2Id == null) {
-            errorOut(res, 404, 'aircraft_type_unknown'); return;
+        if (aircraftAssetId != null) {
+            List<Asset> aircraftRows = [
+                SELECT Id, Product2Id, Product2.Name FROM Asset WHERE Id = :aircraftAssetId LIMIT 1
+            ];
+            if (!aircraftRows.isEmpty() && aircraftRows[0].Product2Id != null) {
+                productId = aircraftRows[0].Product2Id;
+                productName = aircraftRows[0].Product2.Name;
+            }
         }
+        if (productId == null && String.isNotBlank(seg.Flight__r.Aircraft_Type__c)) {
+            String typeText = seg.Flight__r.Aircraft_Type__c;
+            List<Product2> products = [
+                SELECT Id, Name FROM Product2 WHERE Name = :typeText LIMIT 1
+            ];
+            if (!products.isEmpty()) {
+                productId = products[0].Id;
+                productName = products[0].Name;
+            }
+        }
+        if (productId == null) { errorOut(res, 404, 'aircraft_not_set'); return; }
 
         List<Skywave_Seat_Map__c> seatmaps = [
             SELECT Id, Total_Rows__c, Layout_Json__c
             FROM Skywave_Seat_Map__c
-            WHERE Aircraft_Type__c = :aircraft.Product2Id
+            WHERE Aircraft_Type__c = :productId
             LIMIT 1
         ];
         if (seatmaps.isEmpty()) { errorOut(res, 404, 'seatmap_not_found'); return; }
@@ -111,7 +132,7 @@ global with sharing class Skywave_WebsiteSeatMap {
         res.statusCode = 200;
         res.responseBody = Blob.valueOf(JSON.serialize(new Map<String, Object>{
             'ok' => true,
-            'aircraftType' => aircraft.Product2.Name,
+            'aircraftType' => productName,
             'wide' => wide,
             'totalRows' => seatmap.Total_Rows__c,
             'fareClass' => seg.Booking__r.Fare_Class__c,
