@@ -73,13 +73,22 @@
     margin-left: auto;
 }
 
-.sw-seatmap-svg {
-    width: 100%;
-    height: auto;
+.sw-seatmap-scroll {
     flex: 1 1 auto;
-    overflow: visible;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
     padding: 16px 24px;
     background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+    text-align: center;
+}
+.sw-seatmap-svg {
+    display: inline-block;
+    overflow: visible;
+    /* width/height attributes are set on the element by the renderer
+       so the SVG occupies its natural aspect ratio inside the scroll
+       container. Don't add flex/auto here — they collapse the SVG to
+       zero height in nested flex columns on some browsers. */
 }
 
 .sw-seatmap-loading {

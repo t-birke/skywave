@@ -215,11 +215,21 @@ function renderSeatMapCard(card, data, bookingCode, segment, close, onConfirm) {
     const totalH = NOSE_H + cabinH + TAIL_H;
     const totalW = cabinX * 2 + cabinW;
 
+    // Wrap the SVG in a scrollable container so the modal can show the
+    // legend + confirm bar at the bottom even on long cabins. The SVG
+    // itself gets explicit width/height attributes (no `flex: 1 1 auto`
+    // collapse trap) so its rendered size matches its viewBox aspect.
+    const scrollWrap = html('div', { class: 'sw-seatmap-scroll' });
+    const renderWidth = Math.min(420, totalW * 1.4);
+    const renderHeight = renderWidth * (totalH / totalW);
     const root = svg('svg', {
         class: 'sw-seatmap-svg',
         viewBox: `0 0 ${totalW} ${totalH}`,
+        width: renderWidth,
+        height: renderHeight,
         preserveAspectRatio: 'xMidYMin meet'
     });
+    scrollWrap.appendChild(root);
 
     // Fuselage: stadium-shape outline (rounded nose, square mid, rounded tail).
     // Drawn as a single path for a clean profile.
@@ -281,7 +291,7 @@ function renderSeatMapCard(card, data, bookingCode, segment, close, onConfirm) {
         }
     });
 
-    card.appendChild(root);
+    card.appendChild(scrollWrap);
 
     // Legend
     card.appendChild(html('div', { class: 'sw-seatmap-legend' },
