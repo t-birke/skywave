@@ -26,18 +26,6 @@ import {
     auditLog, validate
 } from './api-middleware.js';
 
-// Rewrite an Apex-supplied Shepherd path (e.g.
-// "/sfc/servlet.shepherd/version/download/068g8000003L9z3AAC") into the
-// proxy path the browser actually fetches from this dyno. Returns null
-// for any other shape — including null — so the JSON field stays null
-// when the visitor has no avatar.
-const SHEPHERD_RE = /^\/sfc\/servlet\.shepherd\/version\/download\/([A-Za-z0-9]{15,18})$/;
-function avatarProxyUrl(rawAvatarUrl) {
-    if (!rawAvatarUrl) return null;
-    const m = SHEPHERD_RE.exec(rawAvatarUrl);
-    return m ? `/api/website/avatar/${m[1]}` : null;
-}
-
 export function buildWebsiteRouter({ allowedOrigin }) {
     const router = express.Router();
 
@@ -108,7 +96,7 @@ export function buildWebsiteRouter({ allowedOrigin }) {
                     membershipTier: contact.membershipTier || null,
                     loyaltyPoints: contact.loyaltyPoints || null,
                     memberNumber: contact.memberNumber || null,
-                    avatarUrl: avatarProxyUrl(contact.avatarUrl)
+                    avatarUrl: contact.avatarUrl || null
                 }
             });
         } catch (err) {
@@ -363,44 +351,13 @@ export function buildWebsiteRouter({ allowedOrigin }) {
                     membershipTier: contact.membershipTier || null,
                     loyaltyPoints: contact.loyaltyPoints || null,
                     memberNumber: contact.memberNumber || null,
-                    avatarUrl: avatarProxyUrl(contact.avatarUrl)
+                    avatarUrl: contact.avatarUrl || null
                 }
             });
         } catch (err) {
             const status = err.response?.status ?? 500;
             console.error('/me failed', status, err.response?.data ?? err.message);
             res.status(status).json({ error: 'me_failed' });
-        }
-    });
-
-    // ------- /avatar/:cvId: stream the visitor's avatar bytes -------
-    //
-    // Browsers fetch this from <img src>. Why we go through Apex REST
-    // instead of just hitting /services/data/.../VersionData with the
-    // JWT token: the chat-iframe LWC uploads the avatar as the ESW site
-    // guest, which leaves the ContentVersion with no sharing path to
-    // any non-guest user — even an objectPermission grant returns 404.
-    // The Apex endpoint runs `without sharing` and re-checks ownership
-    // by joining cvId to the deviceId-resolved Contact.
-    router.get('/avatar/:cvId', requireProof, async (req, res) => {
-        const cvId = req.params.cvId;
-        if (!/^[A-Za-z0-9]{15,18}$/.test(cvId)) {
-            return res.status(400).json({ error: 'invalid_cvId' });
-        }
-        try {
-            const data = await apexInvoke('GET',
-                `/skywave/website/avatar?cvId=${encodeURIComponent(cvId)}` +
-                `&deviceId=${encodeURIComponent(req.deviceId)}`);
-            if (!data?.base64) {
-                return res.status(404).json({ error: 'avatar_not_found' });
-            }
-            res.setHeader('Content-Type', data.contentType || 'application/octet-stream');
-            res.setHeader('Cache-Control', 'private, max-age=300');
-            res.end(Buffer.from(data.base64, 'base64'));
-        } catch (err) {
-            const status = err.response?.status ?? 500;
-            console.error('/avatar fetch failed', status, err.response?.data ?? err.message);
-            res.status(status).json({ error: 'avatar_fetch_failed' });
         }
     });
 

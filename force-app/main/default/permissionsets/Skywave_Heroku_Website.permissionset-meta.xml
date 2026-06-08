@@ -52,10 +52,6 @@
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
-        <apexClass>Skywave_WebsiteAvatar</apexClass>
-        <enabled>true</enabled>
-    </classAccesses>
-    <classAccesses>
         <apexClass>Skywave_RestUtil</apexClass>
         <enabled>true</enabled>
     </classAccesses>

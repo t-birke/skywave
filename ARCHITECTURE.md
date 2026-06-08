@@ -257,21 +257,18 @@ bookings, booking creation/management) with public-demo-grade hardening:
 - **Smoke**: `/api/website/session/init` mints/refreshes proof + returns
   Contact profile; `/api/website/me` reads it back. Cross-origin → 403,
   tampered cookie → 401.
-- **Avatar proxy**: `GET /api/website/avatar/:cvId` returns the visitor's
-  avatar image bytes through the relay so Apex's Shepherd path stays
-  inside the Salesforce origin. The chat-iframe LWC inserts the
-  ContentVersion as the ESW guest, which leaves the row with no sharing
-  path to non-guest users — even with object-permission, the standard
-  `/services/data/.../VersionData` REST endpoint returns 404 for the
-  website JWT user. The proxy therefore goes through
-  `Skywave_WebsiteAvatar` (`@RestResource(/skywave/website/avatar)`,
-  `without sharing`), which re-checks ownership by joining cvId to
-  Contact.Session_Id__c + ContactCardPicture__c and returns
-  `{ contentType, base64 }`. The relay decodes and serves the bytes.
-  `avatarProxyUrl()` rewrites Apex's
-  `/sfc/servlet.shepherd/version/download/<cvId>` to
-  `/api/website/avatar/<cvId>` in `/session/init` and `/me` JSON
-  responses, so no Shepherd path ever reaches the browser.
+- **Avatar public URL**: visitor avatars are uploaded by the chat-iframe
+  LWC (running as the ESW guest) — the resulting `ContentVersion` has no
+  sharing path to non-guest users, so the public website couldn't load
+  it via the Shepherd path or the REST `VersionData` endpoint. Instead,
+  `Skywave_Contact_Update_Trigger` (System Mode) inserts a
+  `ContentDistribution` per fresh avatar event in a bulk pre-pass, then
+  stamps `Contact.ContactCardPicture__c` with the resulting
+  `DistributionPublicUrl` (a CDN URL with an unguessable token). The
+  Heroku site serves the URL straight from `/me` and `/session/init`
+  responses — no proxy, no per-impression Apex call, no API limit
+  consumption. Distributions are rotated when prior avatars are deleted
+  via `Skywave_SaveProfile.deletePriorAvatars` (cascades CV→CD).
 - **Read paths** (Phase 2): `GET /api/website/bookings` (re-resolves
   contactId from proof, then `Skywave_WebsiteBookings.cls` calls the same
   `Skywave_GetFlightBookings` invocable the chat agent uses — single

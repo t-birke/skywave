@@ -76,6 +76,54 @@ trigger Skywave_Contact_Update_Trigger on Skywave_Contact_Update__e (after inser
         }
     }
 
+    // ---- Avatar pre-pass ----
+    // Mint a ContentDistribution per CV referenced by an 'avatar' event so
+    // we can stamp Contact.ContactCardPicture__c with the public CDN URL
+    // (works for the public Heroku site without a proxy). The CV is uploaded
+    // by the ESW guest with no sharing path to non-guest users; only a
+    // public distribution makes it browser-loadable. CD insert is idempotent
+    // here per-batch — the event-publish path replaces prior avatars (Apex
+    // deletePriorAvatars), so each cvId in this batch is fresh.
+    Set<Id> avatarCvIds = new Set<Id>();
+    for (List<Skywave_Contact_Update__e> evs : eventsByDeviceId.values()) {
+        for (Skywave_Contact_Update__e ev : evs) {
+            if (ev.Update_Type__c != 'avatar' || String.isBlank(ev.Avatar_Url__c)) continue;
+            String prefix = '/sfc/servlet.shepherd/version/download/';
+            if (!ev.Avatar_Url__c.startsWith(prefix)) continue;
+            try {
+                avatarCvIds.add((Id) ev.Avatar_Url__c.substring(prefix.length()));
+            } catch (Exception e) {}
+        }
+    }
+    Map<Id, String> publicUrlByCvId = new Map<Id, String>();
+    if (!avatarCvIds.isEmpty()) {
+        List<ContentDistribution> cds = new List<ContentDistribution>();
+        for (Id cvId : avatarCvIds) {
+            cds.add(new ContentDistribution(
+                Name = 'skywave_avatar_' + cvId,
+                ContentVersionId = cvId,
+                PreferencesAllowViewInBrowser = true,
+                PreferencesAllowOriginalDownload = false,
+                PreferencesNotifyOnVisit = false,
+                PreferencesPasswordRequired = false
+            ));
+        }
+        try {
+            insert cds;
+            for (ContentDistribution cd : [
+                SELECT ContentVersionId, DistributionPublicUrl
+                FROM ContentDistribution
+                WHERE Id IN :cds
+            ]) {
+                if (String.isNotBlank(cd.DistributionPublicUrl)) {
+                    publicUrlByCvId.put(cd.ContentVersionId, cd.DistributionPublicUrl);
+                }
+            }
+        } catch (Exception e) {
+            System.debug(LoggingLevel.WARN, 'Avatar CD insert failed: ' + e.getMessage());
+        }
+    }
+
     // Find existing Contacts for these deviceIds.
     Map<String, Contact> existingByDeviceId = new Map<String, Contact>();
     for (Contact c : [
@@ -160,13 +208,18 @@ trigger Skywave_Contact_Update_Trigger on Skywave_Contact_Update__e (after inser
                     Payload_Json__c   = JSON.serialize(p)
                 ));
             } else if (ev.Update_Type__c == 'avatar') {
-                // Profile-form avatar upload: the LWC ran in the chat-iframe
-                // ESW guest user context, which can insert ContentVersion but
-                // can't update Contact (no FLS on ContactCardPicture__c). It
-                // publishes this event with the Shepherd URL and we stamp the
-                // Contact here, in System Mode.
-                if (String.isNotBlank(ev.Avatar_Url__c)) {
-                    c.ContactCardPicture__c = ev.Avatar_Url__c;
+                // The avatar pre-pass above minted a ContentDistribution per
+                // cvId and resolved the public URL. Here we just look it up
+                // and stamp the Contact. If the CD insert failed (governor
+                // limit, perms regression), we fall back to the Shepherd
+                // path — useless for browsers but at least keeps the field
+                // populated so internal CRM tooling doesn't see null.
+                String prefix = '/sfc/servlet.shepherd/version/download/';
+                if (String.isNotBlank(ev.Avatar_Url__c) && ev.Avatar_Url__c.startsWith(prefix)) {
+                    String cvIdStr = ev.Avatar_Url__c.substring(prefix.length());
+                    String publicUrl;
+                    try { publicUrl = publicUrlByCvId.get((Id) cvIdStr); } catch (Exception e) {}
+                    c.ContactCardPicture__c = publicUrl != null ? publicUrl : ev.Avatar_Url__c;
                 }
             } else if (ev.Update_Type__c == 'chat_start') {
                 if (String.isNotBlank(ev.Conversation_Id__c)) {
