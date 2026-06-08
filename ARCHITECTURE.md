@@ -388,6 +388,18 @@ bookings, booking creation/management) with public-demo-grade hardening:
   (after the WebSDK resolves the deviceId via the shared
   `skywave-sdk.js` loader) so the nav greeting reflects identity
   reactively. Phone-demo flow runs in the modal layer unchanged.
+- **Standalone signup surface** (`/signup`, alias `/join`): same SPA shell
+  as `/`, but `site.js` detects the pathname and skips the audience-demo
+  flow entirely — no `/api/session/start`, no WS connect, no survey
+  schema fetch, no ESW chat warm-up. The consent gate stays (with copy
+  tailored to "create your SkyRewards profile") and on Accept we still
+  mint the proof cookie via `/api/website/session/init`, then dismiss
+  the modal and route to the existing `#profile` customer-area so the
+  visitor lands on the profile-create form. Returning visitors with a
+  valid proof cookie skip both the consent gate and the demo resume —
+  the customer-area picks up identity from `/api/website/me` exactly
+  like on the demo path. Lets us hand out a clean URL to people who
+  want to self-serve a profile without sitting through the survey.
 - **Booking creation** (Phase 3): hero search-card is wired to a real
   search via `Skywave_WebsiteFlightSearch.cls` (multi-fare-class — each
   flight returns Economy/Premium/Business/First prices in one

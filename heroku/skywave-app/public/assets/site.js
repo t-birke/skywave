@@ -70,6 +70,18 @@ if (modalRoot) {
     });
 }
 
+// Signup mode: visitor landed on /signup or /join. Consent still required,
+// but we drop the audience-demo flow (no Demo_Session start, no WS, no
+// survey, no chat warm-up) and send them straight to the #profile customer-
+// area to create an account. Detected from the pathname at boot — no query
+// param so it survives reloads as a clean URL.
+const SIGNUP_MODE = (() => {
+    try {
+        const p = (window.location.pathname || '').replace(/\/+$/, '');
+        return p === '/signup' || p === '/join';
+    } catch (_) { return false; }
+})();
+
 // Render the website backdrop once on boot. It never re-renders.
 if (siteRoot) renderWebsite(siteRoot);
 
@@ -582,6 +594,26 @@ function render() {
 function renderConsent() {
     setBodyStage('consent');
     root.innerHTML = '';
+    if (SIGNUP_MODE) {
+        root.append(
+            el('div', { class: 'center' },
+                el('div', { class: 'brand' }, 'Skywave'),
+                el('div', { class: 'brand-sub' }, 'Airlines'),
+                el('div', { class: 'card' },
+                    el('h1', {}, 'Create your SkyRewards profile'),
+                    el('p', {},
+                        'We’ll set you up with a member account. ',
+                        'We only collect what you enter on the next screen plus a cookie to recognize you on return visits. ',
+                        'All data is used for this account and may be retained for one follow-up; ',
+                        'everything is deleted within 14 days. ',
+                        'Any prices shown are fictitious.'
+                    ),
+                    el('button', { class: 'btn', onclick: handleConsent }, 'Accept and continue')
+                )
+            )
+        );
+        return;
+    }
     root.append(
         el('div', { class: 'center' },
             el('div', { class: 'brand' }, 'Skywave'),
@@ -669,6 +701,23 @@ async function handleConsent() {
         state.sessionReady = true;
     } catch (e) {
         console.warn('[skywave] website/session/init failed (continuing)', e);
+    }
+
+    // Signup mode: dismiss the demo modal and hand off to the existing
+    // #profile customer-area. We deliberately skip /api/session/start
+    // (no Demo_Session row), WS connect, survey schema fetch, and the
+    // ESW snippet — none of those are wanted on the standalone signup
+    // surface. The proof cookie minted above is enough for #profile to
+    // resolve identity via /api/website/me.
+    if (SIGNUP_MODE) {
+        hideModal();
+        try { refreshIdentity(); } catch (_) { /* best-effort */ }
+        if (location.hash !== '#profile') {
+            location.hash = '#profile';
+        } else {
+            window.dispatchEvent(new HashChangeEvent('hashchange'));
+        }
+        return;
     }
 
     try {
@@ -1156,6 +1205,23 @@ async function resumeSession({ sdkId, surveyAlreadyComplete }) {
             'surveyCompleted=' + !!peek?.surveyCompleted +
             ', profileCompleted=' + !!peek?.profileCompleted);
         state.profileAlreadyComplete = !!peek?.profileCompleted;
+        // Signup mode: returning visitor with a valid proof cookie has
+        // already consented on this device — skip both the consent gate
+        // AND the demo resume. Drop the modal, kick the customer-area
+        // identity refresh so the nav greeting populates, and route to
+        // #profile.
+        if (SIGNUP_MODE) {
+            hideModal();
+            state.consented = true;
+            state.sessionReady = true;
+            try { refreshIdentity(); } catch (_) { /* best-effort */ }
+            if (location.hash !== '#profile') {
+                location.hash = '#profile';
+            } else {
+                window.dispatchEvent(new HashChangeEvent('hashchange'));
+            }
+            return;
+        }
         await resumeSession({
             sdkId,
             surveyAlreadyComplete: !!peek?.surveyCompleted

@@ -24,6 +24,14 @@ app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 app.use(express.static(path.resolve(__dirname, '../public')));
 
+// Signup landing page. Same SPA shell as `/`, but site.js detects the
+// pathname and skips the demo (no Demo_Session start, no WS connect, no
+// survey, no chat warm-up). Visitor sees the consent gate, then is routed
+// straight to the existing #profile customer-area to create an account.
+app.get(['/signup', '/join'], (_, res) => {
+    res.sendFile(path.resolve(__dirname, '../public/index.html'));
+});
+
 app.get('/healthz', (_, res) => {
     res.json({ ok: true, activeWs: activeCount() });
 });
