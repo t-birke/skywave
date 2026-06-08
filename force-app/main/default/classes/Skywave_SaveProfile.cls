@@ -143,12 +143,19 @@ public without sharing class Skywave_SaveProfile {
                     SELECT Session_Id__c, Demo_Session__c
                     FROM Contact WHERE Id = :contactId LIMIT 1
                 ];
-                if (!cs.isEmpty() && String.isNotBlank(cs[0].Session_Id__c)
-                    && cs[0].Demo_Session__c != null) {
+                // Drop the Demo_Session__c gate: this PE's only consumer
+                // is the trigger's avatar pre-pass, which mints a public
+                // ContentDistribution and stamps Contact.ContactCardPicture__c.
+                // None of that needs Demo_Session__c. Keeping the gate
+                // skipped the publish for consent-time visitors whose
+                // Contact hadn't been backfilled yet — leaving the
+                // legacy Shepherd path on the field, which 404s in <img>.
+                if (!cs.isEmpty() && String.isNotBlank(cs[0].Session_Id__c)) {
                     EventBus.publish(new Skywave_Contact_Update__e(
                         Update_Type__c     = 'avatar',
                         Device_Id__c       = cs[0].Session_Id__c,
-                        Demo_Session_Id__c = cs[0].Demo_Session__c,
+                        Demo_Session_Id__c = cs[0].Demo_Session__c == null
+                            ? null : (String) cs[0].Demo_Session__c,
                         Avatar_Url__c      = shepherdUrl
                     ));
                 }

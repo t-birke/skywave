@@ -738,8 +738,26 @@ function renderError(message) {
 function connectWs(wsUrl) {
     const ws = new WebSocket(wsUrl);
     state.ws = ws;
-    ws.addEventListener('open',  () => { state.wsConnected = true;  render(); });
-    ws.addEventListener('close', () => { state.wsConnected = false; render(); });
+    state.wsUrl = wsUrl;
+    ws.addEventListener('open',  () => {
+        state.wsConnected = true;
+        state.wsReconnectDelay = 1000;   // reset backoff on success
+        render();
+    });
+    ws.addEventListener('close', () => {
+        state.wsConnected = false;
+        render();
+        // Auto-reconnect with exponential backoff, capped at 30s. Server
+        // sends ping every 30s but the network can still drop the socket
+        // (page suspend, VPN flip). Without this, late-arriving WS pushes
+        // (e.g. profile_created from chat) get fanned out to a dead
+        // connection and are silently lost.
+        const delay = state.wsReconnectDelay || 1000;
+        state.wsReconnectDelay = Math.min(delay * 2, 30000);
+        setTimeout(() => {
+            if (state.wsUrl) connectWs(state.wsUrl);
+        }, delay);
+    });
     ws.addEventListener('message', (m) => {
         try {
             const msg = JSON.parse(m.data);

@@ -8,7 +8,7 @@ import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { startPubSubSubscriber } from './pubsub-client.js';
-import { register, fanOut, activeCount } from './ws-fanout.js';
+import { register, fanOut, activeCount, startHeartbeat } from './ws-fanout.js';
 import { forwardToApex } from './sf-api.js';
 import { buildWebsiteRouter } from './website-routes.js';
 
@@ -129,6 +129,10 @@ startPubSubSubscriber((ev) => {
 }).catch((err) => {
     console.error('Pub/Sub subscribe failed at startup:', err);
 });
+
+// Heroku's router kills idle WebSockets after 55s (H15). Send a ping
+// every 30s to keep them alive; sockets that miss a pong get terminated.
+startHeartbeat(30000);
 
 server.listen(PORT, () => {
     console.log(`skywave-app listening on :${PORT}`);
