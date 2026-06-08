@@ -99,24 +99,31 @@ trigger Skywave_Contact_Update_Trigger on Skywave_Contact_Update__e (after inser
     if (!avatarCvIds.isEmpty()) {
         List<ContentDistribution> cds = new List<ContentDistribution>();
         for (Id cvId : avatarCvIds) {
+            // PreferencesAllowOriginalDownload MUST be true — that's what
+            // populates ContentDownloadUrl with the raw-bytes URL <img> needs.
+            // Without it, only DistributionPublicUrl is set, which serves an
+            // HTML preview page that fails in an <img> tag.
             cds.add(new ContentDistribution(
                 Name = 'skywave_avatar_' + cvId,
                 ContentVersionId = cvId,
                 PreferencesAllowViewInBrowser = true,
-                PreferencesAllowOriginalDownload = false,
+                PreferencesAllowOriginalDownload = true,
                 PreferencesNotifyOnVisit = false,
                 PreferencesPasswordRequired = false
             ));
         }
         try {
             insert cds;
+            // ContentDownloadUrl is the raw-bytes CDN URL — what <img src> needs.
+            // DistributionPublicUrl points at the HTML preview page, which works
+            // in a browser tab but fails in an <img> tag.
             for (ContentDistribution cd : [
-                SELECT ContentVersionId, DistributionPublicUrl
+                SELECT ContentVersionId, ContentDownloadUrl
                 FROM ContentDistribution
                 WHERE Id IN :cds
             ]) {
-                if (String.isNotBlank(cd.DistributionPublicUrl)) {
-                    publicUrlByCvId.put(cd.ContentVersionId, cd.DistributionPublicUrl);
+                if (String.isNotBlank(cd.ContentDownloadUrl)) {
+                    publicUrlByCvId.put(cd.ContentVersionId, cd.ContentDownloadUrl);
                 }
             }
         } catch (Exception e) {
