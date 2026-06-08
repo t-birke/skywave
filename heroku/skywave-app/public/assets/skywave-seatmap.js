@@ -173,7 +173,19 @@ export async function openSeatMap(bookingCode, segment, onConfirm) {
     }
 
     card.querySelector('.sw-seatmap-loading')?.remove();
-    renderSeatMapCard(card, data, bookingCode, segment, close, onConfirm);
+    try {
+        renderSeatMapCard(card, data, bookingCode, segment, close, onConfirm);
+    } catch (err) {
+        // Surface the error inline so we don't have to dive into DevTools.
+        // The `card` already contains the header at this point; append a
+        // visible error block so the failure shape is obvious.
+        console.error('[skywave-seatmap] render failed:', err);
+        card.appendChild(html('div', { class: 'cust-empty error', style: 'padding:24px' },
+            html('h3', {}, 'Seatmap render failed'),
+            html('pre', { style: 'font-size:11px;text-align:left;white-space:pre-wrap;color:#dc2626' },
+                (err && err.stack) ? err.stack : String(err))
+        ));
+    }
 }
 
 function renderSeatMapCard(card, data, bookingCode, segment, close, onConfirm) {
