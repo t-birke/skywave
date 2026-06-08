@@ -2,8 +2,8 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Demo_Session_Id__c</fullName>
     <label>Demo Session Id</label>
-    <description>The Demo_Session__c record Id whose State changed. Lets consumers filter to the active run.</description>
+    <description>The Demo_Session__c record Id whose State changed. Lets consumers filter to the active run. Nullable since Phase F: client_action events targeted at a single visitor's deviceId don't always have an associated demo session (e.g. the secondary Experience Cloud chat page doesn't run inside a demo run).</description>
     <type>Text</type>
     <length>18</length>
-    <required>true</required>
+    <required>false</required>
 </CustomField>

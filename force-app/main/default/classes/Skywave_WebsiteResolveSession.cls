@@ -68,7 +68,7 @@ global with sharing class Skywave_WebsiteResolveSession {
         List<Contact> existing = [
             SELECT Id, FirstName, LastName, Email, Phone,
                    Home_Airport__c, Profile_Completed__c,
-                   Skywave_Survey_Json__c,
+                   Skywave_Survey_Json__c, Demo_Session__c,
                    Membership_Tier__c, Loyalty_Points__c, Member_Number__c,
                    ContactCardPicture__c, Tracking_Status__c
             FROM Contact
@@ -103,23 +103,56 @@ global with sharing class Skywave_WebsiteResolveSession {
                 res.responseBody = Blob.valueOf(JSON.serialize(peekOut));
                 return;
             }
+            // Stamp the active Demo_Session__c so downstream PE publishes
+            // (Skywave_SaveProfile.publishProfileCreatedEvent → both the
+            // monitor Demo_Event__e and the targeted Demo_State_Change__e
+            // for client_action=profile_created) have a non-null required
+            // Demo_Session_Id__c to use. Without it, both publishes bail
+            // and the website never gets the WS push to refresh /me.
+            Id activeDemoSessionId = null;
+            List<Demo_Session__c> activeRows = [
+                SELECT Id FROM Demo_Session__c
+                WHERE Active__c = true
+                ORDER BY LastModifiedDate DESC
+                LIMIT 1
+            ];
+            if (!activeRows.isEmpty()) activeDemoSessionId = activeRows[0].Id;
+
             c = new Contact(
                 LastName = deviceId,
                 Session_Id__c = deviceId,
-                Tracking_Status__c = trackingStatus
+                Tracking_Status__c = trackingStatus,
+                Demo_Session__c = activeDemoSessionId
             );
             insert c;
             contactExists = true;
         } else {
             c = existing[0];
             contactExists = true;
+            Boolean dirty = false;
             // Only stamp Tracking_Status__c if not already set, so we don't
             // overwrite an opted_out flag with a later websdk call. opted_out
             // is sticky once set.
             if (String.isBlank(c.Tracking_Status__c)) {
                 c.Tracking_Status__c = trackingStatus;
-                update c;
+                dirty = true;
             }
+            // Backfill Demo_Session__c on legacy website Contacts that were
+            // minted before we started stamping it. Without this, the
+            // profile_created publishes (monitor + WS push) bail out.
+            if (c.Demo_Session__c == null) {
+                List<Demo_Session__c> activeRows = [
+                    SELECT Id FROM Demo_Session__c
+                    WHERE Active__c = true
+                    ORDER BY LastModifiedDate DESC
+                    LIMIT 1
+                ];
+                if (!activeRows.isEmpty()) {
+                    c.Demo_Session__c = activeRows[0].Id;
+                    dirty = true;
+                }
+            }
+            if (dirty) update c;
         }
 
         Map<String, Object> out = new Map<String, Object>{

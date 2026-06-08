@@ -190,28 +190,42 @@ public without sharing class Skywave_SaveProfile {
                 FROM Contact WHERE Id = :contactId LIMIT 1
             ];
             if (cs.isEmpty() || String.isBlank(cs[0].Session_Id__c)) return;
-            if (cs[0].Demo_Session__c == null) return;  // PE field is required
 
-            Map<String, Object> payload = new Map<String, Object>{
-                'firstName' => firstName,
-                'lastName'  => lastName
-            };
-            if (String.isNotBlank(avatarUrl)) payload.put('avatarUrl', avatarUrl);
+            String deviceId = cs[0].Session_Id__c;
+            // Demo_Session__c can be null on legacy website-minted Contacts.
+            // The monitor publish needs it (Demo_Event__e schema), so we
+            // skip THAT publish gracefully when missing — but the targeted
+            // WS push (Demo_State_Change__e) is what the website needs to
+            // refresh /me, so we always try that.
+            Id demoSessionId = cs[0].Demo_Session__c;
 
-            Skywave_RestUtil.publishEvent(
-                'profile_created',
-                cs[0].Session_Id__c,
-                cs[0].Demo_Session__c,
-                payload
-            );
+            if (demoSessionId != null) {
+                Map<String, Object> payload = new Map<String, Object>{
+                    'firstName' => firstName,
+                    'lastName'  => lastName
+                };
+                if (String.isNotBlank(avatarUrl)) payload.put('avatarUrl', avatarUrl);
+
+                Skywave_RestUtil.publishEvent(
+                    'profile_created',
+                    deviceId,
+                    demoSessionId,
+                    payload
+                );
+            } else {
+                System.debug(LoggingLevel.INFO,
+                    'profile_created monitor PE skipped: Demo_Session__c null on Contact ' + contactId);
+            }
 
             // Targeted client_action push to the visitor's own dyno via the
             // Demo_State_Change__e channel. New_State__c is left null — the
             // consumer routes on Client_Action__c when the action tag is set.
+            // Demo_Session_Id__c is left null when no demo session is
+            // associated (Phase F made it nullable for exactly this case).
             EventBus.publish(new Demo_State_Change__e(
-                Client_Action__c    = 'profile_created',
-                Target_Session_Id__c = cs[0].Session_Id__c,
-                Demo_Session_Id__c  = cs[0].Demo_Session__c
+                Client_Action__c     = 'profile_created',
+                Target_Session_Id__c = deviceId,
+                Demo_Session_Id__c   = demoSessionId == null ? null : (String) demoSessionId
             ));
         } catch (Exception e) {
             System.debug(LoggingLevel.WARN, 'profile_created publish skipped: ' + e.getMessage());

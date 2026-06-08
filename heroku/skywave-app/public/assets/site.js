@@ -1011,30 +1011,20 @@ function renderThanks() {
 
 // ── Entry ──────────────────────────────────────────────────────────────────
 
-// Read the WebSDK's Tracking-purpose consent state. The SDK is the
-// source of truth — we do NOT mirror this into localStorage. Returns
-// true if the SDK reports an explicit Opt In, false otherwise (incl.
-// SDK absent / Opt Out / never asked).
-function readSdkConsent() {
-    try {
-        const SI = window.SalesforceInteractions;
-        if (!SI) return false;
-        // c360a SDK exposes consents synchronously after init via either
-        // getConsents() (newer) or readState/getState equivalents. We
-        // check both common shapes; if neither is present we treat it
-        // as "unknown" → re-ask.
-        const list =
-            (typeof SI.getConsents === 'function' && SI.getConsents()) ||
-            (SI.consents) || null;
-        if (!Array.isArray(list)) return false;
-        const trackingPurpose = SI.ConsentPurpose?.Tracking ?? 'Tracking';
-        const optIn           = SI.ConsentStatus?.OptIn       ?? 'Opt In';
-        return list.some((c) =>
-            (c.purpose === trackingPurpose) && (c.status === optIn));
-    } catch (e) {
-        console.warn('[skywave] readSdkConsent failed', e);
-        return false;
-    }
+// Has this visitor already consented on this device? We don't read the
+// WebSDK's consent state directly — c360a doesn't expose a stable public
+// API for that, and the persistence shape varies by SDK version. Instead
+// we use a stronger signal we DO control: the proof cookie + peek
+// response. Both conditions are only satisfiable if the visitor went
+// through handleConsent() at least once on this device, which is when
+// we mint the proof cookie + Contact pair. The WebSDK consent cookie
+// will also be set in that flow (handleConsent calls updateConsents),
+// but we don't have to read it back to know — our own state suffices.
+//
+// Returns true iff peek says the proof cookie verified AND has a
+// Contact attached. (Phase 1: peek refreshes the cookie when valid.)
+function previouslyConsented(peek) {
+    return !!(peek && peek.contactExists);
 }
 
 // Resume path for an already-consented visitor: silently do everything
@@ -1143,10 +1133,10 @@ async function resumeSession({ sdkId, surveyAlreadyComplete }) {
         console.warn('[skywave] session/peek failed (continuing as anonymous)', e);
     }
 
-    const sdkConsented = readSdkConsent();
-    if (sdkConsented) {
-        console.log('[skywave] returning visitor: SDK consent=Opt In, surveyCompleted=' +
-            !!peek?.surveyCompleted + ', profileCompleted=' + !!peek?.profileCompleted);
+    if (previouslyConsented(peek)) {
+        console.log('[skywave] returning visitor: proof cookie verified, contactExists=true, ' +
+            'surveyCompleted=' + !!peek?.surveyCompleted +
+            ', profileCompleted=' + !!peek?.profileCompleted);
         state.profileAlreadyComplete = !!peek?.profileCompleted;
         await resumeSession({
             sdkId,
