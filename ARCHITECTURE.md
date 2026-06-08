@@ -345,6 +345,20 @@ bookings, booking creation/management) with public-demo-grade hardening:
   summary so a follow-up chat session has *some* signal to ground on.
   Idempotent — never overwrites a complete survey. Uses `sendBeacon`
   client-side so the request survives the page navigation.
+- **Avatar pipeline (single source of truth)**: `Skywave_AvatarPipeline.cls`
+  owns the bytes-to-public-URL flow (decode base64 → insert
+  `ContentVersion` → mint `ContentDistribution` → return
+  `ContentDownloadUrl`). Both `Skywave_SaveProfile` (chat-iframe LWC,
+  runs as ESW guest) and `Skywave_WebsiteSaveProfile` (Heroku JWT user)
+  call into it. Divergence: the chat path can't write
+  `Contact.ContactCardPicture__c` directly (guest can't write the field),
+  so it routes the stamp through `Skywave_Contact_Update__e` + the
+  System-Mode trigger. The website path calls
+  `Skywave_AvatarPipeline.stampOnContact()` directly. The website also
+  has TWO upload surfaces: the `#profile` form (full edit) and the nav
+  greeting avatar (click-to-swap photo only); both POST to
+  `/api/website/profile`, which dispatches based on whether text fields
+  are present (full save) or absent (avatar-only).
 - **Avatar public URL**: visitor avatars are uploaded by the chat-iframe
   LWC (running as the ESW guest) — the resulting `ContentVersion` has no
   sharing path to non-guest users, so the public website couldn't load

@@ -22,7 +22,11 @@
  */
 public without sharing class Skywave_SaveProfile {
 
-    private static final String AVATAR_TITLE = 'profile_from_signup_demo';
+    // Bytes-to-public-URL pipeline lives in Skywave_AvatarPipeline; we only
+    // keep the GUEST-USER-SPECIFIC bits here (the PE-routed Contact stamp,
+    // because the ESW guest can't write Contact.ContactCardPicture__c
+    // directly). See pipeline class header for the divergence rationale.
+    private static final String AVATAR_TITLE = Skywave_AvatarPipeline.AVATAR_TITLE;
 
     public class Result {
         @AuraEnabled public Boolean success;
@@ -112,26 +116,18 @@ public without sharing class Skywave_SaveProfile {
             // decorative (Files related list on the Contact page in CRM)
             // and the guest can't insert one against a Contact anyway.
 
-            String b64 = avatarBase64;
-            Integer commaAt = b64.indexOf(',');
-            if (commaAt >= 0) {
-                // Strip "data:image/png;base64," style prefix.
-                b64 = b64.substring(commaAt + 1);
-            }
-
             try {
-                deletePriorAvatars(contactId);
+                Skywave_AvatarPipeline.deletePriorAvatars(contactId);
 
-                ContentVersion cv = new ContentVersion();
-                cv.VersionData = EncodingUtil.base64Decode(b64);
-                cv.Title = AVATAR_TITLE;
-                cv.ContentLocation = 'S';
-                cv.PathOnClient = String.isBlank(avatarFileName) ? 'avatar.png' : avatarFileName;
-                insert cv;
+                Id cvId = Skywave_AvatarPipeline.processAvatarBase64(
+                    avatarBase64, avatarFileName);
 
                 // Version-download URL — see header comment for why we
-                // can't resolve the document Id as the guest user.
-                String shepherdUrl = '/sfc/servlet.shepherd/version/download/' + cv.Id;
+                // can't resolve the document Id as the guest user. The
+                // System Mode trigger replaces this with the public CDN
+                // URL (via Skywave_AvatarPipeline.mintPublicUrl) before
+                // it lands on the Contact field.
+                String shepherdUrl = '/sfc/servlet.shepherd/version/download/' + cvId;
                 r.avatarUrl = shepherdUrl;
 
                 // Route the Contact stamp through the System-Mode trigger
@@ -190,6 +186,30 @@ public without sharing class Skywave_SaveProfile {
      *      directly, which would otherwise force the relay to receive every
      *      survey/booking/seat event just to pick up the rare profile one.
      */
+    /**
+     * Public entry point for the profile_created publishes — used by the
+     * website save path (Skywave_WebsiteSaveProfile). When firstName /
+     * lastName aren't supplied (avatar-only update), they're looked up
+     * from the existing Contact so the monitor bubble still gets a name.
+     */
+    public static void publishProfileCreatedExternal(
+        String contactId, String firstName, String lastName, String avatarUrl
+    ) {
+        String fn = firstName, ln = lastName;
+        if (String.isBlank(fn) || String.isBlank(ln)) {
+            try {
+                List<Contact> cs = [
+                    SELECT FirstName, LastName FROM Contact WHERE Id = :contactId LIMIT 1
+                ];
+                if (!cs.isEmpty()) {
+                    if (String.isBlank(fn)) fn = cs[0].FirstName;
+                    if (String.isBlank(ln)) ln = cs[0].LastName;
+                }
+            } catch (Exception e) { /* best effort */ }
+        }
+        publishProfileCreatedEvent(contactId, fn == null ? '' : fn, ln == null ? '' : ln, avatarUrl);
+    }
+
     private static void publishProfileCreatedEvent(String contactId, String firstName, String lastName, String avatarUrl) {
         try {
             List<Contact> cs = [
@@ -239,23 +259,6 @@ public without sharing class Skywave_SaveProfile {
         }
     }
 
-    private static void deletePriorAvatars(Id contactId) {
-        // ContentDocumentLink can't be used in semi-joins, so do it in two steps.
-        Set<Id> docIds = new Set<Id>();
-        for (ContentDocumentLink cdl : [
-            SELECT ContentDocumentId FROM ContentDocumentLink
-            WHERE LinkedEntityId = :contactId
-        ]) {
-            docIds.add(cdl.ContentDocumentId);
-        }
-        if (docIds.isEmpty()) return;
-
-        List<ContentDocument> stale = [
-            SELECT Id FROM ContentDocument
-            WHERE Title = :AVATAR_TITLE AND Id IN :docIds
-        ];
-        if (!stale.isEmpty()) {
-            delete stale;
-        }
-    }
+    // deletePriorAvatars moved to Skywave_AvatarPipeline.deletePriorAvatars
+    // for sharing with Skywave_WebsiteSaveProfile.
 }

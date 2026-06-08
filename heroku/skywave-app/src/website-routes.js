@@ -197,13 +197,29 @@ export function buildWebsiteRouter({ allowedOrigin }) {
         }
     });
 
-    // ------- PUT /profile: write profile fields -------
+    // ------- PUT /profile: write profile fields and/or avatar -------
+    //
+    // Two modes (server-side dispatch — see Skywave_WebsiteSaveProfile):
+    //   - Full save: text fields present (with optional avatar). All
+    //     three of firstName/lastName/email required + min lengths.
+    //   - Avatar-only save: text fields blank/missing AND avatarBase64
+    //     present. For the nav-greeting click-to-swap-photo flow.
+    //
+    // avatarBase64 is the data: URL the client builds from the canvas
+    // crop+resize. We cap at 700kB (post-resize JPEG q=0.5 lands at ~80kB
+    // for a 512×512 image; 700kB gives headroom for clients that don't
+    // pre-resize but still rejects raw camera uploads).
     const profileSchema = z.object({
-        firstName: z.string().min(2).max(80),
-        lastName:  z.string().min(2).max(80),
-        email:     z.string().email().max(200),
-        phone:     z.string().max(40).optional()
-    });
+        firstName: z.string().min(2).max(80).optional(),
+        lastName:  z.string().min(2).max(80).optional(),
+        email:     z.string().email().max(200).optional(),
+        phone:     z.string().max(40).optional(),
+        avatarBase64:   z.string().max(700_000).optional(),
+        avatarFileName: z.string().max(120).optional()
+    }).refine(
+        (v) => !!(v.avatarBase64 || (v.firstName && v.lastName && v.email)),
+        { message: 'either text fields (firstName+lastName+email) or avatarBase64 required' }
+    );
     router.put('/profile', requireProof, validate(profileSchema), async (req, res) => {
         try {
             const me = await apexInvoke('POST', '/skywave/website/resolve', {
@@ -213,10 +229,12 @@ export function buildWebsiteRouter({ allowedOrigin }) {
             req.contactId = me.contactId;
             const r = await apexInvoke('POST', '/skywave/website/profile/save', {
                 contactId: me.contactId,
-                firstName: req.body.firstName,
-                lastName: req.body.lastName,
-                email: req.body.email,
-                phone: req.body.phone || ''
+                firstName: req.body.firstName || '',
+                lastName: req.body.lastName || '',
+                email: req.body.email || '',
+                phone: req.body.phone || '',
+                avatarBase64: req.body.avatarBase64 || '',
+                avatarFileName: req.body.avatarFileName || ''
             });
             res.json(r);
         } catch (err) {

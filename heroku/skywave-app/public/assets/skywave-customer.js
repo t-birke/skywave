@@ -21,6 +21,7 @@
 
 import { initSession } from './skywave-session.js';
 import { openSeatMap } from './skywave-seatmap.js';
+import { fileToAvatarBase64 } from './skywave-image.js';
 
 let session = null;
 let bookingsCache = null;
@@ -48,10 +49,10 @@ function updateNavIdentity() {
     });
 }
 
-function decorateGreeting(el) {
+function decorateGreeting(slotEl) {
     const p = session?.profile || {};
-    const avatarSlot = el.querySelector('.nav-greeting-avatar');
-    const textSlot = el.querySelector('.nav-greeting-text');
+    const avatarSlot = slotEl.querySelector('.nav-greeting-avatar');
+    const textSlot = slotEl.querySelector('.nav-greeting-text');
     if (avatarSlot) {
         avatarSlot.innerHTML = '';
         if (p.avatarUrl) {
@@ -62,11 +63,92 @@ function decorateGreeting(el) {
         } else {
             avatarSlot.textContent = initials(p);
         }
+        // Click-to-upload affordance: the avatar acts as a label for a
+        // hidden file input. Mobile native picker (camera/gallery)
+        // appears on tap; desktop opens the file dialog. Resize +
+        // upload runs the same pipeline as the #profile form, just
+        // with text fields omitted (avatar-only mode on the server).
+        avatarSlot.title = 'Change photo';
+        avatarSlot.setAttribute('role', 'button');
+        avatarSlot.setAttribute('tabindex', '0');
+        if (!avatarSlot.dataset.avatarClickWired) {
+            avatarSlot.addEventListener('click', () => triggerNavAvatarPicker(avatarSlot));
+            avatarSlot.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter' || ev.key === ' ') {
+                    ev.preventDefault();
+                    triggerNavAvatarPicker(avatarSlot);
+                }
+            });
+            avatarSlot.dataset.avatarClickWired = '1';
+        }
     }
     if (textSlot) {
         const name = (p.firstName || '').trim() || 'Member';
         const tier = p.membershipTier || '';
         textSlot.textContent = tier ? `${name} · ${tier}` : name;
+    }
+}
+
+// Hidden file input + handler for the nav avatar's click-to-upload flow.
+// Reused across all identity slots — the input is appended to <body>
+// once and triggered programmatically.
+let navAvatarFileEl = null;
+function ensureNavAvatarFile() {
+    if (navAvatarFileEl) return navAvatarFileEl;
+    navAvatarFileEl = document.createElement('input');
+    navAvatarFileEl.type = 'file';
+    navAvatarFileEl.accept = 'image/*';
+    navAvatarFileEl.className = 'nav-avatar-file-hidden';
+    navAvatarFileEl.addEventListener('change', handleNavAvatarChange);
+    document.body.appendChild(navAvatarFileEl);
+    return navAvatarFileEl;
+}
+function triggerNavAvatarPicker(slot) {
+    const input = ensureNavAvatarFile();
+    input.dataset.targetSlotId = slot.id || (slot.id = `nav-av-${Math.floor(performance.now() * 1000)}`);
+    input.value = '';
+    input.click();
+}
+async function handleNavAvatarChange(ev) {
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    let dataUrl;
+    try {
+        dataUrl = await fileToAvatarBase64(file);
+    } catch (e) {
+        console.warn('[skywave] avatar resize failed:', e.message);
+        return;
+    }
+    // Optimistic preview while the upload runs.
+    const targetId = ev.target.dataset.targetSlotId;
+    const slot = targetId ? document.getElementById(targetId) : null;
+    if (slot) {
+        slot.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        img.alt = '';
+        slot.appendChild(img);
+    }
+    try {
+        const r = await fetch('/api/website/profile', {
+            method: 'PUT',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                avatarBase64: dataUrl,
+                avatarFileName: 'avatar.jpg'
+            })
+        });
+        if (!r.ok) {
+            const data = await r.json().catch(() => ({}));
+            throw new Error(data?.error || 'HTTP ' + r.status);
+        }
+        // Refresh /me so all identity slots pick up the persisted CDN URL.
+        const me = await (await fetch('/api/website/me', { credentials: 'same-origin' })).json();
+        session = me;
+        updateNavIdentity();
+    } catch (err) {
+        console.warn('[skywave] avatar upload failed:', err.message);
     }
 }
 
@@ -630,10 +712,33 @@ async function renderProfile() {
     }
 }
 
+// Pending avatar (cropped+resized data: URL) for the in-progress
+// profile form. Populated by handleAvatarFile, consumed by submitProfile.
+// Module-scoped is fine — only one profile form renders at a time.
+let pendingAvatarBase64 = null;
+
 function profileForm(me) {
     const p = me.profile || {};
     const placeholderLast = (p.lastName && /^[A-Za-z0-9_-]{8,64}$/.test(p.lastName)) ? '' : (p.lastName || '');
+    pendingAvatarBase64 = null;
+
+    const avatarPreview = el('div', { class: 'cust-avatar-preview' });
+    decorateAvatarPreview(avatarPreview, p.avatarUrl || null);
+
+    const fileInput = el('input', {
+        type: 'file', accept: 'image/*', capture: 'user',
+        class: 'cust-avatar-file',
+        onchange: (e) => handleAvatarFile(e, avatarPreview)
+    });
+
+    const avatarTile = el('label', { class: 'cust-avatar-tile' },
+        avatarPreview,
+        el('span', { class: 'cust-avatar-hint' }, 'Tap to add or change photo'),
+        fileInput
+    );
+
     const form = el('form', { class: 'cust-form', onsubmit: (e) => e.preventDefault() },
+        avatarTile,
         el('div', { class: 'cust-form-grid' },
             field('First name',  el('input', { type: 'text', name: 'firstName', value: p.firstName || '', required: true, minlength: 2 })),
             field('Last name',   el('input', { type: 'text', name: 'lastName', value: placeholderLast, required: true, minlength: 2 })),
@@ -651,6 +756,38 @@ function profileForm(me) {
         )
     );
     return form;
+}
+
+function decorateAvatarPreview(slot, url) {
+    slot.innerHTML = '';
+    if (url) {
+        const img = el('img', { src: url, alt: '' });
+        slot.appendChild(img);
+    } else {
+        slot.appendChild(el('span', { class: 'cust-avatar-icon' }, '📷'));
+    }
+}
+
+async function handleAvatarFile(ev, previewSlot) {
+    const file = ev.target.files && ev.target.files[0];
+    const status = document.getElementById('cust-profile-status');
+    if (!file) return;
+    try {
+        const dataUrl = await fileToAvatarBase64(file);
+        pendingAvatarBase64 = dataUrl;
+        decorateAvatarPreview(previewSlot, dataUrl);
+        if (status) {
+            status.textContent = 'Photo ready — save to apply';
+            status.className = 'cust-status';
+        }
+    } catch (e) {
+        if (status) {
+            status.textContent = e.message === 'file_too_large'
+                ? 'That image is too large.'
+                : 'Could not read image.';
+            status.className = 'cust-status err';
+        }
+    }
 }
 
 function field(label, input) {
@@ -673,21 +810,27 @@ async function submitProfile(ev, form) {
     status.textContent = 'Saving…';
     status.className = 'cust-status';
     try {
+        const payload = {
+            firstName: (fd.get('firstName') || '').toString().trim(),
+            lastName:  (fd.get('lastName') || '').toString().trim(),
+            email:     (fd.get('email') || '').toString().trim(),
+            phone:     (fd.get('phone') || '').toString().trim() || undefined
+        };
+        if (pendingAvatarBase64) {
+            payload.avatarBase64 = pendingAvatarBase64;
+            payload.avatarFileName = 'avatar.jpg';
+        }
         const r = await fetch('/api/website/profile', {
             method: 'PUT',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                firstName: (fd.get('firstName') || '').toString().trim(),
-                lastName:  (fd.get('lastName') || '').toString().trim(),
-                email:     (fd.get('email') || '').toString().trim(),
-                phone:     (fd.get('phone') || '').toString().trim() || undefined
-            })
+            body: JSON.stringify(payload)
         });
         const data = await r.json();
         if (!r.ok) throw new Error(data?.issues?.[0]?.message || data.error || ('HTTP ' + r.status));
         status.textContent = 'Saved';
         status.className = 'cust-status ok';
+        pendingAvatarBase64 = null;
         // Refresh in-memory session so nav greeting updates.
         const me = await (await fetch('/api/website/me', { credentials: 'same-origin' })).json();
         session = me;

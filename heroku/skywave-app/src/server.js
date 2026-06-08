@@ -17,7 +17,10 @@ const PORT = process.env.PORT || 3000;
 
 const app = express();
 app.set('trust proxy', 1);  // Heroku terminates TLS one hop in front
-app.use(express.json({ limit: '256kb' }));
+// Body limit raised to 1mb to accommodate base64 avatar uploads. Pre-resize
+// in the browser caps the JPEG at ~80kB → ~110kB base64; 1mb gives plenty
+// of headroom while still rejecting accidental upload of full-size photos.
+app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 app.use(express.static(path.resolve(__dirname, '../public')));
 

@@ -623,3 +623,59 @@
 .skywave-site .cust-booking_past:hover {
     opacity: 0.95;
 }
+
+/* Avatar tile on the #profile form. Square photo with a hint label,
+   reuses native file picker so mobile gets the camera/gallery sheet. */
+.skywave-site .cust-avatar-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    cursor: pointer;
+}
+.skywave-site .cust-avatar-preview {
+    width: 7rem;
+    height: 7rem;
+    border-radius: 999px;
+    background-color: var(--cust-bg-alt, #f5f7fb);
+    border: 2px dashed var(--cust-border, #d8dee8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+.skywave-site .cust-avatar-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.skywave-site .cust-avatar-icon {
+    font-size: 1.8rem;
+    color: var(--cust-mute, #6b7280);
+}
+.skywave-site .cust-avatar-hint {
+    font-size: 0.78rem;
+    color: var(--cust-mute, #6b7280);
+}
+.skywave-site .cust-avatar-file {
+    display: none;
+}
+
+/* Nav greeting avatar: clicking it fires a hidden file picker. Pointer
+   cursor + subtle hover ring so the affordance is visible. */
+.skywave-site .nav-greeting-avatar {
+    cursor: pointer;
+    transition: box-shadow 0.15s ease;
+}
+.skywave-site .nav-greeting-avatar:hover {
+    box-shadow: 0 0 0 2px var(--cust-teal, #14b8a6);
+}
+.skywave-site .nav-avatar-file-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+}
