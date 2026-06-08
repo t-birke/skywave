@@ -20,7 +20,7 @@ import {
     PROOF_COOKIE_NAME, isValidDeviceIdShape, newSyntheticDeviceId,
     setProofCookie, requireProof
 } from './proof-cookie.js';
-import { apexInvoke, pipeFromInstance } from './sf-api.js';
+import { apexInvoke } from './sf-api.js';
 import {
     helmetMiddleware, strictSameOrigin, ipRateLimit, cookieRateLimit,
     auditLog, validate
@@ -375,40 +375,32 @@ export function buildWebsiteRouter({ allowedOrigin }) {
 
     // ------- /avatar/:cvId: stream the visitor's avatar bytes -------
     //
-    // Browsers fetch this from <img src>, so the request rides on the
-    // browser's session cookies. requireProof gates it on a valid proof
-    // cookie. Ownership check: we re-resolve the visitor's Contact and
-    // confirm Apex would currently hand back this exact ContentVersion id
-    // as their avatar — that way one visitor can't enumerate other people's
-    // ContentVersions through the proxy.
+    // Browsers fetch this from <img src>. Why we go through Apex REST
+    // instead of just hitting /services/data/.../VersionData with the
+    // JWT token: the chat-iframe LWC uploads the avatar as the ESW site
+    // guest, which leaves the ContentVersion with no sharing path to
+    // any non-guest user — even an objectPermission grant returns 404.
+    // The Apex endpoint runs `without sharing` and re-checks ownership
+    // by joining cvId to the deviceId-resolved Contact.
     router.get('/avatar/:cvId', requireProof, async (req, res) => {
         const cvId = req.params.cvId;
         if (!/^[A-Za-z0-9]{15,18}$/.test(cvId)) {
             return res.status(400).json({ error: 'invalid_cvId' });
         }
         try {
-            const me = await apexInvoke('POST', '/skywave/website/resolve', {
-                deviceId: req.deviceId,
-                trackingStatus: 'websdk'
-            });
-            req.contactId = me.contactId;
-            const expected = avatarProxyUrl(me.avatarUrl);
-            if (expected !== `/api/website/avatar/${cvId}`) {
+            const data = await apexInvoke('GET',
+                `/skywave/website/avatar?cvId=${encodeURIComponent(cvId)}` +
+                `&deviceId=${encodeURIComponent(req.deviceId)}`);
+            if (!data?.base64) {
                 return res.status(404).json({ error: 'avatar_not_found' });
             }
-            // Shepherd path (/sfc/servlet.shepherd/...) is a UI endpoint that
-            // requires session-cookie auth — Bearer token returns the SF login
-            // redirect HTML. The REST sobjects/VersionData endpoint is the
-            // Bearer-friendly equivalent and streams the raw bytes.
-            await pipeFromInstance(`/services/data/v62.0/sobjects/ContentVersion/${cvId}/VersionData`, res);
+            res.setHeader('Content-Type', data.contentType || 'application/octet-stream');
+            res.setHeader('Cache-Control', 'private, max-age=300');
+            res.end(Buffer.from(data.base64, 'base64'));
         } catch (err) {
             const status = err.response?.status ?? 500;
             console.error('/avatar fetch failed', status, err.response?.data ?? err.message);
-            if (!res.headersSent) {
-                res.status(status).json({ error: 'avatar_fetch_failed' });
-            } else {
-                res.end();
-            }
+            res.status(status).json({ error: 'avatar_fetch_failed' });
         }
     });
 
