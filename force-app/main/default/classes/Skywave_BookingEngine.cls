@@ -22,7 +22,15 @@
  * Guest-user paths that need to bypass sharing wrap the engine call in
  * a `without sharing` shim of their own (see Skywave_ChangeSeat).
  */
-public with sharing class Skywave_BookingEngine {
+public inherited sharing class Skywave_BookingEngine {
+    // `inherited sharing` — runs with the caller's sharing context.
+    // Website paths call from a `with sharing` REST class (integration
+    // user has full Contact/Booking access, so sharing is permissive
+    // anyway). Chat-LWC path calls from Skywave_ChangeSeat's
+    // `without sharing` GuestSeatWriter shim so the ESW guest user can
+    // see the segment to update its seat. Defaulting to `with sharing`
+    // here would silently filter the guest's segment lookup → produces
+    // a confusing `segment_not_found` instead of the real seat-change.
 
     // ---------- public DTOs --------------------------------------------
 
