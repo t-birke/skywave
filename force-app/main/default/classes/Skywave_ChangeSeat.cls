@@ -62,64 +62,28 @@ public class Skywave_ChangeSeat {
 
     /**
      * `without sharing` writer so the ESW guest user can persist the
-     * seat regardless of record sharing. Reads the segment + parent
-     * booking/flight, updates Seat_Number__c, and echoes back the
-     * human-facing identifiers the LWC displays in its confirmation.
+     * seat regardless of record sharing. Delegates the actual update +
+     * monitor publish to Skywave_BookingEngine — single source of truth
+     * shared with the website's seat-change path.
      */
     private without sharing class GuestSeatWriter {
         public SeatChangeResult write(String segmentId, String newSeat) {
             SeatChangeResult r = new SeatChangeResult();
             r.success = false;
-
-            List<Booking_Segment__c> segs = [
-                SELECT Id, Seat_Number__c,
-                       Booking__r.Confirmation_Code__c, Booking__r.Status__c,
-                       Booking__r.Contact__c, Booking__r.Contact__r.Session_Id__c,
-                       Booking__r.Contact__r.Demo_Session__c,
-                       Flight__r.Flight_Number__c
-                FROM Booking_Segment__c
-                WHERE Id = :segmentId
-                LIMIT 1
-            ];
-            if (segs.isEmpty()) {
-                r.message = 'Booking segment not found.';
+            Skywave_BookingEngine.SeatChangeResult er =
+                Skywave_BookingEngine.changeSeatBySegmentId(segmentId, newSeat);
+            if (!er.success) {
+                r.message = String.isNotBlank(er.errorMessage)
+                    ? er.errorMessage
+                    : 'Seat change failed: ' + er.errorCode;
                 return r;
             }
-
-            Booking_Segment__c seg = segs[0];
-            r.oldSeat = seg.Seat_Number__c;
-            seg.Seat_Number__c = newSeat;
-            update seg;
-
-            // Live monitor: append a seat badge to the visitor's bubble.
-            // Best-effort — never blocks the seat change.
-            try {
-                String deviceId = seg.Booking__r.Contact__r != null
-                    ? seg.Booking__r.Contact__r.Session_Id__c : null;
-                Id demoSessionId = seg.Booking__r.Contact__r != null
-                    ? seg.Booking__r.Contact__r.Demo_Session__c : null;
-                if (String.isNotBlank(deviceId) && demoSessionId != null) {
-                    Skywave_RestUtil.publishEvent(
-                        'seat_changed',
-                        deviceId,
-                        demoSessionId,
-                        new Map<String, Object>{
-                            'seat'         => newSeat,
-                            'oldSeat'      => r.oldSeat,
-                            'flightNumber' => seg.Flight__r.Flight_Number__c,
-                            'bookingCode'  => seg.Booking__r.Confirmation_Code__c
-                        }
-                    );
-                }
-            } catch (Exception e) {
-                System.debug(LoggingLevel.WARN, 'seat_changed publish skipped: ' + e.getMessage());
-            }
-
             r.success = true;
-            r.bookingCode = seg.Booking__r.Confirmation_Code__c;
-            r.flightNumber = seg.Flight__r.Flight_Number__c;
-            r.seatNumber = newSeat;
-            r.message = 'Seat changed to ' + newSeat;
+            r.bookingCode = er.bookingCode;
+            r.flightNumber = er.flightNumber;
+            r.seatNumber = er.newSeat;
+            r.oldSeat = er.oldSeat;
+            r.message = 'Seat changed to ' + er.newSeat;
             return r;
         }
     }
@@ -137,79 +101,64 @@ public class Skywave_ChangeSeat {
     private static Result executeSeatChange(Request req) {
         Result r = new Result();
 
-        try {
-            Booking_Segment__c segment = [
-                SELECT Id, Seat_Number__c, Booking__c, Booking__r.Status__c,
-                       Flight__c, Flight__r.Flight_Number__c, Flight__r.Aircraft_Type__c
+        // If the agent passed a specific seat → engine handles validation +
+        // class-aware update. If only a preference, derive a seat from the
+        // booked fare class first, then send through the engine.
+        String newSeat = req.newSeatNumber;
+        if (String.isBlank(newSeat) && String.isNotBlank(req.seatPreference)) {
+            // Resolve the booked fare class + flight for sensible auto-pick.
+            List<Booking_Segment__c> segs = [
+                SELECT Id, Flight__c, Booking__r.Fare_Class__c
                 FROM Booking_Segment__c
-                WHERE Id = :req.bookingSegmentId
-                LIMIT 1
+                WHERE Id = :req.bookingSegmentId LIMIT 1
             ];
-
-            if (segment.Booking__r.Status__c != 'Confirmed') {
+            if (segs.isEmpty()) {
                 r.success = false;
-                r.errorMessage = 'Cannot change seat for a booking that is not confirmed';
+                r.errorMessage = 'Booking segment not found';
                 return r;
             }
-
-            String newSeat;
-            if (String.isNotBlank(req.newSeatNumber)) {
-                if (!isValidSeatFormat(req.newSeatNumber)) {
-                    r.success = false;
-                    r.errorMessage = 'Invalid seat format. Please use format like 12A, 15C, etc.';
-                    return r;
-                }
-                newSeat = req.newSeatNumber.toUpperCase();
-            } else if (String.isNotBlank(req.seatPreference)) {
-                newSeat = assignSeatByPreference(req.seatPreference);
-            } else {
-                r.success = false;
-                r.errorMessage = 'Please provide either a specific seat number or a seat preference';
-                return r;
-            }
-
-            String oldSeat = segment.Seat_Number__c;
-            segment.Seat_Number__c = newSeat;
-            update segment;
-
-            r.success = true;
-            r.updatedSegment = buildSegmentInfo(segment, oldSeat, newSeat);
-
-        } catch (QueryException e) {
+            Booking_Segment__c seg = segs[0];
+            newSeat = Skywave_BookingEngine.autoSeat(
+                seg.Flight__c, seg.Booking__r.Fare_Class__c, normalizePreference(req.seatPreference));
+        }
+        if (String.isBlank(newSeat)) {
             r.success = false;
-            r.errorMessage = 'Booking segment not found';
-            System.debug('Seat change error: ' + e.getMessage());
-        } catch (Exception e) {
-            r.success = false;
-            r.errorMessage = 'Seat change failed: ' + e.getMessage();
-            System.debug('Seat change error: ' + e.getMessage() + '\n' + e.getStackTraceString());
+            r.errorMessage = 'Please provide either a specific seat number or a seat preference';
+            return r;
         }
 
+        Skywave_BookingEngine.SeatChangeResult er =
+            Skywave_BookingEngine.changeSeatBySegmentId(req.bookingSegmentId, newSeat);
+        if (!er.success) {
+            r.success = false;
+            r.errorMessage = String.isNotBlank(er.errorMessage)
+                ? er.errorMessage : 'Seat change failed: ' + er.errorCode;
+            return r;
+        }
+        r.success = true;
+        SegmentInfo info = new SegmentInfo();
+        info.segmentId = req.bookingSegmentId;
+        info.flightNumber = er.flightNumber;
+        info.aircraftType = null;  // not surfaced by the engine; agent doesn't need it
+        info.oldSeat = er.oldSeat;
+        info.newSeat = er.newSeat;
+        info.message = 'Seat successfully changed from ' + er.oldSeat + ' to ' + er.newSeat;
+        r.updatedSegment = info;
         return r;
+    }
+
+    private static String normalizePreference(String pref) {
+        if (String.isBlank(pref)) return null;
+        String lower = pref.toLowerCase();
+        if (lower.contains('window')) return 'Window';
+        if (lower.contains('aisle')) return 'Aisle';
+        return null;
     }
 
     private static Boolean isValidSeatFormat(String seat) {
         Pattern seatPattern = Pattern.compile('^\\d{1,2}[A-Z]$');
         Matcher matcher = seatPattern.matcher(seat.toUpperCase());
         return matcher.matches();
-    }
-
-    private static String assignSeatByPreference(String preference) {
-        Integer row = 10 + Math.mod(Math.abs(Crypto.getRandomInteger()), 20);
-        String seat;
-
-        if (preference.toLowerCase().contains('window')) {
-            seat = Math.mod(Math.abs(Crypto.getRandomInteger()), 2) == 0 ? 'A' : 'F';
-        } else if (preference.toLowerCase().contains('aisle')) {
-            seat = Math.mod(Math.abs(Crypto.getRandomInteger()), 2) == 0 ? 'C' : 'D';
-        } else if (preference.toLowerCase().contains('middle')) {
-            seat = Math.mod(Math.abs(Crypto.getRandomInteger()), 2) == 0 ? 'B' : 'E';
-        } else {
-            List<String> seats = new List<String>{'A', 'B', 'C', 'D', 'E', 'F'};
-            seat = seats[Math.mod(Math.abs(Crypto.getRandomInteger()), seats.size())];
-        }
-
-        return String.valueOf(row) + seat;
     }
 
     private static SegmentInfo buildSegmentInfo(

@@ -167,6 +167,28 @@ lat/lon math (`x = lon + 180`, `y = 90 − lat`).
 The `Skywave_Agent_User` permset grants `Demo_Event__e` Create (= publish
 on a Platform Event) so the bot user's monitor publishes go through.
 
+### 3c'. Booking engine — single source of truth (`Skywave_BookingEngine.cls`)
+
+All booking mutations (create / cancel / seat-change) live in one class.
+Modality wrappers translate their inputs/outputs into the engine's
+contract:
+
+| Modality | Wrapper | Calls |
+|----------|---------|-------|
+| Website  | `Skywave_WebsiteCreateBooking` (REST) | `createBooking(req)` |
+| Website  | `Skywave_WebsiteManageBooking` (REST, `/cancel` and `/seat`) | `cancelBooking()`, `changeSeat()` |
+| Chat     | `Skywave_AckProfileForm` (Invocable) | `createBooking()` with `initialStatus='Pending Confirmation'` |
+| Chat LWC | `Skywave_ChangeSeat.confirmSeatChange` (`@AuraEnabled`, guest-safe `without sharing` shim) | `changeSeatBySegmentId()` |
+| Chat agent action | `Skywave_ChangeSeat.changeSeat` (Invocable) | `changeSeatBySegmentId()` (after preference→seat resolution via `autoSeat()`) |
+
+The engine owns: `assignSeat` (class-zone-aware), `resolveZones` /
+`parseZone` (reading Skywave_Seat_Map__c.Layout_Json__c), confirmation-
+code generation, `flight_booked` / `seat_changed` / `booking_cancelled`
+event publishing. Chat-vs-website differences are passed in
+(`initialStatus`, `initialPaymentStatus`) — chat goes Pending/Unpaid
+because the payment-widget LWC flips it later; website goes
+Confirmed/Paid because clicking Book is the payment cue.
+
 ### 3c. Chat booking pipeline (agent)
 
 The `Skywave_Airlines_Agent` runs a deterministic booking ladder. The flow and

@@ -98,132 +98,35 @@ public with sharing class Skywave_AckProfileForm {
             return out;
         }
 
-        String canonicalFareClass = Skywave_FareClass.normalizeOrDefault(req.fareClass);
-        String key = req.flightId.trim();
+        // Delegate the actual booking insert to Skywave_BookingEngine —
+        // single source of truth shared with the website's create path.
+        // Chat-specific bit: we want a Pending/Unpaid booking so the
+        // payment-widget LWC can flip it to Confirmed/Paid afterward.
+        Skywave_BookingEngine.CreateRequest engineReq = new Skywave_BookingEngine.CreateRequest();
+        engineReq.contactId = req.contactId;
+        engineReq.flightKey = req.flightId.trim();
+        engineReq.travelDate = travelDateParsed;
+        engineReq.fareClass = req.fareClass;
+        engineReq.checkedBags = req.checkedBags != null ? req.checkedBags : 0;
+        engineReq.seatPreference = req.seatPreference;
+        engineReq.initialStatus = 'Pending Confirmation';
+        engineReq.initialPaymentStatus = 'Unpaid';
 
-        try {
-            // Resolve the flight key into an itinerary (single leg, or a
-            // compound "A+B" connection through the JFK hub). One
-            // Booking_Segment__c is created per leg.
-            Skywave_Itinerary.Resolved itin =
-                Skywave_Itinerary.resolve(key, canonicalFareClass, travelDateParsed);
-            if (itin.legs.isEmpty()) {
-                out.message = 'Flight not found for: ' + key;
-                return out;
-            }
-
-            Decimal totalAmount = itin.totalPrice();
-
-            Booking__c booking = new Booking__c(
-                Contact__c = req.contactId,
-                Confirmation_Code__c = generateConfirmationCode(),
-                Status__c = 'Pending Confirmation',
-                Payment_Status__c = 'Unpaid',
-                Fare_Class__c = canonicalFareClass,
-                Total_Amount__c = totalAmount,
-                Checked_Bags__c = req.checkedBags != null ? req.checkedBags : 0,
-                Booking_Date__c = Date.today()
-            );
-            insert booking;
-
-            List<Booking_Segment__c> segments = new List<Booking_Segment__c>();
-            Integer order = 1;
-            for (Skywave_Itinerary.Leg leg : itin.legs) {
-                segments.add(new Booking_Segment__c(
-                    Booking__c = booking.Id,
-                    Flight__c = leg.flight.Id,
-                    Travel_Date__c = leg.departure.date(),
-                    Departure_DateTime__c = leg.departure,
-                    Arrival_DateTime__c = leg.arrival,
-                    Segment_Order__c = order,
-                    Segment_Status__c = 'Scheduled',
-                    Seat_Number__c = assignSeat(req.seatPreference)
-                ));
-                order++;
-            }
-            insert segments;
-
-            // Live monitor: tell the demo map the visitor just booked. Carry
-            // the IATA pairs per leg so the map can draw the route without a
-            // Contact requery (and the connection city for visual emphasis).
-            publishFlightBookedEvent(req.contactId, itin, booking.Confirmation_Code__c);
-
-            out.success = true;
-            out.bookingCode = booking.Confirmation_Code__c;
-            out.totalCharged = '$' + totalAmount.setScale(2).toPlainString();
-            out.message = 'Booking created (Pending/Unpaid), ' + segments.size() + ' segment(s).';
-        } catch (Exception e) {
-            out.message = 'Booking creation failed: ' + e.getMessage();
-            System.debug('Skywave_AckProfileForm error: ' + e.getMessage() +
-                '\n' + e.getStackTraceString());
+        Skywave_BookingEngine.CreateResult r = Skywave_BookingEngine.createBooking(engineReq);
+        if (!r.success) {
+            out.message = String.isNotBlank(r.errorMessage)
+                ? 'Booking creation failed: ' + r.errorMessage
+                : 'Booking creation failed: ' + r.errorCode;
+            return out;
         }
+        out.success = true;
+        out.bookingCode = r.bookingCode;
+        out.totalCharged = r.totalDisplay;
+        out.message = 'Booking created (Pending/Unpaid), ' + r.segmentCount + ' segment(s).';
         return out;
     }
 
-    /**
-     * Publish a Demo_Event__e(type='flight_booked') so the live demo monitor
-     * can draw the route on its world map and recenter the visitor's avatar.
-     * Best-effort — never blocks the booking. The Contact's Session_Id__c is
-     * the device id the monitor uses as the bubble's stable key.
-     */
-    private static void publishFlightBookedEvent(Id contactId, Skywave_Itinerary.Resolved itin, String bookingCode) {
-        try {
-            List<Contact> cs = [
-                SELECT Session_Id__c, Demo_Session__c
-                FROM Contact WHERE Id = :contactId LIMIT 1
-            ];
-            if (cs.isEmpty() || String.isBlank(cs[0].Session_Id__c)) return;
-            if (cs[0].Demo_Session__c == null) return;  // PE field is required
-
-            List<Map<String, String>> legs = new List<Map<String, String>>();
-            for (Skywave_Itinerary.Leg leg : itin.legs) {
-                legs.add(new Map<String, String>{
-                    'from' => leg.flight.Origin__c,
-                    'to'   => leg.flight.Destination__c,
-                    'flightNumber' => leg.flight.Flight_Number__c
-                });
-            }
-            Map<String, Object> payload = new Map<String, Object>{
-                'legs' => legs,
-                'bookingCode' => bookingCode,
-                'isConnection' => itin.isConnection
-            };
-            if (itin.isConnection) {
-                payload.put('connectionAirport', itin.legs[0].flight.Destination__c);
-            }
-            Skywave_RestUtil.publishEvent(
-                'flight_booked',
-                cs[0].Session_Id__c,
-                cs[0].Demo_Session__c,
-                payload
-            );
-            System.debug('flight_booked published for session=' + cs[0].Session_Id__c);
-        } catch (Exception e) {
-            System.debug(LoggingLevel.WARN, 'flight_booked publish skipped: ' + e.getMessage());
-        }
-    }
-
-    private static String generateConfirmationCode() {
-        String chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        String code = '';
-        for (Integer i = 0; i < 6; i++) {
-            Integer idx = Math.mod(Math.abs(Crypto.getRandomInteger()), chars.length());
-            code += chars.substring(idx, idx + 1);
-        }
-        return code;
-    }
-
-    private static String assignSeat(String preference) {
-        Integer row = 10 + Math.mod(Math.abs(Crypto.getRandomInteger()), 20);
-        String seat;
-        if (preference == 'Window') {
-            seat = Math.mod(Math.abs(Crypto.getRandomInteger()), 2) == 0 ? 'A' : 'F';
-        } else if (preference == 'Aisle') {
-            seat = Math.mod(Math.abs(Crypto.getRandomInteger()), 2) == 0 ? 'C' : 'D';
-        } else {
-            List<String> seats = new List<String>{'A','B','C','D','E','F'};
-            seat = seats[Math.mod(Math.abs(Crypto.getRandomInteger()), seats.size())];
-        }
-        return String.valueOf(row) + seat;
-    }
+    // assignSeat / generateConfirmationCode / publishFlightBookedEvent
+    // moved to Skywave_BookingEngine. This class is now a pure Invocable
+    // shim for the chat agent's "Profile created" cue.
 }
