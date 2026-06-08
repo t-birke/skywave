@@ -73,6 +73,29 @@ the stage list and the rationale (it replaced a manual "check state" button).
 
 ## 3. Data flows (the parts no single file reveals)
 
+### 3a'. No-website chat: demo-seed Contact fallback
+
+The chat agent is also embedded on a secondary Experience Cloud page that
+doesn't run our consumer-site JS. That page can't pass a deviceId
+prechat field, so neither rail of the agent's identity resolution
+matches: `@MessagingEndUser.ContactId` is empty (no caller match) and
+the consumer-site PE-trigger never fired (no `Skywave_Conversation_Id__c`
+match either).
+
+`Skywave_ResolveSession` handles this with a third resolution step:
+when both lookups miss, it queries for the single Contact carrying
+`Skywave_Demo_Seed__c=true` and uses that one as the agent's
+`resolved_contact_id`. The seed Contact has a populated survey, a
+non-null Home_Airport, completed profile fields and a backlog of
+`Booking__c` rows — so the agent immediately sees "you have flights to
+talk about" and the booking ladder skips the profile form (because
+`Profile_Completed__c=true`, no risk of overwriting the seed's
+identity). If no Contact in the org carries the flag, the resolver
+falls through to the original placeholder-mint behavior.
+
+To rotate which Contact serves as the seed: set the flag on the new
+Contact, unset it on the old one. Exactly one row should carry true.
+
 ### 3a. Anonymous visitor → known Contact (web)
 
 This is the spine of the demo. A phone is anonymous until the survey, then a

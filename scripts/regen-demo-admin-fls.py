@@ -53,6 +53,7 @@ STD_FIELDS = {
                 'Membership_Start_Date__c', 'Membership_Tier__c', 'Phone_Digits__c', 'Session_Id__c',
                 'Skywave_Conversation_Id__c', 'Skywave_Survey_Json__c', 'Skywave_Survey_Summary__c',
                 'Skywave_Abandoned_At__c', 'Skywave_Abandon_Reason__c',
+                'Skywave_Demo_Seed__c',
                 'Profile_Completed__c', 'Tracking_Status__c',
                 'Geo_Region__c', 'Geo_Latitude__c',
                 'Geo_Longitude__c', 'Home_Airport__c'],

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Skywave_Demo_Seed__c</fullName>
+    <label>Skywave Demo Seed</label>
+    <description>True for exactly one Contact: the curated &quot;demo seed&quot; that Skywave_ResolveSession falls back to when a chat conversation has no MessagingEndUser ContactId and no website-side Contact (Skywave_Conversation_Id__c match). Used by the secondary Experience Cloud chat page that doesn&apos;t carry our deviceId prechat field, so the agent still gets a populated survey + booking history instead of an empty placeholder.</description>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+</CustomField>

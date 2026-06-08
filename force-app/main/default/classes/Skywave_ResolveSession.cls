@@ -87,17 +87,42 @@ public with sharing class Skywave_ResolveSession {
         ];
         Contact c;
         if (contacts.isEmpty()) {
-            // No Contact for this conversation yet — common when the visitor
-            // skipped/blocked the SDK cookie OR opens chat without finishing
-            // the survey first. Mint a placeholder Contact so downstream
-            // booking actions always have a real Id to write against. The
-            // anonymous-survey path's trigger does the same thing on
-            // chat_start; this is the agent-side mirror.
-            c = new Contact(
-                LastName = conversationId,
-                Skywave_Conversation_Id__c = conversationId
-            );
-            insert c;
+            // No Contact for this conversation yet. There are three reasons
+            // we land here:
+            //   - Visitor skipped/blocked the SDK cookie on the consumer site.
+            //   - Visitor opened chat without finishing the survey first.
+            //   - The chat lives on a secondary Experience Cloud page that
+            //     doesn't run our consumer-site JS at all (no deviceId
+            //     prechat, no website-side Contact ever existed).
+            //
+            // Try to fall back to the curated "demo seed" Contact —
+            // exactly one Contact in the org carries Skywave_Demo_Seed__c=
+            // true. Borrowing it gives the agent a populated survey + a
+            // backlog of bookings to talk about, instead of the visitor
+            // hitting "you have no flights" the moment they ask. The seed
+            // also has Profile_Completed__c=true, so the booking ladder
+            // will skip the profile form (no risk of overwriting the
+            // seed's curated identity).
+            //
+            // Final fall-through (no seed exists in the org): mint a fresh
+            // placeholder Contact, same shape as before, so downstream
+            // booking actions still have a real Id to write against.
+            List<Contact> seeds = [
+                SELECT Id, Skywave_Survey_Json__c, Skywave_Survey_Summary__c,
+                       Home_Airport__c, MailingCity, Profile_Completed__c
+                FROM Contact
+                WHERE Skywave_Demo_Seed__c = true
+                LIMIT 1
+            ];
+            if (!seeds.isEmpty()) {
+                c = seeds[0];
+            } else {
+                c = new Contact(
+                    LastName = conversationId,
+                    Skywave_Conversation_Id__c = conversationId
+                );
+                insert c;
+            }
         } else {
             c = contacts[0];
         }
