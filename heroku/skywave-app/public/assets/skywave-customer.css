@@ -662,20 +662,3 @@
     display: none;
 }
 
-/* Nav greeting avatar: clicking it fires a hidden file picker. Pointer
-   cursor + subtle hover ring so the affordance is visible. */
-.skywave-site .nav-greeting-avatar {
-    cursor: pointer;
-    transition: box-shadow 0.15s ease;
-}
-.skywave-site .nav-greeting-avatar:hover {
-    box-shadow: 0 0 0 2px var(--cust-teal, #14b8a6);
-}
-.skywave-site .nav-avatar-file-hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    opacity: 0;
-    pointer-events: none;
-}

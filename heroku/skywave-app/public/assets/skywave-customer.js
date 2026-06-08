@@ -63,92 +63,11 @@ function decorateGreeting(slotEl) {
         } else {
             avatarSlot.textContent = initials(p);
         }
-        // Click-to-upload affordance: the avatar acts as a label for a
-        // hidden file input. Mobile native picker (camera/gallery)
-        // appears on tap; desktop opens the file dialog. Resize +
-        // upload runs the same pipeline as the #profile form, just
-        // with text fields omitted (avatar-only mode on the server).
-        avatarSlot.title = 'Change photo';
-        avatarSlot.setAttribute('role', 'button');
-        avatarSlot.setAttribute('tabindex', '0');
-        if (!avatarSlot.dataset.avatarClickWired) {
-            avatarSlot.addEventListener('click', () => triggerNavAvatarPicker(avatarSlot));
-            avatarSlot.addEventListener('keydown', (ev) => {
-                if (ev.key === 'Enter' || ev.key === ' ') {
-                    ev.preventDefault();
-                    triggerNavAvatarPicker(avatarSlot);
-                }
-            });
-            avatarSlot.dataset.avatarClickWired = '1';
-        }
     }
     if (textSlot) {
         const name = (p.firstName || '').trim() || 'Member';
         const tier = p.membershipTier || '';
         textSlot.textContent = tier ? `${name} · ${tier}` : name;
-    }
-}
-
-// Hidden file input + handler for the nav avatar's click-to-upload flow.
-// Reused across all identity slots — the input is appended to <body>
-// once and triggered programmatically.
-let navAvatarFileEl = null;
-function ensureNavAvatarFile() {
-    if (navAvatarFileEl) return navAvatarFileEl;
-    navAvatarFileEl = document.createElement('input');
-    navAvatarFileEl.type = 'file';
-    navAvatarFileEl.accept = 'image/*';
-    navAvatarFileEl.className = 'nav-avatar-file-hidden';
-    navAvatarFileEl.addEventListener('change', handleNavAvatarChange);
-    document.body.appendChild(navAvatarFileEl);
-    return navAvatarFileEl;
-}
-function triggerNavAvatarPicker(slot) {
-    const input = ensureNavAvatarFile();
-    input.dataset.targetSlotId = slot.id || (slot.id = `nav-av-${Math.floor(performance.now() * 1000)}`);
-    input.value = '';
-    input.click();
-}
-async function handleNavAvatarChange(ev) {
-    const file = ev.target.files && ev.target.files[0];
-    if (!file) return;
-    let dataUrl;
-    try {
-        dataUrl = await fileToAvatarBase64(file);
-    } catch (e) {
-        console.warn('[skywave] avatar resize failed:', e.message);
-        return;
-    }
-    // Optimistic preview while the upload runs.
-    const targetId = ev.target.dataset.targetSlotId;
-    const slot = targetId ? document.getElementById(targetId) : null;
-    if (slot) {
-        slot.innerHTML = '';
-        const img = document.createElement('img');
-        img.src = dataUrl;
-        img.alt = '';
-        slot.appendChild(img);
-    }
-    try {
-        const r = await fetch('/api/website/profile', {
-            method: 'PUT',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                avatarBase64: dataUrl,
-                avatarFileName: 'avatar.jpg'
-            })
-        });
-        if (!r.ok) {
-            const data = await r.json().catch(() => ({}));
-            throw new Error(data?.error || 'HTTP ' + r.status);
-        }
-        // Refresh /me so all identity slots pick up the persisted CDN URL.
-        const me = await (await fetch('/api/website/me', { credentials: 'same-origin' })).json();
-        session = me;
-        updateNavIdentity();
-    } catch (err) {
-        console.warn('[skywave] avatar upload failed:', err.message);
     }
 }
 
