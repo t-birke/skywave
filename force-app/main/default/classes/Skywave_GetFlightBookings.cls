@@ -3,13 +3,20 @@ public class Skywave_GetFlightBookings {
     public class Request {
         @InvocableVariable(label='Contact Id' description='The contact ID to retrieve bookings for' required=false)
         public String contactId;
+
+        @InvocableVariable(
+            label='Deliver historic bookings'
+            description='When true, include bookings whose last segment has already arrived. When false (default — and what the chat agent passes), past bookings are dropped so the agent doesn\'t propose seat changes on flown trips. The website calls with true to power the "Past bookings" section on the customer area.'
+            required=false)
+        public Boolean deliverHistoricBookings;
     }
 
     @InvocableMethod(label='Get Flights for Current User' description='Gets all active flight bookings for the user')
     public static List<Result> getBookings(List<Request> requests) {
         List<Result> results = new List<Result>();
         for (Request req : requests) {
-            results.add(getBookingsForContact(req.contactId));
+            Boolean includePast = req.deliverHistoricBookings == true;
+            results.add(getBookingsForContact(req.contactId, includePast));
         }
         return results;
     }
@@ -20,7 +27,13 @@ public class Skywave_GetFlightBookings {
     // their segments. Fare-class-driven baggage / change /
     // cancellation rules are derived locally so the agent doesn't
     // have to re-reason about them every turn.
-    private static Result getBookingsForContact(String contactId) {
+    //
+    // Past-booking gate: bookings whose last segment has already
+    // arrived are dropped before they reach the agent. The agent
+    // shouldn't propose seat changes on flown trips or pad
+    // "your bookings" with stale itineraries — see
+    // Skywave_BookingDateGate for the rule.
+    private static Result getBookingsForContact(String contactId, Boolean includePast) {
         Result r = new Result();
         r.bookings = new List<Booking>();
 
@@ -32,31 +45,69 @@ public class Skywave_GetFlightBookings {
         }
 
         try {
+            // Two-pass: bookings header first, segments second. Lets us run
+            // the past-cutoff filter after hydration without juggling the
+            // (Booking_Segments__r) sub-relationship inside a stream.
             List<Booking__c> bookings = [
-                SELECT Id, Confirmation_Code__c, Status__c, Fare_Class__c, Total_Amount__c,
-                       (SELECT Id, Segment_Order__c, Travel_Date__c,
-                               Departure_DateTime__c, Arrival_DateTime__c,
-                               Segment_Status__c,
-                               Flight__r.Flight_Number__c,
-                               Flight__r.Origin__c, Flight__r.Destination__c,
-                               Flight__r.Duration_Minutes__c, Flight__r.Aircraft_Type__c
-                        FROM Booking_Segments__r
-                        ORDER BY Segment_Order__c, Departure_DateTime__c)
+                SELECT Id, Confirmation_Code__c, Status__c, Fare_Class__c, Total_Amount__c
                 FROM Booking__c
                 WHERE Contact__c = :contactId
                   AND Status__c IN ('Confirmed', 'Pending Confirmation')
                 ORDER BY CreatedDate DESC
             ];
+            if (bookings.isEmpty()) {
+                r.bookingCount = 0;
+                r.singleBookingCode = '';
+                r.success = true;
+                return r;
+            }
 
+            Set<Id> bookingIds = (new Map<Id, Booking__c>(bookings)).keySet();
+            Map<Id, List<Booking_Segment__c>> segsByBooking =
+                new Map<Id, List<Booking_Segment__c>>();
+            for (Booking_Segment__c seg : [
+                SELECT Id, Booking__c, Segment_Order__c, Travel_Date__c,
+                       Departure_DateTime__c, Arrival_DateTime__c,
+                       Segment_Status__c,
+                       Flight__r.Flight_Number__c,
+                       Flight__r.Origin__c, Flight__r.Destination__c,
+                       Flight__r.Duration_Minutes__c, Flight__r.Aircraft_Type__c
+                FROM Booking_Segment__c
+                WHERE Booking__c IN :bookingIds
+                ORDER BY Segment_Order__c ASC NULLS LAST, Departure_DateTime__c ASC NULLS LAST
+            ]) {
+                if (!segsByBooking.containsKey(seg.Booking__c)) {
+                    segsByBooking.put(seg.Booking__c, new List<Booking_Segment__c>());
+                }
+                segsByBooking.get(seg.Booking__c).add(seg);
+            }
+
+            List<Booking__c> kept = new List<Booking__c>();
             for (Booking__c bk : bookings) {
-                r.bookings.add(buildBooking(bk));
+                List<Booking_Segment__c> segs = segsByBooking.get(bk.Id);
+                Boolean isPast = Skywave_BookingDateGate.isBookingPast(segs);
+                if (isPast && !includePast) continue;
+                Booking shaped = buildBookingFromHydrated(
+                    bk, segs == null ? new List<Booking_Segment__c>() : segs);
+                shaped.isPast = isPast;
+                r.bookings.add(shaped);
+                kept.add(bk);
             }
             r.bookingCount = r.bookings.size();
-            // When there's exactly one booking it IS the seat-change target, so
-            // surface its code as a scalar — Agent Script can't index the list
-            // deterministically, and the seat funnel needs this to run the
-            // segment count without spending an LLM cycle.
-            r.singleBookingCode = (bookings.size() == 1) ? bookings[0].Confirmation_Code__c : '';
+            // When there's exactly one UPCOMING booking it IS the seat-change
+            // target, so surface its code as a scalar — Agent Script can't
+            // index the list deterministically, and the seat funnel needs
+            // this to run the segment count without spending an LLM cycle.
+            // Past bookings (only present when includePast=true) never
+            // qualify — you can't change the seat on a flown trip.
+            Integer upcomingCount = 0;
+            String singleUpcomingCode = '';
+            for (Booking shaped : r.bookings) {
+                if (shaped.isPast == true) continue;
+                upcomingCount++;
+                singleUpcomingCode = shaped.bookingReference;
+            }
+            r.singleBookingCode = (upcomingCount == 1) ? singleUpcomingCode : '';
             r.success = true;
         } catch (Exception e) {
             r.success = false;
@@ -66,7 +117,7 @@ public class Skywave_GetFlightBookings {
         return r;
     }
 
-    private static Booking buildBooking(Booking__c bk) {
+    private static Booking buildBookingFromHydrated(Booking__c bk, List<Booking_Segment__c> segs) {
         Booking b = new Booking();
         b.bookingReference = bk.Confirmation_Code__c;
         b.total = bk.Total_Amount__c != null
@@ -77,7 +128,7 @@ public class Skywave_GetFlightBookings {
         b.checkedBaggageAllowance = baggageFor(bk.Fare_Class__c);
         b.flights = new List<Flight>();
 
-        for (Booking_Segment__c seg : bk.Booking_Segments__r) {
+        for (Booking_Segment__c seg : segs) {
             b.flights.add(buildFlight(seg, bk.Fare_Class__c));
         }
         return b;
@@ -228,6 +279,8 @@ public class Skywave_GetFlightBookings {
         public String checkedBaggageAllowance;
         @InvocableVariable(required=true label='flights' description='all flights in this booking')
         public List<Flight> flights;
+        @InvocableVariable(label='is past' description='True iff every segment has already arrived. Always false in the agent path (those bookings are filtered out before they get here); only meaningful when deliverHistoricBookings=true.')
+        public Boolean isPast = false;
     }
 
     public class Flight {

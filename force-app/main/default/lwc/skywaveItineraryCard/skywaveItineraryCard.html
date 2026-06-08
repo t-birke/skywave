@@ -1,117 +1,213 @@
 <template>
     <article class="sw-card">
-        <h2 class="sw-card__title">Your Itinerary</h2>
-
         <template lwc:if={loading}>
+            <h2 class="sw-card__title">Your Itinerary</h2>
             <div class="sw-state sw-state_loading">Loading bookings…</div>
         </template>
         <template lwc:elseif={hasError}>
+            <h2 class="sw-card__title">Your Itinerary</h2>
             <div class="sw-state sw-state_error">{errorMessage}</div>
         </template>
         <template lwc:elseif={isEmpty}>
+            <h2 class="sw-card__title">Your Itinerary</h2>
             <div class="sw-state sw-state_empty">No confirmed bookings yet.</div>
         </template>
         <template lwc:else>
-            <template for:each={bookings} for:item="b">
-                <article key={b.bookingId} class={b.cssClass}>
-                    <header class="sw-itin__header" data-bookingid={b.bookingId} onclick={handleToggle}>
-                        <div class="sw-itin__route">
-                            <h3 class="sw-itin__title">{b.routeLabel}</h3>
-                            <p class="sw-itin__date">{b.travelDateLabel}</p>
-                        </div>
-                        <div class="sw-itin__times">
-                            <div class="sw-itin__time">
-                                <span class="sw-itin__time-h">{b.departureTime}</span>
-                                <span class="sw-itin__time-code">{b.originCode}</span>
-                            </div>
-                            <div class="sw-itin__connector">
-                                <span class="sw-itin__connector-label">{b.stopsLabel}</span>
-                            </div>
-                            <div class="sw-itin__time sw-itin__time_arr">
-                                <span class="sw-itin__time-h">{b.arrivalTime}</span>
-                                <span class="sw-itin__time-code">{b.destinationCode}</span>
-                            </div>
-                        </div>
-                        <div class="sw-itin__chips">
-                            <span class="sw-itin__chip sw-itin__chip_meta">⏱ {b.totalDurationLabel}</span>
-                            <span class="sw-itin__chip sw-itin__chip_fare">{b.fareClass}</span>
-                            <span class="sw-itin__chip sw-itin__chip_status">✓ {b.status}</span>
-                            <span class="sw-itin__chip sw-itin__chip_code">{b.confirmationCode}</span>
-                        </div>
-                        <button type="button" class="sw-itin__toggle" aria-label="Toggle details">
-                            <span lwc:if={b.expanded}>▴</span>
-                            <span lwc:else>▾</span>
-                        </button>
-                    </header>
+            <template lwc:if={cancelError}>
+                <div class="sw-banner sw-banner_error">{cancelError}</div>
+            </template>
 
-                    <template lwc:if={b.expanded}>
-                        <div class="sw-itin__body">
-                            <section class="sw-itin__details">
-                                <h4 class="sw-itin__section-title">Itinerary details</h4>
-                                <p class="sw-itin__total-pill">Total duration: {b.totalDurationLabel}</p>
-                                <ol class="sw-itin__segments">
-                                    <template for:each={b.segmentsKeyed} for:item="s">
-                                        <li key={s.key} class="sw-itin__segment">
-                                            <template lwc:if={s.layoverLabel}>
-                                                <div class="sw-itin__layover">Layover {s.layoverLabel} in {s.departureCity} ({s.departureCode})</div>
-                                            </template>
-                                            <div class="sw-itin__seg-row">
-                                                <span class="sw-itin__seg-duration">{s.segmentDurationLabel}</span>
-                                                <div class="sw-itin__seg-stops">
-                                                    <div class="sw-itin__seg-stop">
-                                                        <span class="sw-itin__seg-time">{s.departureTime}</span>
-                                                        <span class="sw-itin__seg-city">{s.departureCity}</span>
-                                                        <span class="sw-itin__seg-code">{s.departureCode}</span>
-                                                    </div>
-                                                    <div class="sw-itin__seg-stop sw-itin__seg-stop_arr">
-                                                        <span class="sw-itin__seg-time">{s.arrivalTime}</span>
-                                                        <span class="sw-itin__seg-city">{s.arrivalCity}</span>
-                                                        <span class="sw-itin__seg-code">{s.arrivalCode}</span>
+            <template lwc:if={hasUpcoming}>
+                <h2 class="sw-card__title">Your Itinerary</h2>
+                <template for:each={upcomingBookings} for:item="b">
+                    <article key={b.bookingId} class={b.cssClass}>
+                        <header class="sw-itin__header" data-bookingid={b.bookingId} onclick={handleToggle}>
+                            <div class="sw-itin__route">
+                                <h3 class="sw-itin__title">{b.routeLabel}</h3>
+                                <p class="sw-itin__date">{b.travelDateLabel}</p>
+                            </div>
+                            <div class="sw-itin__times">
+                                <div class="sw-itin__time">
+                                    <span class="sw-itin__time-h">{b.departureTime}</span>
+                                    <span class="sw-itin__time-code">{b.originCode}</span>
+                                </div>
+                                <div class="sw-itin__connector">
+                                    <span class="sw-itin__connector-label">{b.stopsLabel}</span>
+                                </div>
+                                <div class="sw-itin__time sw-itin__time_arr">
+                                    <span class="sw-itin__time-h">{b.arrivalTime}</span>
+                                    <span class="sw-itin__time-code">{b.destinationCode}</span>
+                                </div>
+                            </div>
+                            <div class="sw-itin__chips">
+                                <span class="sw-itin__chip sw-itin__chip_meta">⏱ {b.totalDurationLabel}</span>
+                                <span class="sw-itin__chip sw-itin__chip_fare">{b.fareClass}</span>
+                                <span class="sw-itin__chip sw-itin__chip_status">✓ {b.status}</span>
+                                <span class="sw-itin__chip sw-itin__chip_code">{b.confirmationCode}</span>
+                            </div>
+                            <button type="button" class="sw-itin__toggle" aria-label="Toggle details">
+                                <span lwc:if={b.expanded}>▴</span>
+                                <span lwc:else>▾</span>
+                            </button>
+                        </header>
+
+                        <template lwc:if={b.expanded}>
+                            <div class="sw-itin__body">
+                                <section class="sw-itin__details">
+                                    <h4 class="sw-itin__section-title">Itinerary details</h4>
+                                    <p class="sw-itin__total-pill">Total duration: {b.totalDurationLabel}</p>
+                                    <ol class="sw-itin__segments">
+                                        <template for:each={b.segmentsKeyed} for:item="s">
+                                            <li key={s.key} class="sw-itin__segment">
+                                                <template lwc:if={s.layoverLabel}>
+                                                    <div class="sw-itin__layover">Layover {s.layoverLabel} in {s.departureCity} ({s.departureCode})</div>
+                                                </template>
+                                                <div class="sw-itin__seg-row">
+                                                    <span class="sw-itin__seg-duration">{s.segmentDurationLabel}</span>
+                                                    <div class="sw-itin__seg-stops">
+                                                        <div class="sw-itin__seg-stop">
+                                                            <span class="sw-itin__seg-time">{s.departureTime}</span>
+                                                            <span class="sw-itin__seg-city">{s.departureCity}</span>
+                                                            <span class="sw-itin__seg-code">{s.departureCode}</span>
+                                                        </div>
+                                                        <div class="sw-itin__seg-stop sw-itin__seg-stop_arr">
+                                                            <span class="sw-itin__seg-time">{s.arrivalTime}</span>
+                                                            <span class="sw-itin__seg-city">{s.arrivalCity}</span>
+                                                            <span class="sw-itin__seg-code">{s.arrivalCode}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <div class="sw-itin__seg-meta">
-                                                <span>{s.flightNumber}</span>
-                                                <template lwc:if={s.aircraftType}>
-                                                    <span> · {s.aircraftType}</span>
-                                                </template>
-                                                <template lwc:if={s.seatNumber}>
-                                                    <span> · seat {s.seatNumber}</span>
-                                                </template>
-                                            </div>
-                                        </li>
-                                    </template>
-                                </ol>
-                            </section>
+                                                <div class="sw-itin__seg-meta">
+                                                    <span>{s.flightNumber}</span>
+                                                    <template lwc:if={s.aircraftType}>
+                                                        <span> · {s.aircraftType}</span>
+                                                    </template>
+                                                    <template lwc:if={s.seatNumber}>
+                                                        <span> · seat {s.seatNumber}</span>
+                                                    </template>
+                                                </div>
+                                            </li>
+                                        </template>
+                                    </ol>
+                                </section>
 
-                            <aside class="sw-itin__fare-card">
-                                <h4 class="sw-itin__section-title">Your fare</h4>
-                                <dl class="sw-itin__fare-list">
-                                    <div class="sw-itin__fare-row">
-                                        <dt>Rebooking</dt>
-                                        <dd>{b.rebookingConditions}</dd>
+                                <aside class="sw-itin__fare-card">
+                                    <h4 class="sw-itin__section-title">Your fare</h4>
+                                    <dl class="sw-itin__fare-list">
+                                        <div class="sw-itin__fare-row">
+                                            <dt>Rebooking</dt>
+                                            <dd>{b.rebookingConditions}</dd>
+                                        </div>
+                                        <div class="sw-itin__fare-row">
+                                            <dt>Refundability</dt>
+                                            <dd>{b.refundability}</dd>
+                                        </div>
+                                        <div class="sw-itin__fare-row">
+                                            <dt>Checked baggage</dt>
+                                            <dd>{b.checkedBaggageAllowance}</dd>
+                                        </div>
+                                        <div class="sw-itin__fare-row">
+                                            <dt>Onboard catering</dt>
+                                            <dd>{b.onboardCatering}</dd>
+                                        </div>
+                                        <div class="sw-itin__fare-row sw-itin__fare-row_total">
+                                            <dt>Total paid</dt>
+                                            <dd>{b.totalAmount} <span class="sw-itin__pay-method">via {b.paymentMethod}</span></dd>
+                                        </div>
+                                    </dl>
+                                    <div class="sw-itin__actions">
+                                        <button type="button"
+                                                class="sw-itin__cancel-btn"
+                                                data-code={b.confirmationCode}
+                                                data-bookingid={b.bookingId}
+                                                disabled={b.cancelDisabled}
+                                                onclick={handleCancel}>
+                                            {b.cancelLabel}
+                                        </button>
                                     </div>
-                                    <div class="sw-itin__fare-row">
-                                        <dt>Refundability</dt>
-                                        <dd>{b.refundability}</dd>
-                                    </div>
-                                    <div class="sw-itin__fare-row">
-                                        <dt>Checked baggage</dt>
-                                        <dd>{b.checkedBaggageAllowance}</dd>
-                                    </div>
-                                    <div class="sw-itin__fare-row">
-                                        <dt>Onboard catering</dt>
-                                        <dd>{b.onboardCatering}</dd>
-                                    </div>
-                                    <div class="sw-itin__fare-row sw-itin__fare-row_total">
-                                        <dt>Total paid</dt>
-                                        <dd>{b.totalAmount} <span class="sw-itin__pay-method">via {b.paymentMethod}</span></dd>
-                                    </div>
-                                </dl>
-                            </aside>
-                        </div>
-                    </template>
-                </article>
+                                </aside>
+                            </div>
+                        </template>
+                    </article>
+                </template>
+            </template>
+
+            <template lwc:if={hasPast}>
+                <h2 class="sw-card__title sw-card__title_past">Past bookings</h2>
+                <template for:each={pastBookings} for:item="b">
+                    <article key={b.bookingId} class={b.cssClass}>
+                        <header class="sw-itin__header" data-bookingid={b.bookingId} onclick={handleToggle}>
+                            <div class="sw-itin__route">
+                                <h3 class="sw-itin__title">{b.routeLabel}</h3>
+                                <p class="sw-itin__date">{b.travelDateLabel}</p>
+                            </div>
+                            <div class="sw-itin__times">
+                                <div class="sw-itin__time">
+                                    <span class="sw-itin__time-h">{b.departureTime}</span>
+                                    <span class="sw-itin__time-code">{b.originCode}</span>
+                                </div>
+                                <div class="sw-itin__connector">
+                                    <span class="sw-itin__connector-label">{b.stopsLabel}</span>
+                                </div>
+                                <div class="sw-itin__time sw-itin__time_arr">
+                                    <span class="sw-itin__time-h">{b.arrivalTime}</span>
+                                    <span class="sw-itin__time-code">{b.destinationCode}</span>
+                                </div>
+                            </div>
+                            <div class="sw-itin__chips">
+                                <span class="sw-itin__chip sw-itin__chip_meta">⏱ {b.totalDurationLabel}</span>
+                                <span class="sw-itin__chip sw-itin__chip_fare">{b.fareClass}</span>
+                                <span class="sw-itin__chip sw-itin__chip_code">{b.confirmationCode}</span>
+                            </div>
+                            <button type="button" class="sw-itin__toggle" aria-label="Toggle details">
+                                <span lwc:if={b.expanded}>▴</span>
+                                <span lwc:else>▾</span>
+                            </button>
+                        </header>
+
+                        <template lwc:if={b.expanded}>
+                            <div class="sw-itin__body">
+                                <section class="sw-itin__details">
+                                    <h4 class="sw-itin__section-title">Itinerary details</h4>
+                                    <p class="sw-itin__total-pill">Total duration: {b.totalDurationLabel}</p>
+                                    <ol class="sw-itin__segments">
+                                        <template for:each={b.segmentsKeyed} for:item="s">
+                                            <li key={s.key} class="sw-itin__segment">
+                                                <template lwc:if={s.layoverLabel}>
+                                                    <div class="sw-itin__layover">Layover {s.layoverLabel} in {s.departureCity} ({s.departureCode})</div>
+                                                </template>
+                                                <div class="sw-itin__seg-row">
+                                                    <span class="sw-itin__seg-duration">{s.segmentDurationLabel}</span>
+                                                    <div class="sw-itin__seg-stops">
+                                                        <div class="sw-itin__seg-stop">
+                                                            <span class="sw-itin__seg-time">{s.departureTime}</span>
+                                                            <span class="sw-itin__seg-city">{s.departureCity}</span>
+                                                            <span class="sw-itin__seg-code">{s.departureCode}</span>
+                                                        </div>
+                                                        <div class="sw-itin__seg-stop sw-itin__seg-stop_arr">
+                                                            <span class="sw-itin__seg-time">{s.arrivalTime}</span>
+                                                            <span class="sw-itin__seg-city">{s.arrivalCity}</span>
+                                                            <span class="sw-itin__seg-code">{s.arrivalCode}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="sw-itin__seg-meta">
+                                                    <span>{s.flightNumber}</span>
+                                                    <template lwc:if={s.aircraftType}>
+                                                        <span> · {s.aircraftType}</span>
+                                                    </template>
+                                                    <template lwc:if={s.seatNumber}>
+                                                        <span> · seat {s.seatNumber}</span>
+                                                    </template>
+                                                </div>
+                                            </li>
+                                        </template>
+                                    </ol>
+                                </section>
+                            </div>
+                        </template>
+                    </article>
+                </template>
             </template>
         </template>
     </article>

@@ -46,6 +46,11 @@ public with sharing class Skywave_ContactItinerary {
         @AuraEnabled public String refundability;
         @AuraEnabled public String checkedBaggageAllowance;
         @AuraEnabled public String onboardCatering;
+
+        // True iff every segment has already arrived. The LWC splits
+        // its rendering on this flag — Upcoming on top (cancel button
+        // shown), Past below (history only, no cancel).
+        @AuraEnabled public Boolean isPast = false;
     }
 
     public class SegmentDTO {
@@ -64,7 +69,10 @@ public with sharing class Skywave_ContactItinerary {
         @AuraEnabled public String layoverLabel; // " 2h 20m" — populated on segments AFTER segment 0
     }
 
-    @AuraEnabled(cacheable=true)
+    // NOT cacheable: the LWC needs refreshApex() after the cancel
+    // button updates a booking. cacheable=true makes the wire's
+    // provisioned cache value immutable, blocking the refresh.
+    @AuraEnabled(cacheable=false)
     public static List<BookingDTO> getBookings(Id contactId) {
         if (contactId == null) return new List<BookingDTO>();
 
@@ -123,6 +131,7 @@ public with sharing class Skywave_ContactItinerary {
             : '$' + b.Total_Amount__c.setScale(2).toPlainString();
         d.checkedBags = b.Checked_Bags__c == null ? 0 : Integer.valueOf(b.Checked_Bags__c);
         d.bookingDate = b.Booking_Date__c;
+        d.isPast = Skywave_BookingDateGate.isBookingPast(segs);
 
         // Fare-class chips. Mirrors Skywave_BookFlight#buildBookingResponse
         // for consistency with what the chat card showed during booking.
@@ -258,5 +267,48 @@ public with sharing class Skywave_ContactItinerary {
             'BER' => 'Berlin', 'MUC' => 'Munich'
         };
         return cities.containsKey(code) ? cities.get(code) : code;
+    }
+
+    /**
+     * Soft-cancel a booking from the Contact-page LWC. Wraps
+     * Skywave_BookingEngine.cancelBooking so the chat path, the website
+     * path, and the LWC all share the same engine — including the
+     * booking_cancelled monitor event publish.
+     *
+     * Caller passes the Contact Id (LWC's @api recordId) and the booking's
+     * confirmation code. Engine re-checks ownership (confirmation code
+     * must belong to the contactId) before mutating, so a tampered
+     * recordId can't cancel someone else's row.
+     *
+     * Result is a thin LWC-friendly map. Throws AuraHandledException on
+     * unexpected engine failure so the LWC's catch block can surface
+     * .getMessage() to the user.
+     */
+    @AuraEnabled
+    public static Map<String, Object> cancelBooking(Id contactId, String confirmationCode) {
+        if (contactId == null) {
+            throw new AuraHandledException('Contact Id is required.');
+        }
+        if (String.isBlank(confirmationCode)) {
+            throw new AuraHandledException('Confirmation code is required.');
+        }
+        Skywave_BookingEngine.CancelResult r =
+            Skywave_BookingEngine.cancelBooking(contactId, confirmationCode);
+        if (!r.success) {
+            // Bubble the engine's error code as a user-readable message.
+            // The LWC catches AuraHandledException and shows it inline.
+            String msg;
+            if (r.errorCode == 'booking_not_found') msg = 'Booking not found for this contact.';
+            else if (r.errorCode == 'cancel_failed') msg = 'Cancel failed: ' + r.errorMessage;
+            else msg = r.errorCode == null ? 'Cancel failed.' : r.errorCode;
+            throw new AuraHandledException(msg);
+        }
+        return new Map<String, Object>{
+            'success'          => true,
+            'bookingId'        => r.bookingId,
+            'bookingCode'      => r.bookingCode,
+            'alreadyCancelled' => r.alreadyCancelled,
+            'refundDisplay'    => r.refundDisplay
+        };
     }
 }

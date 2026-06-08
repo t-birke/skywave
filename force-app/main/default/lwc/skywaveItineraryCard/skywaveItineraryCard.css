@@ -407,3 +407,63 @@
     font-weight: 500;
     color: var(--sw-text-mute);
 }
+
+
+/* ── Cancel button + past-section styling (added Phase B/C) ───────────── */
+.sw-itin__actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.85rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--sw-card-divider);
+}
+.sw-itin__cancel-btn {
+    background-color: transparent;
+    color: #b00020;
+    border: 1px solid #b00020;
+    border-radius: 0.5rem;
+    padding: 0.45rem 0.95rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+}
+.sw-itin__cancel-btn:hover:not([disabled]) {
+    background-color: #b00020;
+    color: #fff;
+}
+.sw-itin__cancel-btn[disabled] {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.sw-banner {
+    margin: 0 0 0.85rem;
+    padding: 0.55rem 0.85rem;
+    border-radius: 0.5rem;
+    font-size: 0.82rem;
+}
+.sw-banner_error {
+    background-color: rgba(186, 5, 23, 0.08);
+    color: #b00020;
+}
+
+.sw-card__title_past {
+    margin-top: 1.5rem;
+    color: var(--sw-text-mute);
+}
+
+/* Past bookings: muted, non-interactive feel — still browsable, but clearly
+   historical so the presenter does not confuse them with active itinerary. */
+.sw-itin_past {
+    opacity: 0.75;
+    background-color: var(--sw-bg-alt);
+}
+.sw-itin_past .sw-itin__title,
+.sw-itin_past .sw-itin__time-h {
+    color: var(--sw-text-mute);
+}
+.sw-itin_past .sw-itin__chip_status,
+.sw-itin_past .sw-itin__chip_meta {
+    background-color: rgba(110, 121, 147, 0.12);
+}

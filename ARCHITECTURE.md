@@ -216,6 +216,31 @@ lat/lon math (`x = lon + 180`, `y = 90 − lat`).
 The `Skywave_Agent_User` permset grants `Demo_Event__e` Create (= publish
 on a Platform Event) so the bot user's monitor publishes go through.
 
+### 3c''. Past-booking gate
+
+Bookings are gated by a single rule in `Skywave_BookingDateGate.cls`: a
+booking is *past* iff every segment has already arrived
+(`MAX(Booking_Segment__c.Arrival_DateTime__c) < NOW`). Bookings with no
+segments or all-null arrivals are NOT past — that protects Pending
+Confirmation rows from disappearing on data gaps.
+
+`Skywave_GetFlightBookings.Request.deliverHistoricBookings` (default
+`false`) toggles whether the past bookings are included in the result.
+The chat agent never sets this — past trips don't reach the agent's
+`active_bookings` array, so it can't propose seat changes on flown
+itineraries or pad "your bookings" with stale entries. The website's
+`Skywave_WebsiteBookings` REST endpoint and the Contact-page LWC's
+`Skywave_ContactItinerary.getBookings` both surface past bookings
+(tagged `isPast=true` per row) so the UI can split into separate
+"Upcoming" and "Past bookings" sections.
+
+The Contact-page LWC `skywaveItineraryCard` adds a Cancel button on
+upcoming cards that calls `Skywave_ContactItinerary.cancelBooking`
+→ `Skywave_BookingEngine.cancelBooking` (soft-cancel, same path as
+chat + website). After cancel, the LWC `refreshApex`-es the wired
+result; the cancelled booking falls out of the list because
+`Skywave_ContactItinerary` filters to `Status='Confirmed'`.
+
 ### 3c'. Booking engine — single source of truth (`Skywave_BookingEngine.cls`)
 
 All booking mutations (create / cancel / seat-change) live in one class.

@@ -599,3 +599,27 @@
 .skywave-site .cust-status { font-size: 13px; color: #6b7280; }
 .skywave-site .cust-status.ok  { color: #0d9488; }
 .skywave-site .cust-status.err { color: #ea580c; }
+
+/* Past-bookings section: muted card + clear separation. */
+.skywave-site .cust-bookings-past {
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--cust-border, #e5e7eb);
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+.skywave-site .cust-bookings-past-title {
+    margin: 0 0 0.25rem;
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--cust-mute, #6b7280);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.skywave-site .cust-booking_past {
+    opacity: 0.7;
+}
+.skywave-site .cust-booking_past:hover {
+    opacity: 0.95;
+}

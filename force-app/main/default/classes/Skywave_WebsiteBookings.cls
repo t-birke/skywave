@@ -48,6 +48,10 @@ global with sharing class Skywave_WebsiteBookings {
 
         Skywave_GetFlightBookings.Request req = new Skywave_GetFlightBookings.Request();
         req.contactId = contactId;
+        // Website surface wants past bookings too — they render under a
+        // separate "Past bookings" heading. Chat agent calls without this
+        // flag, so its default false still drops the flown trips.
+        req.deliverHistoricBookings = true;
         Skywave_GetFlightBookings.Result r =
             Skywave_GetFlightBookings.getBookings(
                 new List<Skywave_GetFlightBookings.Request>{ req })[0];
@@ -114,6 +118,7 @@ global with sharing class Skywave_WebsiteBookings {
                 'rebookingConditions'    => b.rebookingConditions,
                 'cancellationConditions' => b.cancellationConditions,
                 'checkedBaggageAllowance' => b.checkedBaggageAllowance,
+                'isPast'  => b.isPast == true,
                 'flights' => flattenFlights(b.flights, orderMap)
             };
             shaped.add(bm);

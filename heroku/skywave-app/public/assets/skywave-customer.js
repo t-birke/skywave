@@ -387,7 +387,9 @@ async function renderBookings() {
     try {
         const data = await fetchBookings();
         list.innerHTML = '';
-        if (!data.bookings?.length) {
+        const upcoming = (data.bookings || []).filter(b => !b.isPast);
+        const past     = (data.bookings || []).filter(b =>  b.isPast);
+        if (!upcoming.length && !past.length) {
             list.appendChild(emptyCard(
                 'No active bookings yet',
                 'Once you book a flight — via the website or the chat assistant — it shows up here.',
@@ -395,7 +397,22 @@ async function renderBookings() {
             ));
             return;
         }
-        data.bookings.forEach(b => list.appendChild(bookingCard(b)));
+        if (upcoming.length) {
+            upcoming.forEach(b => list.appendChild(bookingCard(b)));
+        } else {
+            list.appendChild(emptyCard(
+                'No upcoming bookings',
+                'Your history is below.',
+                el('a', { class: 'btn-pts cust-btn', href: '#book' }, 'Book a flight')
+            ));
+        }
+        if (past.length) {
+            const pastSection = el('div', { class: 'cust-bookings-past' },
+                el('h3', { class: 'cust-bookings-past-title' }, 'Past bookings')
+            );
+            past.forEach(b => pastSection.appendChild(bookingCard(b)));
+            list.appendChild(pastSection);
+        }
     } catch (err) {
         list.innerHTML = '';
         list.appendChild(errorCard(err));
@@ -416,8 +433,9 @@ async function fetchBookings() {
 function bookingCard(b) {
     const first = b.flights?.[0];
     const last = b.flights?.[b.flights.length - 1];
+    const cls = b.isPast ? 'cust-booking cust-booking_past' : 'cust-booking';
     return el('a', {
-        class: 'cust-booking',
+        class: cls,
         href: '#booking/' + encodeURIComponent(b.bookingReference)
     },
         el('div', { class: 'cust-booking-head' },
