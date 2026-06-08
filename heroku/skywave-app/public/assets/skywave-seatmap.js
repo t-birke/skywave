@@ -55,7 +55,10 @@ function svg(tag, attrs = {}, ...children) {
     }
     for (const c of children.flat()) {
         if (c == null || c === false) continue;
-        e.appendChild(c);
+        // Wrap raw strings/numbers in a text node — appendChild only
+        // accepts Nodes. Was the cause of "parameter 1 is not of type
+        // 'Node'" on every <text> element with a string child.
+        e.appendChild(typeof c === 'object' ? c : document.createTextNode(String(c)));
     }
     return e;
 }
