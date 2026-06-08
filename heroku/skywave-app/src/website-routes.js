@@ -396,7 +396,11 @@ export function buildWebsiteRouter({ allowedOrigin }) {
             if (expected !== `/api/website/avatar/${cvId}`) {
                 return res.status(404).json({ error: 'avatar_not_found' });
             }
-            await pipeFromInstance(`/sfc/servlet.shepherd/version/download/${cvId}`, res);
+            // Shepherd path (/sfc/servlet.shepherd/...) is a UI endpoint that
+            // requires session-cookie auth — Bearer token returns the SF login
+            // redirect HTML. The REST sobjects/VersionData endpoint is the
+            // Bearer-friendly equivalent and streams the raw bytes.
+            await pipeFromInstance(`/services/data/v62.0/sobjects/ContentVersion/${cvId}/VersionData`, res);
         } catch (err) {
             const status = err.response?.status ?? 500;
             console.error('/avatar fetch failed', status, err.response?.data ?? err.message);
