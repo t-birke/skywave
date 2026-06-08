@@ -20,11 +20,23 @@ import {
     PROOF_COOKIE_NAME, isValidDeviceIdShape, newSyntheticDeviceId,
     setProofCookie, requireProof
 } from './proof-cookie.js';
-import { apexInvoke } from './sf-api.js';
+import { apexInvoke, pipeFromInstance } from './sf-api.js';
 import {
     helmetMiddleware, strictSameOrigin, ipRateLimit, cookieRateLimit,
     auditLog, validate
 } from './api-middleware.js';
+
+// Rewrite an Apex-supplied Shepherd path (e.g.
+// "/sfc/servlet.shepherd/version/download/068g8000003L9z3AAC") into the
+// proxy path the browser actually fetches from this dyno. Returns null
+// for any other shape — including null — so the JSON field stays null
+// when the visitor has no avatar.
+const SHEPHERD_RE = /^\/sfc\/servlet\.shepherd\/version\/download\/([A-Za-z0-9]{15,18})$/;
+function avatarProxyUrl(rawAvatarUrl) {
+    if (!rawAvatarUrl) return null;
+    const m = SHEPHERD_RE.exec(rawAvatarUrl);
+    return m ? `/api/website/avatar/${m[1]}` : null;
+}
 
 export function buildWebsiteRouter({ allowedOrigin }) {
     const router = express.Router();
@@ -96,7 +108,7 @@ export function buildWebsiteRouter({ allowedOrigin }) {
                     membershipTier: contact.membershipTier || null,
                     loyaltyPoints: contact.loyaltyPoints || null,
                     memberNumber: contact.memberNumber || null,
-                    avatarUrl: contact.avatarUrl || null
+                    avatarUrl: avatarProxyUrl(contact.avatarUrl)
                 }
             });
         } catch (err) {
@@ -351,13 +363,48 @@ export function buildWebsiteRouter({ allowedOrigin }) {
                     membershipTier: contact.membershipTier || null,
                     loyaltyPoints: contact.loyaltyPoints || null,
                     memberNumber: contact.memberNumber || null,
-                    avatarUrl: contact.avatarUrl || null
+                    avatarUrl: avatarProxyUrl(contact.avatarUrl)
                 }
             });
         } catch (err) {
             const status = err.response?.status ?? 500;
             console.error('/me failed', status, err.response?.data ?? err.message);
             res.status(status).json({ error: 'me_failed' });
+        }
+    });
+
+    // ------- /avatar/:cvId: stream the visitor's avatar bytes -------
+    //
+    // Browsers fetch this from <img src>, so the request rides on the
+    // browser's session cookies. requireProof gates it on a valid proof
+    // cookie. Ownership check: we re-resolve the visitor's Contact and
+    // confirm Apex would currently hand back this exact ContentVersion id
+    // as their avatar — that way one visitor can't enumerate other people's
+    // ContentVersions through the proxy.
+    router.get('/avatar/:cvId', requireProof, async (req, res) => {
+        const cvId = req.params.cvId;
+        if (!/^[A-Za-z0-9]{15,18}$/.test(cvId)) {
+            return res.status(400).json({ error: 'invalid_cvId' });
+        }
+        try {
+            const me = await apexInvoke('POST', '/skywave/website/resolve', {
+                deviceId: req.deviceId,
+                trackingStatus: 'websdk'
+            });
+            req.contactId = me.contactId;
+            const expected = avatarProxyUrl(me.avatarUrl);
+            if (expected !== `/api/website/avatar/${cvId}`) {
+                return res.status(404).json({ error: 'avatar_not_found' });
+            }
+            await pipeFromInstance(`/sfc/servlet.shepherd/version/download/${cvId}`, res);
+        } catch (err) {
+            const status = err.response?.status ?? 500;
+            console.error('/avatar fetch failed', status, err.response?.data ?? err.message);
+            if (!res.headersSent) {
+                res.status(status).json({ error: 'avatar_fetch_failed' });
+            } else {
+                res.end();
+            }
         }
     });
 

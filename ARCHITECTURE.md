@@ -257,6 +257,17 @@ bookings, booking creation/management) with public-demo-grade hardening:
 - **Smoke**: `/api/website/session/init` mints/refreshes proof + returns
   Contact profile; `/api/website/me` reads it back. Cross-origin → 403,
   tampered cookie → 401.
+- **Avatar proxy**: `GET /api/website/avatar/:cvId` streams the visitor's
+  ContentVersion bytes through the relay using the cached JWT token, so
+  Apex's Shepherd path stays inside the Salesforce origin. Apex returns
+  the raw `/sfc/servlet.shepherd/version/download/<cvId>` path; the
+  relay rewrites it to `/api/website/avatar/<cvId>` in `/session/init`
+  and `/me` JSON responses (`avatarProxyUrl()` helper). The route
+  re-resolves the visitor's Contact and verifies the requested cvId
+  matches `Contact.ContactCardPicture__c`, so a tampered request can't
+  enumerate other visitors' uploads. No public ContentDistribution and
+  no cross-origin `img-src` exception — the avatar lives at the same
+  origin as everything else.
 - **Read paths** (Phase 2): `GET /api/website/bookings` (re-resolves
   contactId from proof, then `Skywave_WebsiteBookings.cls` calls the same
   `Skywave_GetFlightBookings` invocable the chat agent uses — single

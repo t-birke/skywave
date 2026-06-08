@@ -61,6 +61,26 @@ export async function apexInvocable(actionName, inputs) {
     return res.data;
 }
 
+// Stream a Salesforce-hosted resource (e.g. a Shepherd file download) through
+// the relay using the cached JWT access token. Pipes upstream bytes directly
+// to `res` so we don't buffer in Node memory. Forwards Content-Type /
+// Content-Length when available; sets Cache-Control: private, max-age=300 so
+// the browser caches the image for the demo's lifetime.
+export async function pipeFromInstance(sfPath, res) {
+    const { instanceUrl, config } = await authedClient();
+    const url = `${instanceUrl}${sfPath}`;
+    const upstream = await axios.get(url, {
+        ...config,
+        responseType: 'stream'
+    });
+    const ct = upstream.headers['content-type'];
+    const cl = upstream.headers['content-length'];
+    if (ct) res.setHeader('Content-Type', ct);
+    if (cl) res.setHeader('Content-Length', cl);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    upstream.data.pipe(res);
+}
+
 // Legacy passthrough used by the phone-demo endpoints. Kept for backwards
 // compat — new website routes call apexInvoke / apexInvocable / query
 // directly so the route handler can shape the response and audit-log the
