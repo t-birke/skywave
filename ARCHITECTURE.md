@@ -76,7 +76,22 @@ the stage list and the rationale (it replaced a manual "check state" button).
 ### 3a. Anonymous visitor → known Contact (web)
 
 This is the spine of the demo. A phone is anonymous until the survey, then a
-`Contact` is stitched together across several async hops:
+`Contact` is stitched together across several async hops.
+
+**Boot-time identity, no shadow tracking.** Page load reads the WebSDK's
+own consent state (`SalesforceInteractions.getConsents()`) and probes the
+org via `POST /api/website/session/peek` (read-only — does NOT mint a
+Contact). If the SDK reports `Tracking=Opt In` AND the peek says the
+deviceId already has a Contact with `Skywave_Survey_Json__c` populated,
+boot resumes silently into stage-driven render. If the SDK reports no
+consent, the consent screen renders. Localstorage is never used to
+gate the consent screen — the SDK is the source of truth, and shadowing
+it caused the prior bug where consent re-asked on every reload.
+
+The proof cookie + Contact mint **only** at consent time
+(`/api/website/session/init`, called from `handleConsent`), or silently
+on resume for an already-consented returning visitor. Drive-by visitors
+who never consent do not produce CRM rows.
 
 ```
 Consumer site (site.js)
@@ -123,6 +138,17 @@ ws-fanout.js  → broadcasts to all connected WebSocket clients
   ▼
 site.js  advances each phone's effectiveStage (capped at moderator stage)
 ```
+
+**Same channel, second purpose: targeted client actions.** The PE also
+carries an optional `Client_Action__c` text tag (with `New_State__c`
+left null and `Target_Session_Id__c` set to the visitor's deviceId).
+`server.js` branches on it: a `client_action` payload routes to the
+visitor's WS only, and the client refreshes nav identity in place
+without a reload. Today's only consumer is `profile_created` (published
+by `Skywave_SaveProfile.publishProfileCreatedEvent` after a chat-side
+profile lands). We reuse this PE rather than have the relay subscribe
+to `Demo_Event__e` directly — that channel is the demo-monitor firehose
+and 99% of its traffic is irrelevant to the visitor's phone.
 
 ### 3b'. Visitor activity → demo monitor (web, real time)
 
@@ -257,6 +283,20 @@ bookings, booking creation/management) with public-demo-grade hardening:
 - **Smoke**: `/api/website/session/init` mints/refreshes proof + returns
   Contact profile; `/api/website/me` reads it back. Cross-origin → 403,
   tampered cookie → 401.
+- **`/api/website/session/peek`** (read-only): boot-time identity probe
+  — given a deviceId or proof cookie, returns `{contactExists,
+  surveyCompleted, profileCompleted, profile?}`. Does NOT mint a
+  Contact and does NOT Set-Cookie unless a valid proof is already
+  present. Used by `site.js` boot to decide consent/survey/resume
+  without shadow-tracking via localStorage.
+- **`/api/website/session/abandon`** (proof-required): fired from
+  `userCloseModal` when the visitor X's the demo modal mid-funnel
+  post-consent. Stamps `Contact.Skywave_Abandoned_At__c` +
+  `Skywave_Abandon_Reason__c`; if `Skywave_Survey_Json__c` is still
+  blank, persists partial answers + a "Visitor abandoned after Q<n>"
+  summary so a follow-up chat session has *some* signal to ground on.
+  Idempotent — never overwrites a complete survey. Uses `sendBeacon`
+  client-side so the request survives the page navigation.
 - **Avatar public URL**: visitor avatars are uploaded by the chat-iframe
   LWC (running as the ESW guest) — the resulting `ContentVersion` has no
   sharing path to non-guest users, so the public website couldn't load

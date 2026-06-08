@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Client_Action__c</fullName>
+    <label>Client Action</label>
+    <description>Optional tag carried instead of New_State__c when the event tells the website client to perform a non-stage action (e.g. profile_created → re-fetch /me + refresh nav identity). Lets us reuse the existing Demo_State_Change__e WS pipeline rather than have the Heroku relay subscribe to the (much busier) Demo_Event__e channel.</description>
+    <type>Text</type>
+    <length>40</length>
+    <required>false</required>
+    <unique>false</unique>
+</CustomField>

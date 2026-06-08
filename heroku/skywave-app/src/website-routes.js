@@ -37,6 +37,68 @@ export function buildWebsiteRouter({ allowedOrigin }) {
     router.use(ipRateLimit);
     router.use(cookieRateLimit);
 
+    // ------- /session/peek: read-only "have we seen this deviceId?" -------
+    //
+    // Boot-time identity probe. Does NOT mint a Contact, does NOT Set-Cookie
+    // unless a valid proof cookie is already present. Returns
+    // { contactExists, surveyCompleted, profileCompleted, profile? } so the
+    // client can decide whether to show consent / survey / straight to
+    // stage-driven render.
+    //
+    // Why split from /session/init: page-load minting created a placeholder
+    // Contact for every visitor, even those who never consent. That's both
+    // a privacy smell and noise in CRM/Data Cloud. Now Contact mints only
+    // on consent (via /session/init), and page load only peeks.
+    const peekSchema = z.object({
+        deviceId: z.string().optional()
+    });
+    router.post('/session/peek', validate(peekSchema), async (req, res) => {
+        const { readProofCookie } = await import('./proof-cookie.js');
+        const cookieDeviceId = readProofCookie(req);
+        const bodyDeviceId = req.body.deviceId && isValidDeviceIdShape(req.body.deviceId)
+            ? req.body.deviceId : null;
+        const deviceId = cookieDeviceId || bodyDeviceId;
+        if (!deviceId) {
+            return res.json({
+                contactExists: false,
+                surveyCompleted: false,
+                profileCompleted: false,
+                profile: null
+            });
+        }
+        try {
+            const data = await apexInvoke('POST', '/skywave/website/resolve', {
+                deviceId,
+                trackingStatus: 'websdk',
+                mintIfMissing: false
+            });
+            // If the proof cookie was valid, refresh its expiry so a returning
+            // visitor's session doesn't lapse. Don't mint a new cookie for a
+            // body-supplied deviceId — that's /session/init's job (consent).
+            if (cookieDeviceId) setProofCookie(res, cookieDeviceId);
+            res.json({
+                contactExists: !!data.contactExists,
+                surveyCompleted: !!data.surveyCompleted,
+                profileCompleted: !!data.profileCompleted,
+                profile: data.contactExists ? {
+                    firstName: data.firstName || null,
+                    lastName: data.lastName || null,
+                    email: data.email || null,
+                    phone: data.phone || null,
+                    homeAirport: data.homeAirport || null,
+                    membershipTier: data.membershipTier || null,
+                    loyaltyPoints: data.loyaltyPoints || null,
+                    memberNumber: data.memberNumber || null,
+                    avatarUrl: data.avatarUrl || null
+                } : null
+            });
+        } catch (err) {
+            const status = err.response?.status ?? 500;
+            console.error('session/peek failed', status, err.response?.data ?? err.message);
+            res.status(status).json({ error: 'peek_failed' });
+        }
+    });
+
     // ------- /session/init: mint or refresh skywave_proof -------
     //
     // Body shape:
@@ -50,6 +112,10 @@ export function buildWebsiteRouter({ allowedOrigin }) {
     //   3. Otherwise → mint synthetic UUID, trackingStatus=synthetic.
     //   4. If body.optedOut === true at any point, trackingStatus=opted_out
     //      (sticky in Salesforce side once set).
+    //
+    // Called from the consumer site at consent time (handleConsent) — that's
+    // when we want a Contact to exist. Page-load probing uses /session/peek
+    // instead so we don't mint placeholders for every drive-by visitor.
     const initSchema = z.object({
         deviceId: z.string().optional(),
         optedOut: z.boolean().optional()
@@ -87,6 +153,7 @@ export function buildWebsiteRouter({ allowedOrigin }) {
                 contactId: contact.contactId,
                 trackingStatus: contact.trackingStatus,
                 profileCompleted: contact.profileCompleted,
+                surveyCompleted: !!contact.surveyCompleted,
                 profile: {
                     firstName: contact.firstName || null,
                     lastName: contact.lastName || null,
@@ -325,6 +392,47 @@ export function buildWebsiteRouter({ allowedOrigin }) {
         }
     });
 
+    // ------- POST /session/abandon: stamp mid-funnel exit + partial survey -------
+    //
+    // Fired by the consumer site when the visitor X's the demo modal
+    // mid-funnel (post-consent, pre-survey-or-pre-profile-complete). On
+    // the server side, Skywave_WebsiteAbandon is idempotent:
+    //   - Always stamps Skywave_Abandoned_At__c + Skywave_Abandon_Reason__c.
+    //   - Only persists partialAnswers if Skywave_Survey_Json__c is currently
+    //     empty (visitor never finished). Returning afterwards and finishing
+    //     the survey overwrites the partial with the complete record.
+    //
+    // partialAnswers shape mirrors what the site holds in state.answers:
+    //   { "<questionKey>": { questionText, answerText, answerKey } }
+    const abandonSchema = z.object({
+        reason: z.string().min(1).max(40),
+        partialAnswers: z.record(z.object({
+            questionText: z.string().min(1).max(500),
+            answerText: z.string().min(1).max(500),
+            answerKey: z.string().min(1).max(80)
+        })).optional()
+    });
+    router.post('/session/abandon', requireProof, validate(abandonSchema), async (req, res) => {
+        try {
+            const me = await apexInvoke('POST', '/skywave/website/resolve', {
+                deviceId: req.deviceId,
+                trackingStatus: 'websdk',
+                mintIfMissing: true
+            });
+            req.contactId = me.contactId;
+            const data = await apexInvoke('POST', '/skywave/website/abandon', {
+                contactId: me.contactId,
+                reason: req.body.reason,
+                partialAnswers: req.body.partialAnswers || null
+            });
+            res.json(data);
+        } catch (err) {
+            const status = err.response?.status ?? 500;
+            console.error('session/abandon failed', status, err.response?.data ?? err.message);
+            res.status(status).json({ error: 'abandon_failed' });
+        }
+    });
+
     // ------- /me: smoke test for the proof cookie + Apex round-trip -------
     //
     // Resolves the visitor's full profile from the deviceId in the proof
@@ -342,6 +450,7 @@ export function buildWebsiteRouter({ allowedOrigin }) {
                 contactId: contact.contactId,
                 trackingStatus: contact.trackingStatus,
                 profileCompleted: contact.profileCompleted,
+                surveyCompleted: !!contact.surveyCompleted,
                 profile: {
                     firstName: contact.firstName || null,
                     lastName: contact.lastName || null,

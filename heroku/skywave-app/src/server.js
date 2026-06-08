@@ -99,7 +99,26 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 // Pub/Sub subscriber → WS fan-out
+//
+// One PE channel (Demo_State_Change__e) carries two kinds of payload:
+//   - stage transitions (New_State__c set) → broadcast or targeted phone
+//   - client actions (Client_Action__c set, e.g. profile_created) →
+//     targeted at the visitor's deviceId (Target_Session_Id__c).
+//
+// Splitting via Client_Action__c instead of subscribing to Demo_Event__e
+// avoids hauling the entire monitor firehose (survey/booking/seat events)
+// through the relay just to hand off the rare profile_created push.
 startPubSubSubscriber((ev) => {
+    if (ev.clientAction) {
+        console.log(`client_action -> ${ev.clientAction} (target=${ev.targetSessionId || '*'})`);
+        fanOut({
+            type: 'client_action',
+            action: ev.clientAction,
+            demoSessionId: ev.demoSessionId,
+            replayId: ev.replayId
+        }, ev.targetSessionId);
+        return;
+    }
     console.log(`stage_changed -> ${ev.newState} (target=${ev.targetSessionId || '*'})`);
     fanOut({
         type: 'stage_changed',

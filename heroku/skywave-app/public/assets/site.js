@@ -15,9 +15,14 @@
 // The presenter advances stage via the monitor LWC; phones follow via WS.
 
 import { renderWebsite } from './website.js';
-import { startCustomer } from './skywave-customer.js';
+import { startCustomer, refreshIdentity } from './skywave-customer.js';
 
-const CONSENT_KEY = 'skywave.consent.v1';
+// NOTE: we used to mirror "consent given" into localStorage under
+// 'skywave.consent.v1'. That was shadow tracking — the WebSDK already
+// persists consent state in its own cookie, and that's the source of
+// truth. Boot now reads the SDK's consent state directly (see
+// readSdkConsent below); localStorage is no longer touched.
+//
 // `root` is the modal content container — the demo flow renders INTO the
 // modal that overlays the airline website. The website itself is the page.
 const root = document.getElementById('modal-content');
@@ -38,15 +43,21 @@ function showModal() {
     userClosed = false;
     modalRoot.dataset.state = 'open';
     modalRoot.setAttribute('aria-hidden', 'false');
+    syncEswButtonVisibility();
 }
 function hideModal() {
     if (!modalRoot) return;
     modalRoot.dataset.state = 'hidden';
     modalRoot.setAttribute('aria-hidden', 'true');
+    syncEswButtonVisibility();
 }
 function userCloseModal() {
     userClosed = true;
     hideModal();
+    // Phase 2: if we're consented but mid-funnel, persist whatever
+    // partial state we have so a re-open doesn't lose the visitor's
+    // progress. Idempotent on the server side.
+    maybeSendAbandon('user-closed');
 }
 
 // Wire backdrop + X button to close.
@@ -152,6 +163,48 @@ async function loadGeo() {
 const CONTACT_UPSERT_URL =
     'https://abc-proxy-2552551e6d2c.herokuapp.com/' +
     'https://trailsignup-fb3f5426f87c5d.my.salesforce-sites.com/skywave/services/apexrest/skywave/contact/upsert';
+
+// Persist the visitor's mid-funnel exit so a re-open or a follow-up
+// chat still has signal to ground on. Idempotent server-side. Only
+// fires when:
+//   - the visitor has actually consented (otherwise we have no
+//     Contact yet, and there's nothing to write to);
+//   - the proof cookie has been minted (sessionReady);
+//   - the funnel isn't already complete (post-survey + post-profile
+//     means there's nothing partial to capture).
+//
+// Fires once per page load — `state.abandonSent` flips on first call
+// so a rapid open/close/open sequence doesn't generate noise.
+function maybeSendAbandon(reason) {
+    if (state.abandonSent) return;
+    if (!state.consented || !state.sessionReady) return;
+    if (state.surveyComplete && state.profileAlreadyComplete) return;
+    state.abandonSent = true;
+
+    const partial = Object.keys(state.answers || {}).length > 0
+        ? state.answers : undefined;
+    const body = JSON.stringify({
+        reason,
+        partialAnswers: partial
+    });
+    // Use sendBeacon when available so the request survives the page
+    // navigation that often follows a modal-close (visitor may then
+    // refresh or leave the tab). Fall back to plain fetch otherwise.
+    try {
+        if (navigator.sendBeacon) {
+            const blob = new Blob([body], { type: 'application/json' });
+            const ok = navigator.sendBeacon('/api/website/session/abandon', blob);
+            if (ok) return;
+        }
+    } catch (_) { /* fall through to fetch */ }
+    fetch('/api/website/session/abandon', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        keepalive: true
+    }).catch((e) => console.warn('[skywave] abandon failed', e));
+}
 
 function postContactUpsert(payload) {
     fetch(CONTACT_UPSERT_URL, {
@@ -289,7 +342,20 @@ async function loadEswSnippet(deviceId) {
 // an iframe, and we don't need to touch that.
 function syncEswButtonVisibility() {
     if (typeof document === 'undefined' || !document.body) return;
-    document.body.dataset.eswVisible = AGENT_STAGES.has(effectiveStage()) ? '1' : '0';
+    // New rule: chat button is visible whenever the visitor has consented
+    // AND the demo modal is not currently on screen. That covers:
+    //   - user X'd the modal mid-survey → chat available as fallback
+    //   - moderator is on an agent stage → modal is hidden, chat is the
+    //     entire interaction surface
+    //   - returning visitor whose effective stage drops the modal → chat
+    //     is reachable for help even outside the agent stages
+    //
+    // Pre-consent we keep the button hidden — there's nothing for the
+    // agent to do without an identity, and the consent screen is the
+    // only thing we want the visitor to engage with at that point.
+    const modalOpen = modalRoot && modalRoot.dataset.state === 'open';
+    const visible = state.consented && !modalOpen;
+    document.body.dataset.eswVisible = visible ? '1' : '0';
 }
 
 async function loadInteractionsSdk() {
@@ -327,6 +393,21 @@ async function loadInteractionsSdk() {
 let state = {
     sessionId: null,
     demoSessionId: null,
+    // Visitor has gone through (or has previously consented via the
+    // WebSDK) the consent screen. Drives chat-button eligibility (Phase
+    // 5: chat button shows whenever consented && modal not on screen)
+    // and the abandon endpoint (Phase 2: only fires post-consent).
+    consented: false,
+    // True once /api/website/session/init has run, so we have a proof
+    // cookie + a Contact in the org. Triggered by the SDK-consent path
+    // OR by Accept-consent. Don't fire abandon writes before this.
+    sessionReady: false,
+    // True once the visitor finished the survey OR we observed an
+    // existing Contact with Skywave_Survey_Json__c populated (returning
+    // visitor). Read from /session/peek on boot, set to true on
+    // postSurveyComplete().
+    surveyAlreadyComplete: false,
+    profileAlreadyComplete: false,
     // Visitor's own progress through the stage list. Set initially to
     // 'idle' on consent, then advanced as they complete each step
     // (e.g. survey → thanks). Never advanced beyond moderatorStage.
@@ -522,7 +603,8 @@ function renderConsent() {
 }
 
 async function handleConsent() {
-    try { localStorage.setItem(CONSENT_KEY, '1'); } catch (_) {}
+    state.consented = true;
+    syncEswButtonVisibility();   // chat button now eligible to show
 
     await loadInteractionsSdk();
 
@@ -571,6 +653,22 @@ async function handleConsent() {
         }
     } catch (e) {
         console.warn('partyIdentification sendEvent failed', e);
+    }
+
+    // Mint the hardened-website proof cookie + Contact NOW (consent is
+    // when we have permission to persist anything). Page load only peeked.
+    // Best-effort: a failure here doesn't block the demo flow — the chat
+    // path still works via its own PE-trigger Contact upsert.
+    try {
+        await fetch('/api/website/session/init', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deviceId: sdkId || undefined })
+        });
+        state.sessionReady = true;
+    } catch (e) {
+        console.warn('[skywave] website/session/init failed (continuing)', e);
     }
 
     try {
@@ -658,6 +756,19 @@ function connectWs(wsUrl) {
                     userClosed = false;
                     render();
                 }
+                return;
+            }
+            if (msg.type === 'client_action') {
+                // The org just told us to do something visitor-scoped (no
+                // stage change). Today: profile_created — visitor finished
+                // the chat profile flow, so fold the new identity into the
+                // website surface in place (no reload needed; same proof
+                // cookie + same Contact, just newly-enriched fields).
+                if (msg.action === 'profile_created') {
+                    state.profileAlreadyComplete = true;
+                    refreshIdentity();
+                }
+                return;
             }
         } catch (e) { console.error(e); }
     });
@@ -900,11 +1011,151 @@ function renderThanks() {
 
 // ── Entry ──────────────────────────────────────────────────────────────────
 
+// Read the WebSDK's Tracking-purpose consent state. The SDK is the
+// source of truth — we do NOT mirror this into localStorage. Returns
+// true if the SDK reports an explicit Opt In, false otherwise (incl.
+// SDK absent / Opt Out / never asked).
+function readSdkConsent() {
+    try {
+        const SI = window.SalesforceInteractions;
+        if (!SI) return false;
+        // c360a SDK exposes consents synchronously after init via either
+        // getConsents() (newer) or readState/getState equivalents. We
+        // check both common shapes; if neither is present we treat it
+        // as "unknown" → re-ask.
+        const list =
+            (typeof SI.getConsents === 'function' && SI.getConsents()) ||
+            (SI.consents) || null;
+        if (!Array.isArray(list)) return false;
+        const trackingPurpose = SI.ConsentPurpose?.Tracking ?? 'Tracking';
+        const optIn           = SI.ConsentStatus?.OptIn       ?? 'Opt In';
+        return list.some((c) =>
+            (c.purpose === trackingPurpose) && (c.status === optIn));
+    } catch (e) {
+        console.warn('[skywave] readSdkConsent failed', e);
+        return false;
+    }
+}
+
+// Resume path for an already-consented visitor: silently do everything
+// handleConsent does for the post-Accept stretch (mint proof cookie via
+// /session/init, /api/session/start, connect WS, prefetch survey, warm
+// chat snippet) — but DON'T render the consent screen and DON'T flip
+// state via a button click.
+async function resumeSession({ sdkId, surveyAlreadyComplete }) {
+    state.consented = true;
+    state.surveyAlreadyComplete = !!surveyAlreadyComplete;
+    syncEswButtonVisibility();
+
+    // Hardened-website proof cookie + Contact (idempotent on existing
+    // deviceId — Apex returns the same Contact, just refreshes cookie).
+    try {
+        await fetch('/api/website/session/init', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deviceId: sdkId || undefined })
+        });
+        state.sessionReady = true;
+    } catch (e) {
+        console.warn('[skywave] resume session/init failed', e);
+    }
+
+    try {
+        const startBody = { userAgent: navigator.userAgent, sessionId: sdkId };
+        if (state.geo) {
+            if (state.geo.lat != null) startBody.geoLat = state.geo.lat;
+            if (state.geo.lon != null) startBody.geoLon = state.geo.lon;
+            if (state.geo.city)        startBody.geoCity = state.geo.city;
+            if (state.geo.region)      startBody.geoRegion = state.geo.region;
+            if (state.geo.country)     startBody.geoCountry = state.geo.country;
+        }
+        const res = await fetch('/api/session/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(startBody)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        state.sessionId = data.sessionId;
+        state.demoSessionId = data.demoSessionId;
+        state.moderatorStage = data.currentState || 'idle';
+        // Returning visitor who already finished the survey jumps
+        // straight to whatever the moderator's at (or 'thanks' if mod
+        // is still in early stages — handled by effectiveStage cap).
+        if (state.surveyAlreadyComplete) {
+            state.surveyComplete = true;
+            advanceVisitorStage('thanks');
+        } else {
+            // Already consented but survey not done — drop them on the
+            // survey screen, same as a late arrival on the consent path.
+            state.visitorStage = stageIndex(state.moderatorStage) >= stageIndex('survey')
+                ? 'survey' : state.moderatorStage;
+        }
+        connectWs(data.wsUrl);
+        await loadSurveySchema();
+        loadEswSnippet(sdkId).catch((e) => console.warn('[esw] snippet load failed', e));
+        render();
+    } catch (e) {
+        console.error('[skywave] resume failed', e);
+        renderError(e.message);
+    }
+}
+
 (async () => {
     await loadConfig();
     // Kick off IP geolocation in the background — don't block the consent
     // screen on it. It just needs to be resolved by survey-complete.
     loadGeo();
+
+    // Boot decision tree (no shadow tracking — read the WebSDK + Apex):
+    //
+    //   1. Load the SDK so we can read its persisted consent state and
+    //      its anonymous deviceId in the same step.
+    //   2. Peek at /api/website/session/peek to see whether this
+    //      deviceId already has a Contact, and whether that Contact
+    //      has Skywave_Survey_Json__c populated.
+    //   3. Branch:
+    //        - SDK reports Tracking=Opt In → resume silently. If the
+    //          peek says surveyCompleted, jump to thanks (stage-driven
+    //          render takes over). Otherwise drop into survey.
+    //        - Otherwise → render the consent screen, business as
+    //          usual (handleConsent will run init + start).
+    //
+    // If the SDK fails to load entirely we fall back to "always ask",
+    // which is the safer path.
+    await loadInteractionsSdk();
+    const sdkId = (() => {
+        try { return window.SalesforceInteractions?.getAnonymousId?.() || null; }
+        catch (_) { return null; }
+    })();
+
+    let peek = null;
+    try {
+        const r = await fetch('/api/website/session/peek', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deviceId: sdkId || undefined })
+        });
+        if (r.ok) peek = await r.json();
+    } catch (e) {
+        console.warn('[skywave] session/peek failed (continuing as anonymous)', e);
+    }
+
+    const sdkConsented = readSdkConsent();
+    if (sdkConsented) {
+        console.log('[skywave] returning visitor: SDK consent=Opt In, surveyCompleted=' +
+            !!peek?.surveyCompleted + ', profileCompleted=' + !!peek?.profileCompleted);
+        state.profileAlreadyComplete = !!peek?.profileCompleted;
+        await resumeSession({
+            sdkId,
+            surveyAlreadyComplete: !!peek?.surveyCompleted
+        });
+        return;
+    }
+
+    // Fresh / not-yet-consented visitor: ask.
     renderConsent();
     showModal();
 })();

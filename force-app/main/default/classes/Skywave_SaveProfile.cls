@@ -170,8 +170,18 @@ public without sharing class Skywave_SaveProfile {
     }
 
     /**
-     * Live monitor: replace the cookie-id bubble with the visitor's name +
-     * avatar as soon as the profile form is submitted. Best-effort.
+     * Two best-effort publishes for a fresh profile:
+     *
+     *   1. Demo_Event__e (profile_created) — feeds the live demo monitor LWC
+     *      so the visitor's bubble swaps cookie-id for name + avatar.
+     *
+     *   2. Demo_State_Change__e (Client_Action__c=profile_created, targeted
+     *      at this visitor's deviceId) — rides the existing WS pipeline that
+     *      Heroku already subscribes to. Lets the website client refresh /me
+     *      and update the nav identity in-place, no page reload needed. We
+     *      reuse this PE rather than have Heroku subscribe to Demo_Event__e
+     *      directly, which would otherwise force the relay to receive every
+     *      survey/booking/seat event just to pick up the rare profile one.
      */
     private static void publishProfileCreatedEvent(String contactId, String firstName, String lastName, String avatarUrl) {
         try {
@@ -194,6 +204,15 @@ public without sharing class Skywave_SaveProfile {
                 cs[0].Demo_Session__c,
                 payload
             );
+
+            // Targeted client_action push to the visitor's own dyno via the
+            // Demo_State_Change__e channel. New_State__c is left null — the
+            // consumer routes on Client_Action__c when the action tag is set.
+            EventBus.publish(new Demo_State_Change__e(
+                Client_Action__c    = 'profile_created',
+                Target_Session_Id__c = cs[0].Session_Id__c,
+                Demo_Session_Id__c  = cs[0].Demo_Session__c
+            ));
         } catch (Exception e) {
             System.debug(LoggingLevel.WARN, 'profile_created publish skipped: ' + e.getMessage());
         }

@@ -79,6 +79,7 @@ export async function startPubSubSubscriber(onEvent) {
                 const decoded = schema.fromBuffer(ev.event.payload);
                 onEvent({
                     newState: unwrap(decoded.New_State__c),
+                    clientAction: unwrap(decoded.Client_Action__c),
                     demoSessionId: unwrap(decoded.Demo_Session_Id__c),
                     targetSessionId: unwrap(decoded.Target_Session_Id__c),
                     replayId: ev.replay_id?.toString('base64')

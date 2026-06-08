@@ -1,53 +1,50 @@
 // skywave-session.js — establishes the website's hardened session context.
 //
-// Lifecycle:
-//   1. Load the Salesforce Interactions Web SDK (shared loader, see
-//      skywave-sdk.js). Wait for SDK init to settle and resolve the
-//      anonymous deviceId. This is the deviceId Data Cloud already
-//      knows about — preserve it across the website + chat surfaces.
-//   2. POST /api/website/session/init with the resolved deviceId (or
-//      empty body if SDK is unavailable / blocked). Server responds
-//      with { contactId, profile, ... } and Set-Cookie: skywave_proof
-//      (httpOnly, server-bound).
-//   3. Cache the resolved profile under window.skywaveSession for
-//      page modules to read.
+// Lifecycle (split-by-purpose; no shadow tracking, no pre-consent mint):
+//   1. Page load: skywave-customer.js calls initSession() → reads /me
+//      via proof cookie. If the cookie isn't there yet (no consent yet),
+//      /me 401s and we degrade to "anonymous". If the cookie IS there
+//      (returning visitor, or visitor who already consented this
+//      session), we get back the Contact profile for the nav.
+//   2. Consent moment: site.js calls /api/website/session/init directly
+//      with the SDK's deviceId. That's the ONE place the proof cookie
+//      gets minted and a Contact gets created/upgraded. Once that's
+//      done, subsequent /me reads (refresh, profile_created WS push,
+//      etc.) succeed.
+//   3. Profile created via chat: WS pushes 'client_action profile_created'
+//      from the Heroku relay → site.js calls initSession({force:true})
+//      → re-reads /me → updates nav identity in place.
 //
-// Subsequent API calls use the proof cookie automatically — they don't
-// re-read the WebSDK Id, the Heroku side is now the source of truth
-// for identity. The WebSDK cookie keeps serving Data Cloud event
-// streaming.
-//
-// On any error (SDK absent, network down, SF down) we degrade to
-// "anonymous browsing" — pages that need identity render a friendly
-// affordance instead of crashing.
+// On any error (proof cookie absent, server down, SDK absent) we
+// degrade to "anonymous browsing" — pages that need identity render a
+// friendly affordance instead of crashing.
 
 import { loadSdk } from './skywave-sdk.js';
 
 let sessionPromise = null;
 
-export function initSession({ optedOut = false, force = false } = {}) {
+export function initSession({ force = false } = {}) {
     if (sessionPromise && !force) return sessionPromise;
     sessionPromise = (async () => {
-        const { deviceId, source } = await loadSdk();
-        const body = {};
-        if (deviceId) body.deviceId = deviceId;
-        if (optedOut) body.optedOut = true;
-        // Stamp the source on console for visibility — useful when the
-        // demo is being debugged. Server logs the same outcome via the
-        // Tracking_Status__c stamp.
-        console.log('[skywave] session/init source=' + source +
-            (deviceId ? ' deviceId=' + deviceId.slice(0, 6) + '…' : ' (no deviceId)'));
-        const res = await fetch('/api/website/session/init', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
+        // Load the SDK in the background — keeps the same persisted
+        // deviceId fresh for the chat-side prechat flow. We don't pass
+        // it to /me; the proof cookie is already the identity carrier.
+        loadSdk().catch((e) => console.warn('[skywave-session] SDK load failed', e));
+        const res = await fetch('/api/website/me', {
+            method: 'GET',
+            credentials: 'same-origin'
         });
+        if (res.status === 401) {
+            // No (or invalid) proof cookie — visitor hasn't consented
+            // on this device yet. That's a normal state, not an error.
+            window.skywaveSession = null;
+            return null;
+        }
         if (!res.ok) {
-            throw new Error(`session/init failed: HTTP ${res.status}`);
+            throw new Error(`/me failed: HTTP ${res.status}`);
         }
         const data = await res.json();
-        console.log('[skywave] session/init resolved contactId=' + data.contactId +
+        console.log('[skywave] /me resolved contactId=' + data.contactId +
             ' tracking=' + data.trackingStatus);
         window.skywaveSession = data;
         return data;

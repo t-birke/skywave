@@ -917,3 +917,20 @@ export async function startCustomer() {
         console.warn('[skywave-customer] identity init failed', e);
     }
 }
+
+// Refresh identity in place — re-fetch /me, redraw the nav greeting,
+// and re-render the active customer route if any. Called by site.js
+// when a 'client_action profile_created' WS message arrives, so the
+// website transitions from anonymous to signed-in without a reload.
+//
+// Safe to call when there's no proof cookie yet — initSession returns
+// null and we just no-op.
+export async function refreshIdentity() {
+    try {
+        session = await initSession({ force: true });
+        updateNavIdentity();
+        if (currentRouteKey()) router();
+    } catch (e) {
+        console.warn('[skywave-customer] refreshIdentity failed', e);
+    }
+}

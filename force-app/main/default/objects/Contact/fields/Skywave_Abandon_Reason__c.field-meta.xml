@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Skywave_Abandon_Reason__c</fullName>
+    <label>Skywave Abandon Reason</label>
+    <description>Short tag describing where the visitor abandoned the modal flow (e.g. survey-q3, post-survey, agent-stage, user-closed). Stamped together with Skywave_Abandoned_At__c.</description>
+    <type>Text</type>
+    <length>40</length>
+    <required>false</required>
+    <unique>false</unique>
+</CustomField>

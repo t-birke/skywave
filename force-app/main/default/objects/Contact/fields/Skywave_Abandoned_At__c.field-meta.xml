@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Skywave_Abandoned_At__c</fullName>
+    <label>Skywave Abandoned At</label>
+    <description>Timestamp at which the website visitor closed the demo modal mid-funnel (post-consent, pre-survey-or-pre-profile). Stamped by /api/website/session/abandon. Null if the visitor either finished the funnel or never reached consent.</description>
+    <type>DateTime</type>
+    <required>false</required>
+</CustomField>
