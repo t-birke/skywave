@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RemoteSiteSetting xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Allows Apex callouts from Skywave_PreflightController to status.heroku.com (Statuspage.io JSON). Used to surface active incidents and upcoming scheduled maintenance as a warning pill in the preflight LWC.</description>
+    <disableProtocolSecurity>false</disableProtocolSecurity>
+    <isActive>true</isActive>
+    <url>https://status.heroku.com</url>
+</RemoteSiteSetting>

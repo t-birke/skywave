@@ -10,6 +10,7 @@
     <isNavTabPersistenceDisabled>false</isNavTabPersistenceDisabled>
     <label>Skywave Demo Management</label>
     <navType>Standard</navType>
+    <tabs>Skywave_Preflight</tabs>
     <tabs>Skywave_Demo_Monitor</tabs>
     <tabs>Skywave_Session_Inspector</tabs>
     <tabs>Skywave_Survey_Author</tabs>

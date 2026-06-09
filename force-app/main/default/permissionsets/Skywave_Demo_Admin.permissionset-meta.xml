@@ -23,6 +23,10 @@
         <tab>Skywave_Session_Inspector</tab>
         <visibility>Visible</visibility>
     </tabSettings>
+    <tabSettings>
+        <tab>Skywave_Preflight</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
     <classAccesses>
         <apexClass>Skywave_DemoMonitorController</apexClass>
         <enabled>true</enabled>
@@ -33,6 +37,10 @@
     </classAccesses>
     <classAccesses>
         <apexClass>Skywave_SurveyAuthorController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_PreflightController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <applicationVisibilities>
@@ -370,6 +378,21 @@
     <fieldPermissions>
         <editable>true</editable>
         <field>VoiceCall.Caller_Salutation__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Skywave_Preflight_Config__mdt.Heroku_Origin__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Skywave_Preflight_Config__mdt.Preflight_Key__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Skywave_Preflight_Config__mdt.Statuspage_Url__c</field>
         <readable>true</readable>
     </fieldPermissions>
 </PermissionSet>

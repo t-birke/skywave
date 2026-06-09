@@ -1,0 +1,73 @@
+<template>
+    <lightning-card title="Skywave Demo Preflight" icon-name="utility:checkin">
+        <div slot="actions">
+            <template lwc:if={lastRunLabel}>
+                <span class="slds-text-body_small slds-text-color_weak slds-m-right_small">{lastRunLabel}</span>
+            </template>
+            <lightning-button
+                label={buttonLabel}
+                variant="brand"
+                onclick={handleCheck}
+                disabled={buttonDisabled}>
+            </lightning-button>
+        </div>
+
+        <div class="slds-p-around_medium">
+            <div class={summaryClass}>
+                <template lwc:if={running}>
+                    <lightning-spinner alternative-text="Running" size="small" variant="inverse"></lightning-spinner>
+                </template>
+                <span class="pf-summary-text">{summaryLabel}</span>
+            </div>
+
+            <template for:each={groups} for:item="group">
+                <section key={group.key} class="pf-group slds-m-top_medium">
+                    <header class="pf-group-header">
+                        <h2 class="slds-text-heading_small">{group.label}</h2>
+                        <span class="slds-text-body_small slds-text-color_weak">{group.summary}</span>
+                    </header>
+                    <ul class="pf-rows">
+                        <template for:each={group.rows} for:item="row">
+                            <li key={row.id} class={row.cssClass}>
+                                <div class="pf-icon">
+                                    <template lwc:if={row.manual}>
+                                        <button
+                                            type="button"
+                                            class={row.manualButtonClass}
+                                            data-id={row.id}
+                                            onclick={handleManualToggle}
+                                            title="Tap to mark confirmed (or un-confirm)">
+                                            <lightning-icon
+                                                icon-name={row.iconName}
+                                                size="x-small"
+                                                variant={row.iconVariant}
+                                                alternative-text={row.effectiveStatus}>
+                                            </lightning-icon>
+                                        </button>
+                                    </template>
+                                    <template lwc:elseif={row.isRunning}>
+                                        <div class="pf-row-spinner" role="status" aria-label="running"></div>
+                                    </template>
+                                    <template lwc:else>
+                                        <lightning-icon
+                                            icon-name={row.iconName}
+                                            size="x-small"
+                                            variant={row.iconVariant}
+                                            alternative-text={row.effectiveStatus}>
+                                        </lightning-icon>
+                                    </template>
+                                </div>
+                                <div class="pf-body">
+                                    <div class="pf-label">{row.label}</div>
+                                    <template lwc:if={row.detail}>
+                                        <div class="pf-detail">{row.detail}</div>
+                                    </template>
+                                </div>
+                            </li>
+                        </template>
+                    </ul>
+                </section>
+            </template>
+        </div>
+    </lightning-card>
+</template>

@@ -1,0 +1,83 @@
+.pf-summary {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--slds-g-radius-border-2, 0.5rem);
+    font-weight: 600;
+}
+.pf-summary--running { background: var(--slds-g-color-neutral-base-95, #f3f3f3); color: #444; }
+.pf-summary--pending { background: var(--slds-g-color-neutral-base-95, #f3f3f3); color: #444; }
+.pf-summary--pass    { background: #e3f7ec; color: #04693a; }
+.pf-summary--warn    { background: #fff5d6; color: #8a6500; }
+.pf-summary--fail    { background: #fde7e9; color: #8a0014; }
+
+.pf-summary-text { font-size: 0.95rem; }
+
+.pf-group { border-top: 1px solid var(--slds-g-color-border-base-1, #e5e5e5); padding-top: 0.75rem; }
+.pf-group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.5rem;
+}
+
+.pf-rows { list-style: none; margin: 0; padding: 0; }
+
+.pf-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.45rem 0.25rem;
+    border-bottom: 1px solid var(--slds-g-color-border-base-1, #f0f0f0);
+}
+.pf-row:last-child { border-bottom: none; }
+
+.pf-icon {
+    flex-shrink: 0;
+    width: 1.25rem;
+    height: 1.25rem;
+    display: grid;
+    place-items: center;
+    margin-top: 0.1rem;
+}
+
+.pf-body { flex: 1; min-width: 0; }
+.pf-label { font-size: 0.95rem; }
+.pf-detail {
+    font-family: var(--slds-g-font-family-monospace, ui-monospace, monospace);
+    font-size: 0.8rem;
+    color: var(--slds-g-color-neutral-base-30, #555);
+    margin-top: 0.15rem;
+    word-break: break-word;
+}
+
+.pf-row--running .pf-label { color: #444; }
+.pf-row--idle .pf-label    { color: #888; }
+.pf-row--fail .pf-detail   { color: #8a0014; }
+.pf-row--warn .pf-detail   { color: #8a6500; }
+
+.pf-manual-toggle {
+    background: transparent;
+    border: 1px solid var(--slds-g-color-border-base-1, #c9c9c9);
+    border-radius: 50%;
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+}
+.pf-manual-toggle--checked { border-color: #04693a; background: #e3f7ec; }
+
+.pf-row-spinner {
+    width: 0.9rem;
+    height: 0.9rem;
+    border: 2px solid var(--slds-g-color-border-base-1, #c9c9c9);
+    border-top-color: var(--slds-g-color-brand-base-50, #1b96ff);
+    border-radius: 50%;
+    animation: pf-spin 0.7s linear infinite;
+}
+@keyframes pf-spin {
+    to { transform: rotate(360deg); }
+}

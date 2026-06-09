@@ -444,6 +444,38 @@ Service` + the `observing-agentforce` skill query them. `Skywave_Observability�
 Seeder` can synthesize sessions for a populated dashboard. Enum vocabulary
 matters — see memory `skywave-stdm-synthetic-enum-vocabulary`.
 
+### 3g. Preflight check (presenter pre-demo go/no-go)
+
+A **Skywave Preflight** tab in the *Skywave Demo Management* app surfaces the
+silent-config-drift risks that `git status` cannot show. One **Check Demo**
+button drives a single Apex orchestrator (`Skywave_PreflightController.run‑
+Preflight`) that fans out across three planes:
+
+- **Org** — SOQL only: active Demo_Session present + reset to `idle`, survey
+  questions seeded, Flight/Booking/Skywave_Seat_Map row counts non-zero.
+- **Agent & chat** — bot user holds `Skywave_Agent_User` permset (the silent‑
+  action‑filter trap), `Skywave_Airlines_Agent` BotVersion is Active.
+- **Heroku relay** — one callout to `GET /api/preflight` on the dyno (new
+  `heroku/skywave-app/src/preflight.js`), guarded by an `x-preflight-key`
+  shared secret. The dyno self-reports: Pub/Sub subscriber connection state
+  (new `getSubscriberStatus()` export from `pubsub-client.js`), four `ESW_*`
+  + `SF_INTERACTIONS_SDK_URL` echo for org-side diff, `process.uptime()` plus
+  a `cycleSoon` flag (Heroku exposes no per-dyno restart schedule — uptime
+  ≈22h is the actionable signal to restart pre-demo). `?e2e=1` adds a
+  loopback push probe that registers a synthetic socket in `ws-fanout` and
+  verifies `fanOut` delivers.
+- **Platform / outage** — Statuspage.io JSON (`status.heroku.com/api/v2/{in‑
+  cidents/unresolved,scheduled-maintenances/upcoming}.json`) for active
+  incidents and upcoming scheduled maintenance.
+- **Manual confirms** — two click-to-mark rows for the things no API can
+  verify: ESD republished since last agent publish/activate, and a CLT card
+  visually rendering in the chat preview.
+
+Config: `Skywave_Preflight_Config__mdt.Default` holds `Heroku_Origin__c`,
+`Preflight_Key__c` (must match Heroku `PREFLIGHT_KEY` config var), and
+`Statuspage_Url__c`. Two new remote site settings (`Skywave_Heroku_Relay`,
+`Skywave_Heroku_Statuspage`) whitelist the callouts.
+
 ---
 
 ## 4. Moving parts that are NOT in git

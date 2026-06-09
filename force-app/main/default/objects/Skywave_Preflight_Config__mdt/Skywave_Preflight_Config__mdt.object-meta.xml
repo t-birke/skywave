@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Configuration for Skywave_PreflightController. Holds the Heroku origin and the shared-secret key used to call /api/preflight on the relay dyno. Single record convention: DeveloperName=Default.</description>
+    <label>Skywave Preflight Config</label>
+    <pluralLabel>Skywave Preflight Configs</pluralLabel>
+    <visibility>Public</visibility>
+</CustomObject>

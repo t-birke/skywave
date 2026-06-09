@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RemoteSiteSetting xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Allows Apex callouts from Skywave_PreflightController to the Heroku skywave-app dyno's /api/preflight endpoint. Must match the Heroku_Origin__c on Skywave_Preflight_Config.Default. Update both if the dyno is renamed.</description>
+    <disableProtocolSecurity>false</disableProtocolSecurity>
+    <isActive>true</isActive>
+    <url>https://skywave-app-bb0e8666933b.herokuapp.com</url>
+</RemoteSiteSetting>

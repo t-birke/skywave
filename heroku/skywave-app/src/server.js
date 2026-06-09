@@ -11,6 +11,7 @@ import { startPubSubSubscriber } from './pubsub-client.js';
 import { register, fanOut, activeCount, startHeartbeat } from './ws-fanout.js';
 import { forwardToApex } from './sf-api.js';
 import { buildWebsiteRouter } from './website-routes.js';
+import { buildPreflightRouter } from './preflight.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -73,6 +74,10 @@ app.get('/api/config', (_, res) => {
 // /api/* phone-demo routes are untouched.
 const allowedOrigin = process.env.SKYWAVE_PUBLIC_ORIGIN || 'http://localhost:3000';
 app.use('/api/website', buildWebsiteRouter({ allowedOrigin }));
+
+// Preflight self-report — guarded by x-preflight-key. Apex calls this
+// from the Skywave_PreflightController; not exposed to phones.
+app.use('/api/preflight', buildPreflightRouter(express));
 
 app.post('/api/session/start',     (req, res) => forwardToApex('POST', '/skywave/session/start',    req.body, res, 'session/start'));
 // Note: /api/session/identify is NOT a Heroku route — phones POST

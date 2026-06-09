@@ -28,6 +28,31 @@ let reconnectAttempts = 0;
 const RECONNECT_BASE_MS = 5_000;
 const RECONNECT_MAX_MS = 5 * 60_000;  // cap at 5 min
 
+// Status surface for /api/preflight. `subscribedAt` is set the first time the
+// initial subscribe write succeeds; `lastReplayId` is updated on every event;
+// `lastDataAt` is the wall-clock of the most recent decoded event.
+let subscribedAt = null;
+let lastReplayId = null;
+let lastDataAt = null;
+let lastError = null;
+
+export function getSubscriberStatus() {
+    // "connected" = we successfully subscribed at least once AND there is no
+    // pending reconnect timer. Both `error` and `end` schedule a reconnect, so
+    // a non-null timer means the stream is currently down.
+    const connected = subscribedAt != null && reconnectTimer == null;
+    return {
+        connected,
+        topic: TOPIC,
+        subscribedAt,
+        reconnectAttempts,
+        reconnectScheduled: reconnectTimer != null,
+        lastReplayId,
+        lastDataAt,
+        lastError
+    };
+}
+
 function scheduleReconnect(onEvent, reason) {
     if (reconnectTimer) return; // already scheduled — let it run
     const backoff = Math.min(
@@ -77,12 +102,15 @@ export async function startPubSubSubscriber(onEvent) {
             try {
                 const schema = await getSchema(client, ev.event.schema_id);
                 const decoded = schema.fromBuffer(ev.event.payload);
+                const replayId = ev.replay_id?.toString('base64');
+                lastReplayId = replayId;
+                lastDataAt = new Date().toISOString();
                 onEvent({
                     newState: unwrap(decoded.New_State__c),
                     clientAction: unwrap(decoded.Client_Action__c),
                     demoSessionId: unwrap(decoded.Demo_Session_Id__c),
                     targetSessionId: unwrap(decoded.Target_Session_Id__c),
-                    replayId: ev.replay_id?.toString('base64')
+                    replayId
                 });
             } catch (err) {
                 console.error('event decode failed', err);
@@ -95,6 +123,7 @@ export async function startPubSubSubscriber(onEvent) {
     // reconnect attempt scheduled at a time — scheduleReconnect dedupes.
     stream.on('error', (err) => {
         console.error('Pub/Sub stream error:', err.code, err.details ?? err.message);
+        lastError = { code: err.code, message: err.details ?? err.message, at: new Date().toISOString() };
         scheduleReconnect(onEvent, `error: ${err.code}`);
     });
     stream.on('end', () => {
@@ -108,8 +137,10 @@ export async function startPubSubSubscriber(onEvent) {
         replay_preset: 'LATEST'
     });
 
-    // Connection succeeded; reset the retry counter.
+    // Connection succeeded; reset the retry counter and stamp subscribedAt.
     reconnectAttempts = 0;
+    subscribedAt = new Date().toISOString();
+    lastError = null;
 
     console.log(`subscribed to ${TOPIC}`);
     return stream;
