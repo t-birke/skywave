@@ -382,7 +382,7 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
-        <field>Skywave_Preflight_Config__mdt.Heroku_Origin__c</field>
+        <field>Skywave_Preflight_Config__mdt.Heroku_Origin_Url__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
@@ -392,7 +392,7 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
-        <field>Skywave_Preflight_Config__mdt.Statuspage_Url__c</field>
+        <field>Skywave_Preflight_Config__mdt.Statuspage_Base_Url__c</field>
         <readable>true</readable>
     </fieldPermissions>
 </PermissionSet>

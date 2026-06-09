@@ -82,7 +82,7 @@ public with sharing class Skywave_PreflightController {
             Map<String, Object> e2eReport = callHeroku(cfg, true);
             Map<String, Object> rt = (Map<String, Object>) e2eReport.get('roundtrip');
             CheckResult r = new CheckResult('e2e.loopback', GROUP_E2E, GROUP_LABELS.get(GROUP_E2E), 'Loopback push delivered on dyno');
-            if (rt != null && Boolean.TRUE.equals(rt.get('ok'))) {
+            if (rt != null && rt.get('ok') == true) {
                 r.status = 'pass';
                 Object ms = rt.get('deliveredMs');
                 r.detail = (ms == null) ? 'ok' : ('delivered in ' + ms + 'ms');
@@ -182,28 +182,34 @@ public with sharing class Skywave_PreflightController {
         // 2a. The bot user must hold the Skywave_Agent_User permset, or
         //     actions whose Apex class isn't accessible to it get silently
         //     filtered from tools_sent (memory: feedback-bot-user-apex-permissions).
-        //     We resolve the bot user by matching the agent .agent file's
-        //     replaceable username convention: skywaveserviceagent@<domain>.
+        //     Resolve the runtime user via BotDefinition.BotUserId — the
+        //     authoritative pointer Agentforce uses at runtime.
         CheckResult botRow = new CheckResult('agent.botUser', GROUP_AGENT, GROUP_LABELS.get(GROUP_AGENT), 'Bot user has Skywave_Agent_User permset');
         try {
-            List<User> botUsers = [
-                SELECT Id, Username FROM User
-                WHERE Username LIKE 'skywaveserviceagent@%' AND IsActive = true
+            List<BotDefinition> bots = [
+                SELECT Id, BotUserId FROM BotDefinition
+                WHERE DeveloperName = 'Skywave_Airlines_Agent'
                 LIMIT 1
             ];
-            if (botUsers.isEmpty()) {
-                botRow.detail = 'No active user matching skywaveserviceagent@%. Bot user is required for the agent to run.';
+            if (bots.isEmpty() || bots[0].BotUserId == null) {
+                botRow.detail = 'BotDefinition Skywave_Airlines_Agent missing or has no BotUserId.';
             } else {
-                Integer assigned = [
-                    SELECT COUNT() FROM PermissionSetAssignment
-                    WHERE AssigneeId = :botUsers[0].Id
-                      AND PermissionSet.Name = 'Skywave_Agent_User'
-                ];
-                if (assigned > 0) {
-                    botRow.status = 'pass';
-                    botRow.detail = botUsers[0].Username;
+                Id botUserId = bots[0].BotUserId;
+                List<User> botUsers = [SELECT Id, Username, IsActive FROM User WHERE Id = :botUserId LIMIT 1];
+                if (botUsers.isEmpty() || !botUsers[0].IsActive) {
+                    botRow.detail = 'Bot user is inactive or not visible.';
                 } else {
-                    botRow.detail = botUsers[0].Username + ' is missing the Skywave_Agent_User permset — agent actions will silently disappear from tools_sent.';
+                    Integer assigned = [
+                        SELECT COUNT() FROM PermissionSetAssignment
+                        WHERE AssigneeId = :botUserId
+                          AND PermissionSet.Name = 'Skywave_Agent_User'
+                    ];
+                    if (assigned > 0) {
+                        botRow.status = 'pass';
+                        botRow.detail = botUsers[0].Username;
+                    } else {
+                        botRow.detail = botUsers[0].Username + ' is missing the Skywave_Agent_User permset — agent actions will silently disappear from tools_sent.';
+                    }
                 }
             }
         } catch (Exception e) {
@@ -245,7 +251,7 @@ public with sharing class Skywave_PreflightController {
     private static Skywave_Preflight_Config__mdt loadConfig() {
         // Single-tenant: DeveloperName=Default convention.
         List<Skywave_Preflight_Config__mdt> rows = [
-            SELECT DeveloperName, Heroku_Origin__c, Preflight_Key__c, Statuspage_Url__c
+            SELECT DeveloperName, Heroku_Origin_Url__c, Preflight_Key__c, Statuspage_Base_Url__c
             FROM Skywave_Preflight_Config__mdt
             WHERE DeveloperName = 'Default'
             LIMIT 1
@@ -254,15 +260,15 @@ public with sharing class Skywave_PreflightController {
     }
 
     private static Map<String, Object> callHeroku(Skywave_Preflight_Config__mdt cfg, Boolean e2e) {
-        if (String.isBlank(cfg.Heroku_Origin__c)) {
-            throw new CalloutException('Skywave_Preflight_Config.Default.Heroku_Origin__c is not set.');
+        if (String.isBlank(cfg.Heroku_Origin_Url__c)) {
+            throw new CalloutException('Skywave_Preflight_Config.Default.Heroku_Origin_Url__c is not set.');
         }
         if (String.isBlank(cfg.Preflight_Key__c)) {
             throw new CalloutException('Skywave_Preflight_Config.Default.Preflight_Key__c is not set.');
         }
 
         HttpRequest req = new HttpRequest();
-        String url = cfg.Heroku_Origin__c.removeEnd('/') + '/api/preflight' + (e2e ? '?e2e=1' : '');
+        String url = cfg.Heroku_Origin_Url__c.removeEnd('/') + '/api/preflight' + (e2e ? '?e2e=1' : '');
         req.setEndpoint(url);
         req.setMethod('GET');
         req.setHeader('x-preflight-key', cfg.Preflight_Key__c);
@@ -288,7 +294,7 @@ public with sharing class Skywave_PreflightController {
         // 3b. Pub/Sub subscriber connected.
         Map<String, Object> ps = (Map<String, Object>) r.get('pubsub');
         CheckResult psRow = new CheckResult('relay.pubsub', GROUP_RELAY, GROUP_LABELS.get(GROUP_RELAY), 'Pub/Sub subscriber connected to Demo_State_Change__e');
-        if (ps != null && Boolean.TRUE.equals(ps.get('connected'))) {
+        if (ps != null && ps.get('connected') == true) {
             psRow.status = 'pass';
             psRow.detail = 'subscribedAt=' + ps.get('subscribedAt');
         } else {
@@ -304,12 +310,15 @@ public with sharing class Skywave_PreflightController {
         if (dyno == null) {
             dynoRow.status = 'fail';
             dynoRow.detail = 'no dyno report';
-        } else if (Boolean.TRUE.equals(dyno.get('cycleSoon'))) {
-            dynoRow.status = 'warn';
-            dynoRow.detail = 'Dyno up ~' + Math.round(((Decimal) dyno.get('uptimeSec')) / 3600) + 'h. Heroku cycles ~24h — restart pre-demo to avoid mid-show cycle.';
         } else {
-            dynoRow.status = 'pass';
-            dynoRow.detail = 'up ' + Math.round(((Decimal) dyno.get('uptimeSec')) / 3600) + 'h, mem ' + dyno.get('memoryMb') + 'MB';
+            Long uptimeHrs = uptimeHours(dyno.get('uptimeSec'));
+            if (dyno.get('cycleSoon') == true) {
+                dynoRow.status = 'warn';
+                dynoRow.detail = 'Dyno up ~' + uptimeHrs + 'h. Heroku cycles ~24h — restart pre-demo to avoid mid-show cycle.';
+            } else {
+                dynoRow.status = 'pass';
+                dynoRow.detail = 'up ' + uptimeHrs + 'h, mem ' + dyno.get('memoryMb') + 'MB';
+            }
         }
         rows.add(dynoRow);
 
@@ -341,50 +350,53 @@ public with sharing class Skywave_PreflightController {
 
     private static List<CheckResult> checkStatuspage(Skywave_Preflight_Config__mdt cfg) {
         List<CheckResult> rows = new List<CheckResult>();
-        String base = String.isBlank(cfg.Statuspage_Url__c) ? 'https://status.heroku.com' : cfg.Statuspage_Url__c.removeEnd('/');
+        String base = String.isBlank(cfg.Statuspage_Base_Url__c) ? 'https://status.heroku.com' : cfg.Statuspage_Base_Url__c.removeEnd('/');
 
-        // Active incidents.
+        // Heroku exposes its status as a single document at v4/current-status:
+        // { status:[{system,status:'green'|...}], incidents:[...], scheduled:[...] }
         CheckResult incRow = new CheckResult('platform.incidents', GROUP_PLATFORM, GROUP_LABELS.get(GROUP_PLATFORM), 'No active Heroku incidents');
+        CheckResult mxRow  = new CheckResult('platform.maintenance', GROUP_PLATFORM, GROUP_LABELS.get(GROUP_PLATFORM), 'No upcoming Heroku maintenance');
         try {
             Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(
-                statuspageGet(base + '/api/v2/incidents/unresolved.json')
+                statuspageGet(base + '/api/v4/current-status')
             );
             List<Object> incidents = (List<Object>) body.get('incidents');
-            Integer n = (incidents == null) ? 0 : incidents.size();
-            if (n == 0) {
+            List<Object> scheduled = (List<Object>) body.get('scheduled');
+            List<Object> systems   = (List<Object>) body.get('status');
+
+            Integer nInc = (incidents == null) ? 0 : incidents.size();
+            // Also check that no Heroku system itself is reporting non-green.
+            Integer degraded = 0;
+            if (systems != null) {
+                for (Object s : systems) {
+                    Map<String, Object> sm = (Map<String, Object>) s;
+                    if (sm.get('status') != 'green') degraded++;
+                }
+            }
+            if (nInc == 0 && degraded == 0) {
                 incRow.status = 'pass';
-                incRow.detail = 'unresolved=0';
+                incRow.detail = 'all systems green, 0 active incidents';
             } else {
                 incRow.status = 'warn';
-                incRow.detail = n + ' active incident(s) — see status.heroku.com';
+                incRow.detail = nInc + ' incident(s), ' + degraded + ' degraded system(s) — see status.heroku.com';
             }
-        } catch (Exception e) {
-            incRow.status = 'warn';
-            incRow.detail = 'Statuspage unreachable: ' + e.getMessage();
-        }
-        rows.add(incRow);
 
-        // Upcoming maintenance.
-        CheckResult mxRow = new CheckResult('platform.maintenance', GROUP_PLATFORM, GROUP_LABELS.get(GROUP_PLATFORM), 'No upcoming Heroku maintenance');
-        try {
-            Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(
-                statuspageGet(base + '/api/v2/scheduled-maintenances/upcoming.json')
-            );
-            List<Object> mx = (List<Object>) body.get('scheduled_maintenances');
-            Integer n = (mx == null) ? 0 : mx.size();
-            if (n == 0) {
+            Integer nMx = (scheduled == null) ? 0 : scheduled.size();
+            if (nMx == 0) {
                 mxRow.status = 'pass';
                 mxRow.detail = 'upcoming=0';
             } else {
                 mxRow.status = 'warn';
-                mxRow.detail = n + ' scheduled — review timing vs your demo slot';
+                mxRow.detail = nMx + ' scheduled — review timing vs your demo slot';
             }
         } catch (Exception e) {
+            incRow.status = 'warn';
+            incRow.detail = 'Statuspage unreachable: ' + e.getMessage();
             mxRow.status = 'warn';
             mxRow.detail = 'Statuspage unreachable: ' + e.getMessage();
         }
+        rows.add(incRow);
         rows.add(mxRow);
-
         return rows;
     }
 
@@ -433,5 +445,16 @@ public with sharing class Skywave_PreflightController {
     private static String truncate(String s, Integer n) {
         if (s == null) return '';
         return s.length() <= n ? s : s.substring(0, n) + '…';
+    }
+
+    // JSON.deserializeUntyped returns Long for whole numbers, Double for
+    // floats. Either may show up as uptimeSec depending on dyno age.
+    private static Long uptimeHours(Object o) {
+        if (o == null) return 0;
+        if (o instanceof Long)    return ((Long) o)    / 3600;
+        if (o instanceof Integer) return ((Integer) o) / 3600;
+        if (o instanceof Decimal) return Math.round(((Decimal) o) / 3600);
+        if (o instanceof Double)  return Math.round(((Double) o) / 3600.0);
+        return 0;
     }
 }

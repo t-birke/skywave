@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
-    <fullName>Heroku_Origin__c</fullName>
+    <fullName>Heroku_Origin_Url__c</fullName>
     <description>HTTPS origin of the Heroku skywave-app dyno (no trailing slash), e.g. https://skywave-app-bb0e8666933b.herokuapp.com. Apex appends /api/preflight to call the self-report endpoint.</description>
-    <label>Heroku Origin</label>
+    <label>Heroku Origin URL</label>
     <length>255</length>
     <required>false</required>
-    <type>Url</type>
+    <type>Text</type>
+    <unique>false</unique>
 </CustomField>

@@ -3,15 +3,11 @@
     <label>Default</label>
     <protected>false</protected>
     <values>
-        <field>Heroku_Origin__c</field>
+        <field>Heroku_Origin_Url__c</field>
         <value xsi:type="xsd:string">https://skywave-app-bb0e8666933b.herokuapp.com</value>
     </values>
     <values>
-        <field>Preflight_Key__c</field>
-        <value xsi:nil="true"/>
-    </values>
-    <values>
-        <field>Statuspage_Url__c</field>
+        <field>Statuspage_Base_Url__c</field>
         <value xsi:type="xsd:string">https://status.heroku.com</value>
     </values>
 </CustomMetadata>

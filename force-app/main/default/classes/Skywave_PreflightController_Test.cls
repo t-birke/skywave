@@ -75,10 +75,12 @@ private class Skywave_PreflightController_Test {
             Scheduled_Arrival_Time__c=Time.newInstance(16, 0, 0, 0),
             Duration_Minutes__c=480, Base_Price_Economy__c=200
         );
-        insert new Skywave_Seat_Map__c(Aircraft_Type__c='B738', Layout_Json__c='{}', Total_Rows__c=30);
+        Product2 acft = new Product2(Name='B738');
+        insert acft;
+        insert new Skywave_Seat_Map__c(Aircraft_Type__c=acft.Id, Layout_Json__c='{}', Total_Rows__c=30);
         Contact c = new Contact(LastName='X');
         insert c;
-        insert new Booking__c(Contact__c=c.Id, Confirmation_Code__c='ABC123', Status__c='Confirmed');
+        insert new Booking__c(Contact__c=c.Id, Confirmation_Code__c='ABC123', Status__c='Confirmed', Total_Amount__c=200);
     }
 
     @IsTest
