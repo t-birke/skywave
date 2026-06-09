@@ -471,10 +471,13 @@ Preflight`) that fans out across three planes:
   verify: ESD republished since last agent publish/activate, and a CLT card
   visually rendering in the chat preview.
 
-Config: `Skywave_Preflight_Config__mdt.Default` holds `Heroku_Origin__c`,
+Config: `Skywave_Preflight_Config__mdt.Default` holds `Heroku_Origin_Url__c`,
 `Preflight_Key__c` (must match Heroku `PREFLIGHT_KEY` config var), and
-`Statuspage_Url__c`. Two new remote site settings (`Skywave_Heroku_Relay`,
-`Skywave_Heroku_Statuspage`) whitelist the callouts.
+`Statuspage_Base_Url__c`. Two new remote site settings (`Skywave_Heroku_Relay`,
+`Skywave_Heroku_Statuspage`) whitelist the callouts. The Default record's
+`Preflight_Key__c` is set out-of-band (anonymous Apex via Metadata API), not
+in source — the value never lands in git, only in `.secrets/preflight.key`
+locally and as the `PREFLIGHT_KEY` Heroku config var.
 
 ---
 
