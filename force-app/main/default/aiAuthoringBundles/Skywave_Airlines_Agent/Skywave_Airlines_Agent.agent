@@ -215,7 +215,7 @@ start_agent agent_router:
               - Booking a NEW flight (search, choose, pay) OR vague travel intent ("surprise me", "somewhere warm", "I want to travel") -> use go_to_flight_booking
               - Viewing, canceling, or changing an EXISTING booking or flight -> use go_to_flight_management
               - Seat selection or seat changes on an existing booking -> use go_to_seat_selection
-              - Correcting or updating the traveler's first or last name on a booking -> use go_to_name_change
+              - Correcting or updating the traveler's OWN profile (first name, last name, email, phone, or avatar) -> use go_to_profile_management
               - Questions about mileage balance, tier points, loyalty points, or frequent flyer miles -> use go_to_mileage_account
               - Support cases, complaints, case status, creating a case -> use go_to_case_management
               - Request to speak to a human agent or live agent -> use go_to_escalation
@@ -245,8 +245,8 @@ start_agent agent_router:
             go_to_case_management: @utils.transition to @subagent.case_management
                 description: "Create, view, or update support cases"
 
-            go_to_name_change: @utils.transition to @subagent.name_change
-                description: "Correct or update the traveler's first or last name on a booking"
+            go_to_profile_management: @utils.transition to @subagent.profile_management
+                description: "Update the traveler's own profile (first name, last name, email, phone, or avatar) on their Contact — not tied to a booking"
 
             go_to_mileage_account: @utils.transition to @subagent.mileage_account
                 description: "Check mileage balance, tier points, loyalty points, or frequent flyer miles"
@@ -983,196 +983,11 @@ subagent flight_booking:
 subagent flight_management:
     label: "Flight Management"
 
-    description: "Assist the visitor with their EXISTING bookings: viewing them, cancelling a booking, or requesting a flight change. Does NOT book new flights (that is flight_booking's job)."
+    description: "Stub: viewing, cancelling, or changing existing bookings is not supported in this agent. Politely inform the visitor and offer alternatives."
 
     reasoning:
         instructions: ->
-            | You are a Skywave Airlines agent helping the visitor with their EXISTING bookings. The visitor is anonymous. Address them in second person ("you", "your"). Never guess a name. The visitor's bookings have already been loaded centrally — use {!@variables.active_bookings}; do NOT fetch them again.
-
-              You handle three things only:
-              - View existing bookings: from {!@variables.active_bookings}, give a SHORT one-line summary per booking. Use exact values; do NOT paraphrase numbers. If they ask about a specific booking, summarise that one.
-              - Cancel a booking: state its cancellationConditions, ask the visitor to confirm, then call {!@actions.cancel_booking} with the bookingReference. Relay the confirmationMessage using exact values.
-              - Change a flight (route/time/date): call {!@actions.change_flight} with the original flight and the requested change, then relay the options/result.
-
-              If the visitor wants to BOOK A NEW flight, or change a SEAT, do NOT handle it here — briefly tell them you'll help with that and let them restate it so the router can send them to the right place.
-
-            if @variables.active_bookings is None:
-                | The visitor has no active bookings on file. Let them know, and offer to help book a new flight.
-
-        actions:
-            identify_customer: @actions.resolve_contact
-                description: "Look up a customer by their email address to identify them"
-                available when @variables.resolved_contact_id == ""
-                with email = ...
-                set @variables.resolved_contact_id = @outputs.contactId
-
-            Reschedule_Flights: @actions.Reschedule_Flights
-                with "Input:New_Flight_Requested" = ...
-
-            cancel_booking: @actions.cancel_booking
-                with bookingReference = ...
-                with contactId = @variables.resolved_contact_id
-
-            change_flight: @actions.change_flight
-                with Flight = ...
-                with requested_change = ...
-
-    actions:
-        Reschedule_Flights:
-            description: "Reschedule flights based on user tier and booking type"
-            label: "Reschedule Flights"
-            require_user_confirmation: False
-            include_in_progress_indicator: False
-            target: "generatePromptResponse://Skywave_RescheduleFlights"
-
-            inputs:
-                "Input:New_Flight_Requested": string
-                    description: "requested flight"
-                    label: "New Flight Requested"
-                    is_required: True
-                    complex_data_type_name: "lightning__textType"
-
-            outputs:
-                "promptResponse": string
-                    description: "The prompt response generated by the action based on the specified prompt and input."
-                    label: "Prompt Response"
-                    complex_data_type_name: "lightning__textType"
-                    filter_from_agent: False
-                    is_displayable: True
-
-        resolve_contact:
-            description: "Resolves a Contact ID from a known ID or email lookup"
-            label: "Resolve Contact"
-            require_user_confirmation: False
-            include_in_progress_indicator: False
-            target: "apex://Skywave_ResolveContact"
-
-            inputs:
-                "contactId": string
-                    description: "A known Contact ID to validate"
-                    label: "Contact ID"
-                    is_required: False
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-                "email": string
-                    description: "Email address to look up a Contact"
-                    label: "Email"
-                    is_required: False
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-
-            outputs:
-                "contactId": string
-                    description: "The resolved Contact ID"
-                    label: "Contact ID"
-                    is_displayable: False
-                    is_used_by_planner: True
-                "contactName": string
-                    description: "The contact name"
-                    label: "Contact Name"
-                    is_displayable: False
-                    is_used_by_planner: True
-                "success": boolean
-                    description: "true if the contact was resolved"
-                    label: "success"
-                    is_displayable: False
-                    is_used_by_planner: True
-                "errorMessage": string
-                    description: "Error details"
-                    label: "error message"
-                    is_displayable: False
-                    is_used_by_planner: True
-
-        cancel_booking:
-            description: "Cancels a flight booking and processes the refund"
-            label: "Cancel Booking"
-            require_user_confirmation: False
-            include_in_progress_indicator: True
-            progress_indicator_message: "Processing cancellation"
-            target: "apex://Skywave_CancelFlight"
-
-            inputs:
-                "bookingReference": string
-                    description: "The booking reference of the booking to cancel"
-                    label: "Booking Reference"
-                    is_required: True
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-                "contactId": string
-                    description: "The contact ID associated with the booking"
-                    label: "Contact ID"
-                    is_required: False
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-
-            outputs:
-                "success": boolean
-                    description: "true if the cancellation was processed"
-                    label: "success"
-                    is_displayable: False
-                    is_used_by_planner: True
-                "errorMessage": string
-                    description: "details in case of an error"
-                    label: "error message"
-                    is_displayable: False
-                    is_used_by_planner: True
-                "bookingReference": string
-                    description: "the cancelled booking reference"
-                    label: "booking reference"
-                    is_displayable: True
-                    is_used_by_planner: True
-                "cancellationFee": string
-                    description: "the fee applied for cancelling the booking"
-                    label: "cancellation fee"
-                    is_displayable: True
-                    is_used_by_planner: True
-                "refundAmount": string
-                    description: "the amount refunded to the customer"
-                    label: "refund amount"
-                    is_displayable: True
-                    is_used_by_planner: True
-                "refundMethod": string
-                    description: "where the refund will be issued"
-                    label: "refund method"
-                    is_displayable: True
-                    is_used_by_planner: True
-                "confirmationMessage": string
-                    description: "human-readable confirmation of the cancellation"
-                    label: "confirmation message"
-                    is_displayable: True
-                    is_used_by_planner: True
-
-        change_flight:
-            description: "Change a flight by providing the original flight info and the desired change"
-            label: "Change Flight"
-            require_user_confirmation: False
-            include_in_progress_indicator: True
-            progress_indicator_message: "Requesting flight change"
-            target: "flow://Skywave_ChangeFlight"
-
-            inputs:
-                "Flight": string
-                    description: "The original flight that needs to be changed"
-                    label: "Flight"
-                    is_required: True
-                    is_user_input: False
-                "requested_change": string
-                    description: "The requested change: route, time, or date change"
-                    label: "requested_change"
-                    is_required: True
-                    is_user_input: False
-
-            outputs:
-                "available_options": string
-                    description: "Options available based on the requested change"
-                    label: "available_options"
-                    filter_from_agent: False
-                    is_displayable: True
-                "changed_flight_information": string
-                    description: "The new flight with changed information"
-                    label: "changed_flight_information"
-                    filter_from_agent: False
-                    is_displayable: True
+            | Managing existing bookings (viewing, cancelling, or changing flights) is not available right now. Briefly apologise, tell the visitor this isn't something you can help with at the moment, and offer the things you CAN do: book a new flight, change a seat on an existing booking, correct a name on a booking, or check their mileage balance. Do NOT call any action. Do NOT mention specific bookings even if any are loaded.
 
 subagent escalation:
     label: "Escalation"
@@ -1355,98 +1170,65 @@ subagent seat_selection:
                     is_displayable: False
                     is_used_by_planner: True
 
-subagent name_change:
-    label: "Name Change"
+subagent profile_management:
+    label: "Profile Management"
 
-    description: "Correct or update the traveler's first or last name on a booking."
+    description: "Correct or update the traveler's own profile — first name, last name, email, phone, or avatar. The profile lives on the Contact, not on a booking."
 
     reasoning:
         instructions: ->
-            | Help the visitor correct the first or last name on one of their bookings. The visitor is already identified for this conversation — never ask for email or identification. Bookings are already loaded centrally — use {!@variables.active_bookings}; do NOT fetch them again.
+            | Help the visitor correct or update their OWN profile: first name, last name, email, phone, or avatar photo. This is profile data on the visitor's Contact record — it is NOT tied to any single booking, so NEVER ask "which booking". The visitor is already identified for this conversation — never ask for email or identification to look them up.
 
-            if @variables.active_bookings is None:
-                | The visitor currently has no bookings to update. Let them know and offer to help with something else.
+            if @variables.resolved_contact_id == "" or @variables.resolved_contact_id == "003000000000000":
+                | We don't have a profile on file to edit for this visitor yet. Briefly explain that there's no profile to update right now, and offer to help with something else (e.g. booking a flight, which will set up their profile). Do NOT call present_profile_form.
 
-            if @variables.active_bookings is not None:
-                | Here are the visitor's current bookings: {!@variables.active_bookings}
-                  If they have more than one booking, ask which booking the name change is for using a SHORT one-line summary per booking (trip type, origin/destination, how far out).
-                  Ask for the corrected first name and last name, then confirm the change with them before calling the action.
-                  When they confirm, call {!@actions.change_name} with the booking's bookingReference, the new firstName, and the new lastName.
-                  After the action returns, relay the confirmationMessage to the user using its exact values — do NOT paraphrase.
+            if @variables.resolved_contact_id != "" and @variables.resolved_contact_id != "003000000000000":
+                | The visitor has a profile we can edit. Show the inline profile card so they can update their details directly.
+                  - On entering this subagent, IMMEDIATELY call {!@actions.present_profile_form} with contactId — that renders the form card, pre-filled with their current details. You MUST invoke the action — do NOT claim a form is shown, or tell the visitor to "use the form below", without actually calling {!@actions.present_profile_form} first. A text reply alone does NOT render the card.
+
+                    The output of this action is always renderable. Always use show_command to display the result to the user. After present_profile_form completes, you MUST present the formData output to the visitor. ALWAYS show the structured action output (the Skywave Profile Form card). Do NOT ask for name/email/phone in text first — the form card collects them. Do NOT rewrite, restate, or summarize the form fields as plain text — the interactive form is contained in the formData output and must be displayed as-is. In your text reply alongside the card, keep it short (1 sentence). Do NOT enumerate the fields. Do NOT claim anything was booked — this is a profile edit, not a booking.
+                  - When the visitor sends the exact phrase "Profile created" (the cue from the form on successful submit): their profile has already been saved by the card. Simply acknowledge in one short sentence that their profile is updated, then ask if there's anything else you can help with. Do NOT call ack_profile_form. Do NOT call confirm_booking. Do NOT create or mention any booking — submitting this card does NOT create a booking.
 
         actions:
-            change_name: @actions.change_name
-                with bookingReference = ...
-                with firstName = ...
-                with lastName = ...
+            present_profile_form: @actions.present_profile_form
+                description: "Display the inline profile form card so the visitor can edit their own profile. Invoke ONCE on entering this subagent. Do NOT call repeatedly; wait for the 'Profile created' cue. Renders the card only — NO booking, NO save."
                 with contactId = @variables.resolved_contact_id
 
     actions:
-        change_name:
-            description: "Updates the traveler's first and last name on a booking"
-            label: "Change Name on Booking"
-            require_user_confirmation: True
-            include_in_progress_indicator: True
-            progress_indicator_message: "Updating name on booking"
-            target: "apex://Skywave_ChangeName"
+        present_profile_form:
+            description: "Renders the Skywave Profile Form card so the visitor can update name, email, phone, and avatar inline in chat. On submit the visitor's chat sends 'Profile created'. This action only prepares the card payload — it performs no Contact or Booking DML."
+            label: "Present Profile Form"
+            require_user_confirmation: False
+            include_in_progress_indicator: False
+            target: "apex://Skywave_PresentProfileForm"
 
             inputs:
-                "bookingReference": string
-                    description: "The booking reference (confirmation code) for the booking to update"
-                    label: "Booking Reference"
-                    is_required: True
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-                "firstName": string
-                    description: "The corrected first name for the traveler"
-                    label: "First Name"
-                    is_required: True
-                    is_user_input: True
-                    complex_data_type_name: "lightning__textType"
-                "lastName": string
-                    description: "The corrected last name for the traveler"
-                    label: "Last Name"
-                    is_required: True
-                    is_user_input: True
-                    complex_data_type_name: "lightning__textType"
                 "contactId": string
-                    description: "The contact ID associated with the booking"
-                    label: "Contact ID"
-                    is_required: False
+                    description: "The Contact Id to pre-fill the form with."
+                    label: "Contact Id"
+                    is_required: True
                     is_user_input: False
                     complex_data_type_name: "lightning__textType"
 
             outputs:
+                "formData": object
+                    description: "Structured payload rendered as the Skywave Profile Form chat card."
+                    label: "Form Data"
+                    complex_data_type_name: "c__SkywaveProfileForm"
+                    filter_from_agent: True
+                    is_displayable: True
                 "success": boolean
-                    description: "true if the name change was processed"
+                    description: "True if the form payload was prepared."
                     label: "success"
+                    complex_data_type_name: "lightning__booleanType"
+                    filter_from_agent: False
                     is_displayable: False
-                    is_used_by_planner: True
-                "errorMessage": string
-                    description: "details in case of an error"
-                    label: "error message"
+                "message": string
+                    description: "Status detail."
+                    label: "Message"
+                    complex_data_type_name: "lightning__textType"
+                    filter_from_agent: False
                     is_displayable: False
-                    is_used_by_planner: True
-                "bookingReference": string
-                    description: "the booking reference that was updated"
-                    label: "booking reference"
-                    is_displayable: True
-                    is_used_by_planner: True
-                "updatedFirstName": string
-                    description: "the new first name on the booking"
-                    label: "updated first name"
-                    is_displayable: True
-                    is_used_by_planner: True
-                "updatedLastName": string
-                    description: "the new last name on the booking"
-                    label: "updated last name"
-                    is_displayable: True
-                    is_used_by_planner: True
-                "confirmationMessage": string
-                    description: "human-readable confirmation of the name change"
-                    label: "confirmation message"
-                    is_displayable: True
-                    is_used_by_planner: True
 
 subagent mileage_account:
     label: "Mileage Account"
