@@ -358,8 +358,7 @@ subagent flight_booking:
             if @variables.flight_selected is True and @variables.profile_collected is False:
                 set @variables.booking_step = "profile"
 
-            | You are a Skywave Airlines booking agent helping the visitor book a NEW flight. The visitor is anonymous. Address them in second person ("you", "your"). Never guess a name.
-              If at any point the visitor says they want to stop, cancel this booking, or asks for something NOT related to completing this new booking (e.g. seat changes, viewing other bookings, profile updates, talking to a human), STOP the booking flow: set booking_step back to empty by calling {!@actions.abort_booking}, then briefly acknowledge and let them restate what they need.
+            | If at any point the visitor says they want to stop, cancel this booking, or asks for something NOT related to completing this new booking (e.g. seat changes, viewing other bookings, profile updates, talking to a human), STOP the booking flow: set booking_step back to empty by calling {!@actions.abort_booking}, then briefly acknowledge and let them restate what they need.
 
             if @variables.survey_summary is not None and @variables.survey_summary != "":
                 | The visitor previously answered a short travel-preferences survey. {!@variables.survey_summary}
