@@ -60,3 +60,13 @@ secrets/
 # Observability dataset export — build artifact, not source
 skywave-observability-dataset/
 skywave-observability-dataset.zip
+
+# ECv2 reference raw assets are Salesforce "Company Confidential" minified
+# files — never commit them (repo is planned to go public). We keep only our
+# own DERIVED notes/values: the markdown docs + keyframes-decoded.css.
+docs/ecv2-reference/raw-assets/home_view*.js
+docs/ecv2-reference/raw-assets/init.min.js
+docs/ecv2-reference/raw-assets/init.min.css
+docs/ecv2-reference/raw-assets/embedded-messaging-styling.min.css
+docs/ecv2-reference/raw-assets/iframe-shell.html
+docs/ecv2-reference/raw-assets/*-extract.txt

@@ -1,0 +1,34 @@
+/* ECv2 chat UI keyframes — decoded from home_view LWR bundle (values verbatim) */
+
+@keyframes dot-pop-in { 0% {transform: scale(0);opacity: 0;}50% {transform: scale(1.2);opacity: 1;}100% {transform: scale(1);opacity: 1;}}
+
+@keyframes fadeIn { 0% {opacity: 0;}100% {opacity: 1;}}
+
+@keyframes fadeInUp { to {opacity: 1;transform: translateY(0);}}
+
+@keyframes fadeOut { 0% {opacity: 1;}100% {opacity: 0;}}
+
+@keyframes fadeOutDown { from {opacity: 1;transform: translateY(0);}to {opacity: 0;transform: translateY(20px);}}
+
+@keyframes fabFadeInWithDelay { from {opacity: 0;}to {opacity: 1;}}
+
+@keyframes container-fade-out { from {opacity: 1;}to {opacity: 0;}}
+
+@keyframes pulse { 0% {background-color: var( --agentic-message-inbound-text-color, var(--slds-g-color-neutral-base-10, #181818) );}33.33% {background-color: color-mix( in srgb, var( --agentic-message-inbound-text-color, var(--slds-g-color-neutral-base-10, #181818) ) 20%, white );}}
+
+@keyframes shimmer { from {background-position: 200% 0;}to {background-position: -200% 0;}}
+
+@keyframes textShimmer { from {background-position: 100% 0%;}to {background-position: 0% 0%;}}
+
+@keyframes jump { 0%, 60%, 100% {transform: translateY(0);}30% {transform: translateY(-4px);}}
+
+@keyframes rotate { from {transform: rotate(0deg);}to {transform: rotate(360deg);}}
+
+@keyframes highlight-background { 0% {background-color: var(--slds-g-color-brand-base-90, #d8e6fe);}100% {background-color: transparent;}}
+
+@keyframes slide-in-tr { 0% {transform: translate(10px, -10px);opacity: 0;}100% {transform: translate(0, 0);opacity: 1;}}
+
+@keyframes twinkling { 0% {scale: 1;}100% {scale: 0.6;}}
+
+@keyframes sweepColours { 0% {background-position: 0% 50%;}25% {background-position: 50% 50%;}50% {background-position: 100% 50%;}75% {background-position: 50% 50%;}100% {background-position: 0% 50%;}}
+
