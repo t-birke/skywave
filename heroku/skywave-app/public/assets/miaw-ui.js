@@ -130,18 +130,23 @@ export class MiawUI {
         this.open = true;
         this.fab.style.display = 'none';
         this.panel.classList.add('open');
-        // First open: boot the conversation + stream.
+        // First open: boot the conversation + stream. ONLY these two are
+        // essential — if they fail, chat genuinely can't work. Backfill is
+        // best-effort and must never gate startup (it already swallows its
+        // own errors, but keep it out of the fatal path too).
         if (!this._started) {
             this._started = true;
             try {
                 await this.client.startStream();
                 await this.client.openConversation();
-                // Optional: backfill prior entries on resume.
-                await this.client.loadEntries();
             } catch (e) {
                 console.error('[miaw-ui] start failed', e);
+                this._started = false;  // allow a retry on next open
                 this._systemLine('Sorry — chat is unavailable right now.');
+                return;
             }
+            // Non-fatal backfill (resumed conversations); ignore failures.
+            this.client.loadEntries().catch(() => {});
         }
         setTimeout(() => this.input.focus(), 350);
     }

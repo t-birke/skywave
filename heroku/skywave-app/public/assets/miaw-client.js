@@ -164,17 +164,25 @@ export class MiawClient extends Emitter {
         return id;
     }
 
-    // Backfill prior entries (e.g. resumed conversation). Best-effort.
+    // Backfill prior entries (e.g. resumed conversation). Best-effort and
+    // NEVER throws — a fresh conversation has nothing to backfill, and a
+    // transport hiccup here must not block chat startup. The endpoint is a
+    // POST (with a JSON body), not a GET — a GET returns 405.
     async loadEntries() {
         if (!this.conversationId) return [];
-        const res = await fetch(`${this.cfg.scrt2Url}${API}/queries/conversation/${this.conversationId}/entries`, {
-            method: 'GET', headers: this._authHeaders(false)
-        });
-        if (!res.ok) { console.warn('[miaw] loadEntries', res.status); return []; }
-        const j = await res.json();
-        const entries = j.conversationEntries || j.entries || [];
-        entries.forEach((e) => this._dispatchEntry(e));
-        return entries;
+        try {
+            const res = await fetch(`${this.cfg.scrt2Url}${API}/queries/conversation/${this.conversationId}/entries`, {
+                method: 'POST', headers: this._authHeaders(), body: '{}'
+            });
+            if (!res.ok) { console.warn('[miaw] loadEntries', res.status); return []; }
+            const j = await res.json();
+            const entries = j.conversationEntries || j.entries || [];
+            entries.forEach((e) => this._dispatchEntry(e));
+            return entries;
+        } catch (e) {
+            console.warn('[miaw] loadEntries failed (non-fatal)', e?.message || e);
+            return [];
+        }
     }
 
     async end() {
