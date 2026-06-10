@@ -39,7 +39,6 @@ sf project deploy start \
   --source-dir force-app/main/default/classes \
   --source-dir force-app/main/default/permissionsets \
   --source-dir force-app/main/default/aiAuthoringBundles \
-  --source-dir force-app/main/default/genAiPromptTemplates \
   --ignore-conflicts --wait 30 --concise
 
 echo "─── Publishing agent bundle ───"
