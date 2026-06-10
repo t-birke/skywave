@@ -103,3 +103,33 @@ like the real client.
 **Verification:** put real ECv2 (desktop, where it works) side-by-side with
 the custom client and diff visually + with the timing values above. They
 should be frame-for-frame identical.
+
+## Exact branding colors (live from embedded-service-config `branding[]`, 2026-06-10)
+
+These are THE ECv2 colors for this deployment. Drive CSS vars from the
+config response at runtime; values below are the current resolved set.
+
+| Surface | Color |
+|---|---|
+| Header / chat button / primaryColor | `#1A1B1E` |
+| Header foreground / text | `#FFFFFF` |
+| User message background | `#005290` |
+| User message text | `#FFFFFF` |
+| Agent message background | `#F3F3F3` |
+| Agent message text | `#2E2E2E` |
+| Agent message link | `#0469C1` |
+| Primary button background | `#005290` |
+| Primary button text | `#FFFFFF` |
+| Input outline | `#C9C9C9` |
+| Input footer button | `#005290` |
+| Primary text | `#333333` |
+| Secondary text | `#5C5C5C` |
+| Alert | `#D72E2D` |
+| Font | Arial |
+| Base font size | Medium (16px root) |
+| Panel base w×h (branding) | 320 × 480 (frame chrome maximized 480 × 742) |
+
+Frame chrome (verified via headless computed style): `border-radius:20px`,
+`box-shadow: rgba(0,0,0,0.2) 2px 2px 20px`. Note the headless probe can't
+read the in-iframe bubble padding (LWC shadow DOM); match SLDS chat bubble
+metrics and visually diff against real ECv2 on desktop to finalize.
