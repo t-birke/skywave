@@ -3,7 +3,10 @@
 > **Scope.** This describes what is *actually built and deployed today*, the
 > cross-system data flows, and the moving parts that don't live in git.
 > It deliberately does **not** restate what the code already shows (class
-> bodies, field lists, the agent topic graph) — read the source for that.
+> bodies, field lists, exact agent instructions/action contracts) — read the
+> source for that. It *does* document the agent's topic graph **shape** and
+> the non-obvious runtime mechanics behind it (see §3c), because those have
+> repeatedly cost us re-investigation.
 >
 > **Sibling docs:**
 > - `SKYWAVE_INTERACTIVE_DESIGN.md` — the *intent*: 10-stage demo vision,
@@ -263,22 +266,91 @@ event publishing. Chat-vs-website differences are passed in
 because the payment-widget LWC flips it later; website goes
 Confirmed/Paid because clicking Book is the payment cue.
 
-### 3c. Chat booking pipeline (agent)
+### 3c. How the Skywave Airlines Agent works
 
-The `Skywave_Airlines_Agent` runs a deterministic booking ladder. The flow and
-the actions are in the `.agent` file; the load-bearing facts:
-- **Search → select → profile → payment → confirm**, gated by a
-  `booking_step` variable. The Booking__c is inserted at the *profile* gate
-  (`Skywave_AckProfileForm`), not at confirm — see memory.
-- **Connecting flights**: Skywave is a JFK hub. `Skywave_Itinerary` resolves a
-  single OR compound flight key (`SW3001+SW4017`); when a direct O&D search is
-  empty, `Skywave_FlightSearch` returns one through-JFK connection as a
-  compound key that threads unchanged through the card → BookFlight →
-  per-leg `Booking_Segment__c` rows.
-- **CLT cards**: action outputs render as Lightning Web Components (flight
-  results, profile form, payment picker, seat map). The card posts a literal
-  chat phrase (e.g. `Book flight <key>`, `Payment completed`) back as the cue
-  for the next deterministic step.
+`Skywave_Airlines_Agent` is an Agent Script (`.agent`) service agent on the
+**graph runtime** (`additional_parameter__enable_graph_runtime: True`). The
+full topic graph and action contracts are in the `.agent` file; this section
+captures the runtime mechanics that the source does *not* make obvious — the
+parts that have bitten us and must not be "cleaned up" without re-reading this.
+
+**Hub-and-spoke topic graph.** `start_agent agent_router` is the entry node; it
+routes by intent to spoke subagents and never answers directly:
+
+| Spoke | Handles |
+|-------|---------|
+| `flight_booking` | Book a NEW flight (search → select → profile → payment → confirm) |
+| `seat_selection` | Seat change on an existing booking (single- vs multi-segment) |
+| `profile_management` | Edit the visitor's own Contact profile via the profile card |
+| `flight_management` | **Stub** — managing existing bookings is not supported; declines + redirects |
+| `off_topic` / `ambiguous_question` | Decline-and-redirect (also catches mileage/cases, which are not built) |
+
+Escalation is **not** a spoke — the router calls `@utils.escalate`
+(`escalate_to_human`) directly for a one-hop human handoff. There is no
+mileage, case-management, or live booking-management capability; requests for
+those route to `off_topic`, which declines honestly and offers a human.
+
+**Central data load (router, once per session).** The router runs
+`resolve_contact` + `resolve_session` (survey/identity) and `get_bookings`
+exactly once, gated by sentinels (`active_booking_count == -1`,
+`resolved_contact_id != "003000000000000"`). Every spoke then reads
+`@variables.active_bookings` / `active_booking_count`; **no spoke re-fetches.**
+A second `get_bookings` fires once post-confirm so a just-made booking shows up.
+
+**Booking pipeline.** Search → select → profile → payment → confirm, gated by a
+`booking_step` string. The Booking__c is inserted at the *profile* gate
+(`Skywave_AckProfileForm`), not at confirm — see memory. Connecting flights:
+Skywave is a JFK hub; `Skywave_Itinerary` resolves a single OR compound flight
+key (`SW3001+SW4017`); when a direct O&D search is empty, `Skywave_FlightSearch`
+returns one through-JFK connection as a compound key that threads unchanged
+through the card → BookFlight → per-leg `Booking_Segment__c` rows. Action
+outputs render as **CLT cards** (LWCs: flight results, profile form, payment
+picker, seat map); each card posts a literal chat phrase (`Book flight <key>`,
+`Profile created`, `Payment completed`) back as the cue for the next step.
+
+#### The booking-step ladder — DO NOT dedup or refactor (trace-proven 2026-06-10)
+
+`booking_step` is derived from completion flags (`flight_selected`,
+`profile_collected`, `payment_processed`, `booking_confirmed`) by a 4-line
+`if`-ladder that appears **twice**: once at the top of the router's
+`reasoning.instructions`, once at the top of `flight_booking`'s. They look
+redundant. **They are not** — they run at different moments, and both are
+load-bearing:
+
+- **Router copy** = *cross-turn re-entry.* The router runs at the **start of
+  every turn** (it's the graph entry node — confirmed by traces showing the
+  router palette built before every subagent palette). It recomputes
+  `booking_step` from the persisted flags, then a transition-pin
+  (`if booking_step in profile/payment/confirm: transition to flight_booking`)
+  deterministically re-enters the booking subagent **without** an LLM routing
+  call — so a mid-booking turn can't be mis-routed.
+- **`flight_booking` copy** = *within-turn chaining.* A single turn runs
+  **multiple reasoning iterations** (the post-action loop: action runs →
+  `reasoning.instructions` re-resolves → LLM reasons again). The ladder sits at
+  the **top** of that block, so on each re-resolution it re-derives the advanced
+  step from the flag the just-run action set — letting one turn chain
+  `book_flight → ack_profile_form → present_payment_form`.
+
+Why neither the ladder logic nor its duplication can move (all three tried and
+trace-disproven):
+
+1. **`if @outputs.success → set booking_step` inside a `reasoning.actions` tool
+   block** — invalid grammar. Tool blocks support only `with` and `set`; the
+   `if` is silently ignored (zero writes in the trace). **`sf agent validate`
+   passes it anyway** — a false positive. Don't trust validate for this.
+2. **`after_reasoning` block** — runs **once at turn end**, NOT between
+   post-action-loop iterations (trace: `booking_step` set at the final node,
+   after both LLM iterations already ran). The asset-doc claim that
+   `after_reasoning` "runs after each reasoning step" is **wrong for the graph
+   runtime**. The advance lands too late to chain within the turn.
+3. **Tying the advance to the action output generally** — same failure: only
+   `reasoning.instructions` re-resolves between within-turn iterations, so the
+   ladder *must* live there, at the top.
+
+`abort_booking` / `reset_booking` clear `booking_step=""` with all flags false;
+the ladder (evaluated so the lowest step wins last) then leaves it cleared. The
+returning-visitor fast path (`profile_ever_collected` true) runs
+`ack_profile_form` deterministically and skips the profile card.
 
 ### 3d. IP geolocation → home airport (web)
 
