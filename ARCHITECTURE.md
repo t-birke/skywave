@@ -151,6 +151,46 @@ Key non-obvious points (each is a memory entry):
   site guest user**, not the messaging end user — see memory
   `reference-ecv2-clt-runtime-context`.
 
+### 3a''. Chat transport: custom MIAW client (branch `custom-chat-client`)
+
+> Status: on the `custom-chat-client` branch, not yet on `main`. `main`
+> still embeds the official ECv2 widget.
+
+The official ECv2 embedded client dies on **iOS Safari** in a "too many HTTP
+redirects" loop: its session cookie is set on `*.my.site.com` but the host
+page is `*.herokuapp.com` — different public-suffix domains, so the cookie
+is third-party and iOS ITP drops it. We can't share a registrable domain
+(the demo must stay transferable to any installer), so we replace the widget
+with a **custom chat client that talks to the scrt2 REST API directly**. The
+auth JWT comes back in the response *body* and lives in first-party
+`localStorage` on the Heroku origin — nothing for ITP to block, no redirect.
+
+Moving parts (all in `heroku/skywave-app/public/assets/`):
+- `miaw-client.js` — transport: unauth `accessToken` → `conversation` →
+  SSE receive (via `fetch`+`ReadableStream`; `EventSource` can't set the
+  required `Authorization`/`X-Org-Id` headers) → `message` → `DELETE`.
+- `miaw-ui.js` + `miaw-ui.css` — pixel-exact ECv2 chrome (frame geometry
+  from the served `init.min.css`, animation keyframes lifted verbatim,
+  colors driven at runtime from the `embedded-service-config` `branding[]`).
+- `miaw-seatmap.js` + `miaw-seatmap.css` — standalone port of the
+  `skywaveSeatMapRenderer` LWC; renders the CLT payload that arrives over
+  the wire as a `formatType:"ExperienceType"` message.
+- `site.js` `loadEswSnippet()` now boots `MiawUI` instead of the ECv2
+  snippet (same name/signature; visibility logic unchanged).
+
+Identity is **unchanged** from §3a: the custom client generates its own
+conversation UUID, which the platform exposes as
+`Conversation.ConversationIdentifier` — exactly what `chat_start` already
+sends — so the existing PE-trigger resolution path works as-is.
+
+Seat confirm runs through the proof-cookie'd Heroku→Apex path
+(`POST /api/website/bookings/seat-by-id` → `…/manage/seatById` →
+`Skywave_BookingEngine.changeSeatBySegmentId`, ownership-checked), then the
+UI cues the agent `"seat change confirmed"` — same flow the LWC had, but the
+write no longer runs as the ESW guest user.
+
+Reference assets + the recovered styling spec live in `docs/ecv2-reference/`.
+
 ### 3b. Presenter state → every phone (web, real time)
 
 ```
