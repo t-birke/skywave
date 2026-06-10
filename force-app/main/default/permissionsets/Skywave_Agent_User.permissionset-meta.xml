@@ -87,14 +87,6 @@
         <apexClass>Skywave_ChangeSeat</apexClass>
         <enabled>true</enabled>
     </classAccesses>
-    <classAccesses>
-        <apexClass>Skywave_CancelFlight</apexClass>
-        <enabled>true</enabled>
-    </classAccesses>
-    <classAccesses>
-        <apexClass>Skywave_GetMileageBalance</apexClass>
-        <enabled>true</enabled>
-    </classAccesses>
     <fieldPermissions>
         <editable>true</editable>
         <field>Booking_Segment__c.Seat_Number__c</field>

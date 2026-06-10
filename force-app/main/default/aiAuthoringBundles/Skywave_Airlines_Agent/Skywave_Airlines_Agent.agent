@@ -17,127 +17,80 @@ config:
     additional_parameter__enable_graph_runtime: True
 
 variables:
-    EndUserId: linked string
-        source: @MessagingSession.MessagingEndUserId
-        description: "MessagingEndUser Id"
-    RoutableId: linked string
-        source: @MessagingSession.Id
-        description: "MessagingSession Id"
     ContactId: linked string
         source: @MessagingEndUser.ContactId
         description: "MessagingEndUser ContactId"
-    EndUserLanguage: linked string
-        source: @MessagingSession.EndUserLanguage
-        description: "MessagingSession EndUserLanguage"
     Conversation_Id: linked string
         source: @MessagingSession.ConversationId
         description: "Join key for Skywave_ResolveSession to look up the visitor's anonymous Contact."
     testingSession: mutable string = "0dwg8000000Csz7AAC"
         label: "Testing Session (studio override)"
-        description: "Studio-preview override for Conversation_Id. Default points at a Contact with valid survey data (Tokyo, Business, window-seat) so the preview hydrates immediately. Real chat ignores this — Conversation_Id wins when populated."
+        description: "Studio-preview override for Conversation_Id (real chat ignores it). Points at a Contact with valid survey data so the preview hydrates."
     survey_summary: mutable string
         label: "Survey Summary"
-        description: "Natural-language summary of the visitor's survey answers (favourite destination, cabin class, etc.) keyed off Session_ID."
-    survey_responses_json: mutable string
-        label: "Survey Responses (JSON)"
-        description: "Structured JSON map of question_key → {questionText, answerText, answerKey} for fine-grained reasoning."
+        description: "Natural-language summary of the visitor's survey answers (destination, cabin class, etc.)."
     survey_resolved: mutable boolean = False
         label: "Survey Resolved"
         description: "True once Skywave_ResolveSession has run for this conversation."
-    VerifiedCustomerId: mutable string
-        description: "Verified customer contact ID"
-    Latest_Flight_Search_Results: mutable object
-        label: "Latest Flight Search Results"
-        description: ""
-    flight_booking_detail: mutable object
-        label: "Flight Selection Detail"
-        description: "Quote-shaped DTO from book_flight (which only validates and quotes — confirmation comes later)."
-    flight_booking_error_detail: mutable string
-        label: "Flight Booking Error Detail"
-        description: ""
     flight_selected: mutable boolean = False
         label: "Flight Selected"
-        description: "True once book_flight has validated the visitor's choice and pinned the selection variables. Drives the router into booking_step=profile."
+        description: "True once book_flight pinned the selection. Drives booking_step=profile."
     selected_flight_id: mutable string = ""
         label: "Selected Flight Id"
-        description: "Flight__c Id pinned at flight-pick. Re-used by confirm_booking once the visitor reaches the end of the booking flow."
+        description: "Flight__c Id pinned at flight-pick. Reused by ack_profile_form."
     selected_travel_date: mutable string = ""
         label: "Selected Travel Date"
-        description: "Travel date (YYYY-MM-DD) pinned at flight-pick. Re-used by confirm_booking."
+        description: "Travel date (YYYY-MM-DD) pinned at flight-pick."
     selected_checked_bags: mutable number = 0
         label: "Selected Checked Bags"
-        description: "Number of checked bags pinned at flight-pick. Defaults to 0."
+        description: "Checked bags pinned at flight-pick. Defaults to 0."
     selected_seat_preference: mutable string = ""
         label: "Selected Seat Preference"
         description: "Seat preference (Window/Aisle/blank) pinned at flight-pick."
     selected_booking_code: mutable string = ""
         label: "Selected Booking Code"
-        description: "Confirmation code returned by ack_profile_form once the Booking__c is inserted (Pending/Unpaid). The agent passes this to present_payment_form so the payment widget can flip the right row to Paid."
+        description: "Confirmation code from ack_profile_form; passed to the payment widget."
     selected_total_charged: mutable string = ""
         label: "Selected Total Charged"
-        description: "Total amount string (e.g. '$1430.00') returned by ack_profile_form. Displayed in the payment-picker card."
+        description: "Total amount string (e.g. '$1430.00') from ack_profile_form."
     active_bookings: mutable object
         label: "Active Bookings"
-        description: ""
-    retrieve_active_booking_error_message: mutable string
-        label: "Retrieve Active Booking Error Message"
-        description: ""
+        description: "Visitor's active bookings, loaded once at the router."
     active_booking_count: mutable number = -1
         label: "Active Booking Count"
-        description: "Active bookings count: -1 not yet loaded, 0 none, N count. Set once at the router, refreshed after a booking confirms. Gates get_bookings, seat routing (>0), and the seat funnel."
+        description: "-1 not yet loaded, 0 none, N count. Gates seat routing (>0) and the seat funnel."
     seat_change_active_booking_number_of_segments: mutable number = -1
         label: "Seat Change: Segments on Chosen Booking"
-        description: "Segments on the booking being seat-changed. -1 = not yet queried. Set by get_segment_count; drives the single-vs-multiple-flight branch."
+        description: "-1 = not yet queried. Set by get_segment_count; drives the single-vs-multiple-flight branch."
     seat_target_booking_code: mutable string = ""
         label: "Seat Change: Target Booking Code"
-        description: "Confirmation code of the booking the visitor is changing a seat on. Prefilled with the single booking code; set by the LLM when the visitor picks among several. Gates the deterministic segment-count run."
-    Tier_Status: mutable string
-        label: "Tier Status"
-        description: ""
-    mileage_balance: mutable number
-        label: "Mileage Balance"
-        description: ""
-    mileage_balance_message: mutable string
-        label: "Mileage Balance Message"
-        description: ""
-    booking: mutable string
-        label: "Booking"
-        description: ""
-    Booking_Outcome: mutable boolean
-        label: "Booking Outcome"
-        description: ""
+        description: "Confirmation code of the booking being seat-changed. Gates the deterministic segment-count run."
     resolved_contact_id: mutable string = "003000000000000"
-        description: "Resolved contact ID for the current user (demo: pre-authenticated as Lauren)"
+        description: "Resolved Contact Id for the current visitor (placeholder until resolve_session runs)."
     selected_fare_class: mutable string = ""
         label: "Selected Fare Class"
-        description: "The canonical fare class (Economy, Premium Economy, Business, First) the visitor has agreed to. Once set after a flight search, it must be the value passed to book_flight and quoted to the visitor."
-    selected_total_price: mutable string = ""
-        label: "Selected Total Price"
-        description: "The total price string (e.g. '$1430.00') tied to the selected_fare_class. Once set, the agent quotes this exact value at confirmation; it must NOT be re-derived."
-    selected_payment_method: mutable string = ""
-        label: "Selected Payment Method"
-        description: "The payment method the visitor chose: Apple Pay, Saved card, or Demo card. Set after the visitor picks; passed to process_payment."
+        description: "Canonical fare class (Economy, Premium Economy, Business, First) agreed during search; passed to book_flight."
     profile_collected: mutable boolean = False
         label: "Profile Collected"
-        description: "True once update_profile succeeded for the current pending booking. Tells the agent NOT to ask for name/email again."
+        description: "True once the profile is saved for the current pending booking."
     profile_ever_collected: mutable boolean = False
         label: "Profile Ever Collected"
-        description: "True once the visitor has completed the profile form at least once this session. Survives reset_booking, so a second booking skips the profile card and creates the booking straight away."
+        description: "True once the visitor completed the profile form this session. Survives reset_booking so a second booking skips the form."
     payment_processed: mutable boolean = False
         label: "Payment Processed"
-        description: "True once process_payment succeeded. Tells the agent NOT to ask for payment method again."
+        description: "True once confirm_booking verified payment."
     booking_confirmed: mutable boolean = False
         label: "Booking Confirmed"
-        description: "True once confirm_booking succeeded. The post-booking sequence is complete; the agent should NOT re-run any of those steps."
+        description: "True once confirm_booking succeeded."
     booked_confirmation_codes: mutable string = ""
         label: "Booked Confirmation Codes"
-        description: "Comma-separated codes from the most recent confirm_booking. Used so the agent can quote them again if asked, without re-running the action."
+        description: "Codes from the most recent confirm_booking, so the agent can re-quote without re-running."
     bookings_refreshed_post_confirm: mutable boolean = False
         label: "Bookings Refreshed Post-Confirm"
-        description: "True once active_bookings has been re-fetched after a confirm_booking succeeded — prevents re-fetching on every subsequent reasoning turn."
+        description: "True once active_bookings was re-fetched after a confirm; prevents re-fetching each turn."
     booking_step: mutable string = ""
         label: "Booking Step"
-        description: "Booking pipeline state: '' / profile / payment / confirm / done. Used by router to lock to flight_management mid-booking."
+        description: "Booking pipeline state: '' / profile / payment / confirm / done."
     VoiceCallId: linked string
         description: "This variable may also be referred to as Voice Call Id"
         source: @VoiceCall.Id
@@ -176,7 +129,6 @@ start_agent agent_router:
                     with conversationId = @variables.Conversation_Id
                     with testingSession = @variables.testingSession
                     set @variables.survey_summary = @outputs.summary
-                    set @variables.survey_responses_json = @outputs.responsesJson
                     set @variables.resolved_contact_id = @outputs.contactId
                     set @variables.profile_ever_collected = @outputs.profileEverCollected
                     set @variables.survey_resolved = True
@@ -188,7 +140,6 @@ start_agent agent_router:
                 run @actions.get_bookings
                     with contactId = @variables.resolved_contact_id
                     set @variables.active_bookings = @outputs.bookings
-                    set @variables.retrieve_active_booking_error_message = @outputs.errorMessage
                     set @variables.active_booking_count = @outputs.bookingCount
                     set @variables.seat_target_booking_code = @outputs.singleBookingCode
 
@@ -216,10 +167,10 @@ start_agent agent_router:
               - Viewing, canceling, or changing an EXISTING booking or flight -> use go_to_flight_management
               - Seat selection or seat changes on an existing booking -> use go_to_seat_selection
               - Correcting or updating the traveler's OWN profile (first name, last name, email, phone, or avatar) -> use go_to_profile_management
-              - Questions about mileage balance, tier points, loyalty points, or frequent flyer miles -> use go_to_mileage_account
-              - Support cases, complaints, case status, creating a case -> use go_to_case_management
-              - Request to speak to a human agent or live agent -> use go_to_escalation
-              - Ambiguous within an airline context (visitor wants something but isn't clear which booking/case/etc.) -> use go_to_ambiguous_question
+              - Mileage balance, tier points, loyalty points, or frequent flyer miles (NOT a supported capability) -> use go_to_off_topic. Do NOT route these to go_to_profile_management.
+              - Support cases, complaints, case status, opening/creating a case, or issues like lost baggage (NOT a supported capability) -> use go_to_off_topic. Do NOT route these to go_to_flight_management.
+              - Request to speak to a human agent or live agent -> use escalate_to_human (this transfers the conversation directly; it is NOT a transition to another subagent)
+              - Ambiguous within an airline context (visitor wants something but isn't clear which booking/seat/etc.) -> use go_to_ambiguous_question
               - Genuinely off-topic and unrelated to travel/airlines (weather chitchat, news, jokes, code help, general knowledge) -> use go_to_off_topic
               Never attempt to help the customer yourself. Always route.
 
@@ -230,8 +181,8 @@ start_agent agent_router:
             go_to_flight_management: @utils.transition to @subagent.flight_management
                 description: "Route to view, cancel, or change an existing booking or flight"
 
-            go_to_escalation: @utils.transition to @subagent.escalation
-                description: "Transfer to a live human agent"
+            escalate_to_human: @utils.escalate
+                description: "Transfer the conversation to a live human agent. Use when the visitor explicitly asks to speak to a person/live agent."
 
             go_to_off_topic: @utils.transition to @subagent.off_topic
                 description: "Handle off-topic or unrelated questions"
@@ -242,14 +193,8 @@ start_agent agent_router:
             go_to_seat_selection: @utils.transition to @subagent.seat_selection
                 description: "Select or change the seat on one of the visitor's bookings, or explain there is no booking to change"
 
-            go_to_case_management: @utils.transition to @subagent.case_management
-                description: "Create, view, or update support cases"
-
             go_to_profile_management: @utils.transition to @subagent.profile_management
                 description: "Update the traveler's own profile (first name, last name, email, phone, or avatar) on their Contact — not tied to a booking"
-
-            go_to_mileage_account: @utils.transition to @subagent.mileage_account
-                description: "Check mileage balance, tier points, loyalty points, or frequent flyer miles"
 
     actions:
         resolve_contact:
@@ -414,7 +359,7 @@ subagent flight_booking:
                 set @variables.booking_step = "profile"
 
             | You are a Skywave Airlines booking agent helping the visitor book a NEW flight. The visitor is anonymous. Address them in second person ("you", "your"). Never guess a name.
-              If at any point the visitor says they want to stop, cancel this booking, or asks for something NOT related to completing this new booking (e.g. seat changes, viewing other bookings, mileage, support), STOP the booking flow: set booking_step back to empty by calling {!@actions.abort_booking}, then briefly acknowledge and let them restate what they need.
+              If at any point the visitor says they want to stop, cancel this booking, or asks for something NOT related to completing this new booking (e.g. seat changes, viewing other bookings, profile updates, talking to a human), STOP the booking flow: set booking_step back to empty by calling {!@actions.abort_booking}, then briefly acknowledge and let them restate what they need.
 
             if @variables.survey_summary is not None and @variables.survey_summary != "":
                 | The visitor previously answered a short travel-preferences survey. {!@variables.survey_summary}
@@ -487,7 +432,6 @@ subagent flight_booking:
                 with destination = ...
                 with origin = ...
                 with fareClass = ...
-                set @variables.Latest_Flight_Search_Results = @outputs.flightSummary
 
             book_flight: @actions.book_flight
                 description: "Selects the flight (resolves a flight NUMBER or a Flight Id) and pins the choice. Call when the card posts 'Book flight <number>'. Does NOT create a booking; advances to profile."
@@ -497,8 +441,6 @@ subagent flight_booking:
                 with fareClass = ...
                 with checkedBags = ...
                 with seatPreference = ...
-                set @variables.flight_booking_detail = @outputs.booking
-                set @variables.flight_booking_error_detail = @outputs.errorMessage
                 set @variables.flight_selected = @outputs.success
                 set @variables.selected_flight_id = @outputs.selectedFlightId
                 set @variables.selected_travel_date = @outputs.selectedTravelDate
@@ -987,19 +929,7 @@ subagent flight_management:
 
     reasoning:
         instructions: ->
-            | Managing existing bookings (viewing, cancelling, or changing flights) is not available right now. Briefly apologise, tell the visitor this isn't something you can help with at the moment, and offer the things you CAN do: book a new flight, change a seat on an existing booking, correct a name on a booking, or check their mileage balance. Do NOT call any action. Do NOT mention specific bookings even if any are loaded.
-
-subagent escalation:
-    label: "Escalation"
-    description: "Handles requests from users who want to transfer to a live human agent."
-
-    reasoning:
-        instructions: ->
-            | If a user explicitly asks to transfer to a live agent, escalate the conversation.
-              If escalation fails, acknowledge the issue and ask if they would like to log a support case instead.
-        actions:
-            escalate_to_human: @utils.escalate
-                description: "Escalate to a human agent."
+            | Managing existing bookings (viewing, cancelling, or changing flights) is not available right now. Briefly apologise, tell the visitor this isn't something you can help with at the moment, and offer the things you CAN do: book a new flight, change a seat on an existing booking, or update their profile (name, email, phone, avatar). Do NOT call any action. Do NOT mention specific bookings even if any are loaded.
 
 subagent off_topic:
     label: "Off Topic"
@@ -1009,7 +939,9 @@ subagent off_topic:
         instructions: ->
             | Your job is to redirect the conversation to relevant topics politely and succinctly.
               NEVER answer general knowledge questions. Only respond to general greetings and questions about your capabilities.
-              Do not acknowledge the off-topic question. Redirect by asking how you can help with flight bookings or support cases.
+              Do not acknowledge the off-topic question. Redirect by asking how you can help with their flight bookings.
+              If the visitor asks about mileage, tier points, loyalty points, or frequent flyer miles: that is not something you can help with right now. Say so briefly — do NOT promise to look it up — and redirect to what you CAN do (book a flight, change a seat, or update their profile).
+              If the visitor wants to open a support case, file a complaint, check a case, or raise an issue like lost baggage: that is not something you can do here right now. Say so briefly — do NOT promise to create or look up a case — and offer what you CAN do (book a flight, change a seat, or update their profile), or to connect them with a human agent if they'd like.
 
 subagent ambiguous_question:
     label: "Ambiguous Question"
@@ -1136,40 +1068,6 @@ subagent seat_selection:
                     filter_from_agent: False
                     is_displayable: False
 
-        get_bookings:
-            description: "Gets all active flight bookings for the user"
-            label: "Get Bookings"
-            require_user_confirmation: False
-            include_in_progress_indicator: True
-            progress_indicator_message: "Checking your flights"
-            target: "apex://Skywave_GetFlightBookings"
-
-            inputs:
-                "contactId": string
-                    description: "the contact Id of the user"
-                    label: "contactIds"
-                    is_required: True
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-
-            outputs:
-                "bookings": list[object]
-                    description: "a list of bookings for the customer"
-                    label: "bookings"
-                    is_displayable: False
-                    is_used_by_planner: True
-                    complex_data_type_name: "@apexClassType/c__Skywave_GetFlightBookings$Booking"
-                "errorMessage": string
-                    description: "details in case of an error"
-                    label: "error message"
-                    is_displayable: False
-                    is_used_by_planner: True
-                "success": boolean
-                    description: "true if the action completed without error"
-                    label: "success"
-                    is_displayable: False
-                    is_used_by_planner: True
-
 subagent profile_management:
     label: "Profile Management"
 
@@ -1229,211 +1127,6 @@ subagent profile_management:
                     complex_data_type_name: "lightning__textType"
                     filter_from_agent: False
                     is_displayable: False
-
-subagent mileage_account:
-    label: "Mileage Account"
-
-    description: "Provides the customer's mileage / tier points / loyalty points balance."
-
-    reasoning:
-        instructions: ->
-            if @variables.mileage_balance is None:
-                run @actions.get_mileage_balance
-                    with contactId = @variables.resolved_contact_id
-                    set @variables.mileage_balance = @outputs.milesBalance
-                    set @variables.mileage_balance_message = @outputs.confirmationMessage
-
-            | Tell Lauren her current mileage balance using the exact number from mileage_balance. Do NOT paraphrase or round the number.
-              Use the confirmation message as the primary response: {!@variables.mileage_balance_message}
-              Then ask if there is anything else you can help with.
-
-    actions:
-        get_mileage_balance:
-            description: "Gets the customer's current mileage / tier points / loyalty points balance"
-            label: "Get Mileage Balance"
-            require_user_confirmation: False
-            include_in_progress_indicator: True
-            progress_indicator_message: "Checking your mileage balance"
-            target: "apex://Skywave_GetMileageBalance"
-
-            inputs:
-                "contactId": string
-                    description: "The contact ID for the customer"
-                    label: "Contact ID"
-                    is_required: False
-                    is_user_input: False
-                    complex_data_type_name: "lightning__textType"
-
-            outputs:
-                "success": boolean
-                    description: "true if the action completed without error"
-                    label: "success"
-                    is_displayable: False
-                    is_used_by_planner: True
-                "errorMessage": string
-                    description: "details in case of an error"
-                    label: "error message"
-                    is_displayable: False
-                    is_used_by_planner: True
-                "milesBalance": object
-                    description: "the customer's current mileage balance"
-                    label: "miles balance"
-                    complex_data_type_name: "lightning__integerType"
-                    is_displayable: True
-                    is_used_by_planner: True
-                "confirmationMessage": string
-                    description: "human-readable summary of the mileage balance"
-                    label: "confirmation message"
-                    is_displayable: True
-                    is_used_by_planner: True
-
-subagent case_management:
-    label: "Case Management"
-
-    description: "Handles customer inquiries and actions related to support cases, including providing case information, updating existing cases, and creating new cases."
-
-    reasoning:
-        instructions: ->
-            | Always format dates in a human readable format.
-              Do not show Case Id to the customer.
-              If the customer is not known, ask for their email address and get their Contact record first.
-              When adding a comment, first retrieve the case details, ask for the exact comment, then add it.
-              When sharing case details, show: Case number, Subject, Description, and Status as an itemized list.
-              When a customer asks to create a case, summarize the conversation. Subject should be under 7 words. Description should be no more than 3 sentences.
-              Acknowledge and validate user concerns with empathy and professionalism.
-
-        actions:
-            create_case: @actions.create_case
-                with verifiedCustomerID = ...
-                with messagingSessionID = ...
-                with caseSubject = ...
-                with caseDescription = ...
-
-            get_cases_for_contact: @actions.get_cases_for_contact
-                with verifiedContactID = ...
-
-            get_case_by_number: @actions.get_case_by_number
-                with caseNumber = ...
-                with customerEmail = ...
-
-            add_case_comment: @actions.add_case_comment
-                with caseRecord = ...
-                with caseComment = ...
-
-    actions:
-        create_case:
-            description: "Creates a support case for the customer"
-            label: "Create Case"
-            require_user_confirmation: True
-            include_in_progress_indicator: True
-            target: "flow://Skywave_CreateCase"
-
-            inputs:
-                "verifiedCustomerID": string
-                    description: "The contact ID for the case"
-                    label: "Verified Customer ID"
-                    is_required: True
-                    is_user_input: False
-                "messagingSessionID": string
-                    description: "The messaging session ID"
-                    label: "Messaging Session ID"
-                    is_required: False
-                    is_user_input: False
-                "caseSubject": string
-                    description: "The subject of the case"
-                    label: "Case Subject"
-                    is_required: False
-                    is_user_input: True
-                "caseDescription": string
-                    description: "The description of the case"
-                    label: "Case Description"
-                    is_required: False
-                    is_user_input: True
-
-            outputs:
-                "caseRecord": object
-                    description: "The created case record"
-                    label: "Case record"
-                    is_displayable: True
-                    filter_from_agent: False
-                    complex_data_type_name: "lightning__recordInfoType"
-
-        get_cases_for_contact:
-            description: "Returns a list of cases for a given contact ID"
-            label: "Get Cases for Contact"
-            require_user_confirmation: False
-            include_in_progress_indicator: True
-            target: "flow://Skywave_GetCasesForContact"
-
-            inputs:
-                "verifiedContactID": string
-                    description: "The contact record ID"
-                    label: "Verified Contact record ID"
-                    is_required: True
-                    is_user_input: False
-
-            outputs:
-                "caseList": list[object]
-                    description: "Cases for the contact"
-                    label: "Case List"
-                    is_displayable: True
-                    filter_from_agent: False
-                    complex_data_type_name: "lightning__recordInfoType"
-
-        get_case_by_number:
-            description: "Returns a case by email and case number"
-            label: "Get Case by Number"
-            require_user_confirmation: False
-            include_in_progress_indicator: True
-            progress_indicator_message: "Checking Status"
-            target: "flow://Skywave_GetCaseByNumber"
-
-            inputs:
-                "caseNumber": string
-                    description: "case number"
-                    label: "caseNumber"
-                    is_required: False
-                    complex_data_type_name: "lightning__textType"
-                "customerEmail": string
-                    description: "contact email"
-                    label: "customerEmail"
-                    is_required: False
-                    complex_data_type_name: "lightning__textType"
-
-            outputs:
-                "caseRecord": object
-                    description: "the case record"
-                    label: "caseRecord"
-                    complex_data_type_name: "lightning__recordInfoType"
-                    filter_from_agent: False
-                    is_displayable: True
-
-        add_case_comment:
-            description: "Adds a comment to an existing case"
-            label: "Add Case Comment"
-            require_user_confirmation: True
-            include_in_progress_indicator: True
-            target: "flow://Skywave_AddCaseComment"
-
-            inputs:
-                "caseRecord": object
-                    description: "The case record to add the comment to"
-                    label: "Case record"
-                    is_required: True
-                    is_user_input: False
-                    complex_data_type_name: "lightning__recordInfoType"
-                "caseComment": string
-                    description: "The comment text"
-                    label: "Case comment"
-                    is_required: True
-                    is_user_input: True
-
-            outputs:
-                "outcomeMessage": string
-                    description: "Result message"
-                    label: "Outcome message"
-                    is_displayable: True
-                    filter_from_agent: False
 
 connection customer_web_client:
     adaptive_response_allowed: True
