@@ -69,10 +69,10 @@ public with sharing class Skywave_ContactItinerary {
         @AuraEnabled public String layoverLabel; // " 2h 20m" — populated on segments AFTER segment 0
     }
 
-    // NOT cacheable: the LWC needs refreshApex() after the cancel
-    // button updates a booking. cacheable=true makes the wire's
-    // provisioned cache value immutable, blocking the refresh.
-    @AuraEnabled(cacheable=false)
+    // cacheable=true is required by @wire. After cancelBooking() the LWC
+    // calls refreshApex() on the wired result, which invalidates the
+    // cache and re-fetches — that's the standard read+mutate pattern.
+    @AuraEnabled(cacheable=true)
     public static List<BookingDTO> getBookings(Id contactId) {
         if (contactId == null) return new List<BookingDTO>();
 
