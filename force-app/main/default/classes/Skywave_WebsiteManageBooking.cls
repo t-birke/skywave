@@ -8,6 +8,13 @@
  *     { "contactId": "003...", "bookingCode": "QLG6JJ",
  *       "segmentOrder": 1, "newSeat": "12C" }
  *
+ *   POST /services/apexrest/skywave/website/bookings/manage/seatById
+ *     { "contactId": "003...", "bookingSegmentId": "a31...", "newSeat": "12C" }
+ *     Used by the custom MIAW chat client's seatmap card, which carries the
+ *     exact Booking_Segment__c Id in its payload. Ownership is verified
+ *     against contactId before the change so the proof-cookie'd visitor can
+ *     only edit their own segment.
+ *
  * Thin shim: route dispatch + JSON shaping. All domain logic lives in
  * Skywave_BookingEngine, which is the single source of truth shared
  * with the chat agent's path.
@@ -49,6 +56,23 @@ global with sharing class Skywave_WebsiteManageBooking {
             catch (Exception e) { errorOut(res, 400, 'invalid_segmentOrder'); return; }
             Skywave_BookingEngine.SeatChangeResult r =
                 Skywave_BookingEngine.changeSeat(contactId, bookingCode, segOrder, newSeat);
+            respondSeat(res, r);
+        } else if (action == 'seatById') {
+            String segmentId = String.valueOf(body.get('bookingSegmentId'));
+            String newSeat = String.valueOf(body.get('newSeat'));
+            if (String.isBlank(segmentId)) { errorOut(res, 400, 'missing_bookingSegmentId'); return; }
+            if (String.isBlank(newSeat))   { errorOut(res, 400, 'missing_newSeat'); return; }
+            // Ownership gate: the segment must belong to a booking owned by
+            // the resolved (proof-cookie'd) contact. changeSeatBySegmentId
+            // itself does no ownership check, so we enforce it here.
+            List<Booking_Segment__c> owned = [
+                SELECT Id FROM Booking_Segment__c
+                WHERE Id = :segmentId AND Booking__r.Contact__c = :contactId
+                LIMIT 1
+            ];
+            if (owned.isEmpty()) { errorOut(res, 404, 'segment_not_found'); return; }
+            Skywave_BookingEngine.SeatChangeResult r =
+                Skywave_BookingEngine.changeSeatBySegmentId(segmentId, newSeat.toUpperCase());
             respondSeat(res, r);
         } else {
             errorOut(res, 400, 'unknown_action');

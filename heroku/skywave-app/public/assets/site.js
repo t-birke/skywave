@@ -16,6 +16,7 @@
 
 import { renderWebsite } from './website.js';
 import { startCustomer, refreshIdentity } from './skywave-customer.js';
+import { MiawUI } from './miaw-ui.js';
 
 // NOTE: we used to mirror "consent given" into localStorage under
 // 'skywave.consent.v1'. That was shadow tracking — the WebSDK already
@@ -125,7 +126,8 @@ const AGENT_STAGES = new Set(['agent_book', 'agent_seat_fail', 'agent_seat_pass'
 
 let config = { interactionsSdkUrl: null, esw: null };
 let sdkReady = false;
-let eswReady = false;        // bootstrap loaded + init() called
+let eswReady = false;        // custom chat client mounted
+let miawUi = null;           // MiawUI instance (custom chat client)
 
 async function loadConfig() {
     try {
@@ -230,144 +232,117 @@ function postContactUpsert(payload) {
     });
 }
 
-// Requires the four ESW values from /api/config (driven by Heroku Config Vars
-// SF_ESW_*). If any is missing we silently skip — the consumer site still
-// works, just without chat.
+// Boot the custom MIAW chat client (replaces the ECv2 embedded widget).
+//
+// Why custom: the official ECv2 client dies on iOS Safari in a redirect
+// loop — its session cookie is set on *.my.site.com but the host page is
+// *.herokuapp.com (different public-suffix domains), so the cookie is
+// third-party and iOS ITP drops it. We can't share a registrable domain
+// (the demo must stay transferable), so we talk to the scrt2 REST API
+// directly: the auth JWT lives in first-party localStorage on THIS origin
+// and there is nothing for ITP to block. See docs/ecv2-reference/.
+//
+// The function name + signature are kept (loadEswSnippet) so both call
+// sites and the button-visibility logic keep working unchanged.
+//
+// Identity: the custom client generates its own conversation UUID, which
+// the platform exposes as Conversation.ConversationIdentifier. We fire the
+// SAME chat_start POST the ECv2 path used; the existing Contact-update
+// trigger resolves that UUID to the internal MessagingSession.ConversationId
+// and stamps the visitor's Contact so Skywave_ResolveSession matches. No
+// new identity mechanism — verified against the org.
 async function loadEswSnippet(deviceId) {
     if (eswReady) return true;
     const esw = config.esw || {};
-    if (!esw.orgId || !esw.escName || !esw.siteUrl || !esw.scrt2Url) {
-        console.warn('[esw] config incomplete; skipping chat snippet load', esw);
+    // siteUrl is the published LWR site; scrt2Url + orgId + escName are what
+    // the REST client needs. escName is the EmbeddedServiceConfig dev name.
+    if (!esw.orgId || !esw.escName || !esw.scrt2Url) {
+        console.warn('[miaw] config incomplete; skipping chat client load', esw);
         return false;
     }
-
-    // The bootstrap script defines window.embeddedservice_bootstrap and
-    // installs onEmbeddedMessagingReady before we need it.
-    await new Promise((resolve) => {
-        const s = document.createElement('script');
-        s.src = `${esw.siteUrl}/assets/js/bootstrap.min.js`;
-        s.async = true;
-        s.onload = () => resolve();
-        s.onerror = () => { console.warn('[esw] bootstrap.min.js failed to load'); resolve(); };
-        document.head.appendChild(s);
-    });
-
-    if (!window.embeddedservice_bootstrap) {
-        console.warn('[esw] embeddedservice_bootstrap is undefined after script load');
-        return false;
-    }
-
-    // Set the Session_ID hidden prechat field on TWO lifecycle events to
-    // defeat ECv2 timing issues (Salesforce engineering noted intermittent
-    // cases where hidden fields aren't picked up at conversation start):
-    //   1. onEmbeddedMessagingReady — armed before the user can tap chat.
-    //   2. onEmbeddedMessagingConversationStarted — defensive re-set in
-    //      case any intermediate snippet bootstrap state cleared it.
-    //
-    // Prechat value is a bare string, NOT { value: '...' } — runtime
-    // rejects the wrapped form.
-    //
-    // The chat button visibility is controlled via CSS in site.css
-    // (utilAPI.hideChatButton / hideChatButtonOnLoad are platform-broken
-    // in ECv2 as of April 2026).
-    const setSessionPrechat = (eventName) => {
-        try {
-            if (deviceId) {
-                window.embeddedservice_bootstrap.prechatAPI.setHiddenPrechatFields({
-                    Session_ID: deviceId
-                });
-                console.log(`[esw] Session_ID prechat field set on ${eventName}:`, deviceId);
-            }
-        } catch (e) { console.warn(`[esw] setHiddenPrechatFields failed on ${eventName}`, e); }
-    };
-    window.addEventListener('onEmbeddedMessagingReady', () =>
-        setSessionPrechat('Ready'), { once: true });
-
-    // WORKAROUND: ECv2 doesn't propagate custom hidden prechat parameters
-    // to the session-handler flow's input variable (May 2026). The
-    // setHiddenPrechatFields call above sets the value on the SDK side
-    // but it never reaches MessagingSession.Session_ID__c via the
-    // platform path. Until the platform fix ships, we POST the deviceId
-    // directly to a public Apex endpoint when the conversation starts.
-    // Once Salesforce closes that gap, drop this listener and rely on
-    // setHiddenPrechatFields alone (already in place above).
-    window.addEventListener('onEmbeddedMessagingConversationStarted', (e) => {
-        setSessionPrechat('ConversationStarted');
-        const conversationId = e?.detail?.conversationId;
-        if (!conversationId || !deviceId) {
-            console.warn('[esw] no conversationId/deviceId on ConversationStarted; skipping identify',
-                { conversationId, deviceId });
-            return;
-        }
-        const csPayload = {
-            type: 'chat_start',
-            deviceId,
-            demoSessionId: state.demoSessionId,
-            conversationId
-        };
-        // Carry IP geo on chat_start too. The trigger writes it onto the
-        // (possibly brand-new) Contact record, so the visitor's geo lands
-        // on the Contact early — independent of whether they finish the
-        // survey. Best-effort.
-        if (state.geo) {
-            if (state.geo.city)        csPayload.geoCity    = state.geo.city;
-            if (state.geo.region)      csPayload.geoRegion  = state.geo.region;
-            if (state.geo.country)     csPayload.geoCountry = state.geo.country;
-            if (state.geo.lat != null) csPayload.geoLat     = state.geo.lat;
-            if (state.geo.lon != null) csPayload.geoLon     = state.geo.lon;
-        }
-        postContactUpsert(csPayload);
-    }, { once: true });
-    const ready = Promise.resolve();
 
     try {
-        window.embeddedservice_bootstrap.settings.language = 'en_US';
-        // hideChatButtonOnLoad is partially supported in ECv2 (Salesforce
-        // Support, Apr 2026: "not yet supported in the V2 client … the
-        // product team is working on it"). Set it anyway — forward-
-        // compatible, no harm. CSS in site.css does the actual hiding for
-        // now via body[data-esw-visible].
-        window.embeddedservice_bootstrap.settings.hideChatButtonOnLoad = true;
-        window.embeddedservice_bootstrap.init(
-            esw.orgId, esw.escName, esw.siteUrl, { scrt2URL: esw.scrt2Url }
-        );
+        miawUi = new MiawUI({
+            orgId: esw.orgId,
+            developerName: esw.escName,
+            scrt2Url: esw.scrt2Url,
+            deviceId,
+            title: 'Skywave Airlines',
+
+            // Conversation opened: stamp identity via the existing trigger
+            // path (carry IP geo too, exactly like the old ConversationStarted
+            // handler) so the visitor's Contact is resolvable on turn 1.
+            onConversationOpened: (conversationId) => {
+                if (!conversationId || !deviceId) return;
+                const csPayload = {
+                    type: 'chat_start',
+                    deviceId,
+                    demoSessionId: state.demoSessionId,
+                    conversationId
+                };
+                if (state.geo) {
+                    if (state.geo.city)        csPayload.geoCity    = state.geo.city;
+                    if (state.geo.region)      csPayload.geoRegion  = state.geo.region;
+                    if (state.geo.country)     csPayload.geoCountry = state.geo.country;
+                    if (state.geo.lat != null) csPayload.geoLat     = state.geo.lat;
+                    if (state.geo.lon != null) csPayload.geoLon     = state.geo.lon;
+                }
+                postContactUpsert(csPayload);
+            },
+
+            // Seat confirm: change the seat through the proof-cookie'd
+            // Heroku->Apex path (ownership-checked server-side), then the UI
+            // cues the agent "seat change confirmed" — ECv2-faithful.
+            onSeatConfirm: async (sel) => {
+                const res = await fetch('/api/website/bookings/seat-by-id', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        bookingSegmentId: sel.bookingSegmentId,
+                        newSeat: sel.newSeatNumber
+                    })
+                });
+                if (!res.ok) throw new Error(`seat change ${res.status}`);
+                return res.json();
+            }
+        });
+        await miawUi.mount();
     } catch (e) {
-        console.warn('[esw] init failed', e);
+        console.warn('[miaw] chat client init failed', e);
         return false;
     }
 
-    await ready;
     eswReady = true;
     return true;
 }
 
-// Toggle a body data-attribute that CSS uses to show/hide the chat button.
+// Show/hide the custom chat client's launch button.
 //
-// We hide the button via CSS rather than utilAPI.hideChatButton because
-// the v2 API for hiding is platform-broken (Salesforce-confirmed April
-// 2026): hideChatButtonOnLoad setting is ignored, hideChatButton API
-// throws "API not available before onEmbeddedMessagingButtonCreated",
-// and polling around it interferes with the snippet's own bootstrap.
+// We own the FAB now (it's part of MiawUI, not a platform iframe widget),
+// so visibility is a direct style toggle — no more CSS data-attribute
+// dance or fighting the platform-broken ECv2 hideChatButton API.
 //
-// The button is mounted in the parent-page DOM (not in the chat iframe),
-// so CSS on the host page can target it. Only the chat *panel* lives in
-// an iframe, and we don't need to touch that.
+// Rule (unchanged): the button is visible whenever the visitor has
+// consented AND the demo modal is not currently on screen. That covers:
+//   - user X'd the modal mid-survey → chat available as fallback
+//   - moderator is on an agent stage → modal is hidden, chat is the
+//     entire interaction surface
+//   - returning visitor whose effective stage drops the modal → chat
+//     is reachable for help even outside the agent stages
+// Pre-consent we keep it hidden — nothing for the agent to do without an
+// identity, and the consent screen is the only thing to engage with.
 function syncEswButtonVisibility() {
     if (typeof document === 'undefined' || !document.body) return;
-    // New rule: chat button is visible whenever the visitor has consented
-    // AND the demo modal is not currently on screen. That covers:
-    //   - user X'd the modal mid-survey → chat available as fallback
-    //   - moderator is on an agent stage → modal is hidden, chat is the
-    //     entire interaction surface
-    //   - returning visitor whose effective stage drops the modal → chat
-    //     is reachable for help even outside the agent stages
-    //
-    // Pre-consent we keep the button hidden — there's nothing for the
-    // agent to do without an identity, and the consent screen is the
-    // only thing we want the visitor to engage with at that point.
     const modalOpen = modalRoot && modalRoot.dataset.state === 'open';
     const visible = state.consented && !modalOpen;
     document.body.dataset.eswVisible = visible ? '1' : '0';
+    // Drive the actual client root (explicit value — CSS default is none).
+    // While the panel is open we keep it visible regardless of stage (the
+    // FAB hides itself when open); otherwise show only when eligible.
+    if (miawUi && miawUi.root) {
+        miawUi.root.style.display = (visible || miawUi.open) ? 'block' : 'none';
+    }
 }
 
 async function loadInteractionsSdk() {

@@ -410,6 +410,34 @@ export function buildWebsiteRouter({ allowedOrigin }) {
         }
     });
 
+    // ------- POST /bookings/seat-by-id: change seat by Booking_Segment__c Id -------
+    //
+    // Used by the custom MIAW chat client's seatmap card, whose CLT payload
+    // carries the exact bookingSegmentId. Same proof-cookie + resolve pattern
+    // as /bookings/:code/seat; the Apex shim verifies the segment belongs to
+    // the resolved contact before changing it.
+    const seatByIdSchema = z.object({
+        bookingSegmentId: z.string().min(15).max(18),
+        newSeat: z.string().regex(/^\d{1,2}[A-Z]$/i)
+    });
+    router.post('/bookings/seat-by-id', requireProof, validate(seatByIdSchema), async (req, res) => {
+        try {
+            const me = await apexInvoke('POST', '/skywave/website/resolve', {
+                deviceId: req.deviceId, trackingStatus: 'websdk'
+            });
+            const data = await apexInvoke('POST', '/skywave/website/bookings/manage/seatById', {
+                contactId: me.contactId,
+                bookingSegmentId: req.body.bookingSegmentId,
+                newSeat: req.body.newSeat
+            });
+            res.json(data);
+        } catch (err) {
+            const status = err.response?.status ?? 500;
+            console.error('change seat by id failed', status, err.response?.data ?? err.message);
+            res.status(status).json(err.response?.data ?? { error: 'seat_change_failed' });
+        }
+    });
+
     // ------- POST /session/abandon: stamp mid-funnel exit + partial survey -------
     //
     // Fired by the consumer site when the visitor X's the demo modal

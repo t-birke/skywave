@@ -223,21 +223,10 @@ body {
 }
 
 
-/* Hide the Agentforce chat BUTTON (not the panel) until we reach an
- * agent stage. The button is rendered in the host page's DOM under
- * the standard ECv2 wrapper — not in the chat iframe — so a CSS rule
- * on the host page can target it directly.
- *
- * We do this in CSS because the v2 platform APIs for button hiding
- * (hideChatButtonOnLoad setting, utilAPI.hideChatButton method) are
- * acknowledged-broken by Salesforce as of April 2026. site.js sets
- * body[data-esw-visible="1"] only on agent stages.
- *
- * The chat *panel* is unreachable from this CSS (it's in an iframe),
- * but we don't need to touch it — once the user taps the button at
- * agent stage, the panel opens via the snippet's own logic. */
-body:not([data-esw-visible="1"]) #embedded-messaging,
-body:not([data-esw-visible="1"]) embedded-messaging {
-    display: none !important;
-    pointer-events: none !important;
-}
+/* The custom chat client (.miaw-root) is hidden by default so the FAB never
+ * flashes before it's eligible. site.js's syncEswButtonVisibility is the
+ * single source of truth: it sets an inline display (block when the visitor
+ * has consented and is off the demo modal, or whenever the panel is open;
+ * none otherwise), which overrides this default. No !important — we never
+ * want CSS to fight an open panel. */
+.miaw-root { display: none; }
