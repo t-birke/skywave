@@ -1,7 +1,8 @@
 // miaw-seatmap.js — standalone port of skywaveSeatMapRenderer (LWC) for the
 // custom chat client. Same markup, data-shaping and dark-card look, but
-// plain DOM. Consumes the seatMapJSON exactly as it arrives over the MIAW
-// REST API (verified: values[].value.seatMapData.seatMapJSON).
+// plain DOM. Uses the SHARED primitives in miaw-cards.css (.sw-card,
+// .sw-btn, .sw-success, .sw-aborted, .sw-anim) plus seatmap-specific classes.
+// Consumes the seatMapJSON exactly as it arrives over the MIAW REST API.
 //
 // Seat-confirm does NOT call Apex here — it hands the selection up to the UI
 // layer (onConfirm), which routes the change through the host app's
@@ -27,7 +28,7 @@ function decorateSeat(s, selectedSeat, frozen) {
 export function renderSeatMapCard(container, seatMapJSON, handlers) {
     let parsed;
     try { parsed = typeof seatMapJSON === 'string' ? JSON.parse(seatMapJSON) : seatMapJSON; }
-    catch (e) { container.textContent = 'Could not load the seat map.'; return; }
+    catch (e) { container.innerHTML = '<p class="sw-error">Could not load the seat map.</p>'; return; }
 
     const state = {
         bookingSegmentId: parsed.bookingSegmentId || '',
@@ -48,28 +49,28 @@ export function renderSeatMapCard(container, seatMapJSON, handlers) {
     function paint() {
         if (state.view === 'processing') {
             container.innerHTML = `
-                <div class="sw-seat-anim">
-                    <div class="sw-seat-anim__sky"><span class="sw-seat-anim__plane" aria-label="airplane">✈</span></div>
-                    <div class="sw-seat-anim__caption">Changing your seat…</div>
+                <div class="sw-anim">
+                    <div class="sw-anim__sky"><span class="sw-anim__plane" aria-label="airplane">✈</span></div>
+                    <div class="sw-anim__caption">Changing your seat…</div>
                 </div>`;
             return;
         }
         if (state.view === 'completed') {
             container.innerHTML = `
-                <div class="sw-seat-success">
-                    <span class="sw-seat-success__icon">✓</span>
+                <div class="sw-success">
+                    <span class="sw-success__icon">✓</span>
                     <div>
-                        <div class="sw-seat-success__title">Seat change confirmed</div>
-                        <div class="sw-seat-success__sub">Booking ${state.bookingCode} · Flight ${state.flightNumber} · Seat ${state.selectedSeat}</div>
+                        <div class="sw-success__title">Seat change confirmed</div>
+                        <div class="sw-success__sub">Booking ${state.bookingCode} · Flight ${state.flightNumber} · Seat ${state.selectedSeat}</div>
                     </div>
                 </div>`;
             return;
         }
         if (state.view === 'aborted') {
             container.innerHTML = `
-                <div class="sw-seat-aborted">
-                    <span class="sw-seat-aborted__icon">✕</span>
-                    <div class="sw-seat-aborted__title">Seat change aborted</div>
+                <div class="sw-aborted">
+                    <span class="sw-aborted__icon">✕</span>
+                    <div class="sw-aborted__title">Seat change aborted</div>
                 </div>`;
             return;
         }
@@ -87,10 +88,10 @@ export function renderSeatMapCard(container, seatMapJSON, handlers) {
             : 'Pick a seat';
 
         container.innerHTML = `
-            <article class="sw-seat-card">
-                <header class="sw-seat-card__header">
-                    <h3 class="sw-seat-card__title">Choose your seat</h3>
-                    <p class="sw-seat-card__sub">${headerSub}</p>
+            <article class="sw-card">
+                <header class="sw-card__header">
+                    <h3 class="sw-card__title">Choose your seat</h3>
+                    <p class="sw-card__sub">${headerSub}</p>
                 </header>
                 <div class="sw-seat-cabin">${rowsHtml}</div>
                 <div class="sw-seat-legend">
@@ -99,14 +100,13 @@ export function renderSeatMapCard(container, seatMapJSON, handlers) {
                     <span class="sw-seat-legend__item"><span class="sw-seat-swatch sw-seat-swatch_taken"></span>Taken</span>
                 </div>
                 <p class="sw-seat-selection">${selectionLabel}</p>
-                ${state.error ? `<p class="sw-seat-error">${state.error}</p>` : ''}
+                ${state.error ? `<p class="sw-error">${state.error}</p>` : ''}
                 <div class="sw-seat-actions">
-                    <button type="button" class="sw-seat-btn sw-seat-btn_abort">Abort</button>
-                    <button type="button" class="sw-seat-btn sw-seat-btn_confirm"${(!state.selectedSeat || state.selectedSeat === state.currentSeat) ? ' disabled' : ''}>Confirm seat</button>
+                    <button type="button" class="sw-btn sw-btn_ghost" data-act="abort">Abort</button>
+                    <button type="button" class="sw-btn sw-btn_teal" data-act="confirm"${(!state.selectedSeat || state.selectedSeat === state.currentSeat) ? ' disabled' : ''}>Confirm seat</button>
                 </div>
             </article>`;
 
-        // wire seat clicks
         container.querySelectorAll('.sw-seat').forEach((btn) => {
             btn.addEventListener('click', () => {
                 if (state.frozen || btn.dataset.status === 'taken') return;
@@ -115,20 +115,17 @@ export function renderSeatMapCard(container, seatMapJSON, handlers) {
                 paint();
             });
         });
-        container.querySelector('.sw-seat-btn_abort').addEventListener('click', () => {
+        container.querySelector('[data-act="abort"]').addEventListener('click', () => {
             state.view = 'aborted'; paint();
             handlers.onAbort?.();
         });
-        container.querySelector('.sw-seat-btn_confirm').addEventListener('click', () => {
+        container.querySelector('[data-act="confirm"]').addEventListener('click', () => {
             if (!state.selectedSeat || state.selectedSeat === state.currentSeat) {
                 state.error = 'Please pick a different seat first.'; paint(); return;
             }
             state.frozen = true;
             state.view = 'processing';
             paint();
-            // Run the animation timer and the upstream confirm in parallel,
-            // reveal success only when both resolve — same punch-line timing
-            // as the LWC.
             const timer = new Promise((r) => setTimeout(r, ANIMATION_MS));
             const confirm = Promise.resolve(handlers.onConfirm?.({
                 bookingSegmentId: state.bookingSegmentId,

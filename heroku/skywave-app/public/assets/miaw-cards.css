@@ -1,0 +1,218 @@
+/*
+ * miaw-cards.css — ONE shared stylesheet for all custom-client CLT cards
+ * (seatmap, flight options, payment, profile). Replaces the per-component
+ * style duplication the four renderer LWCs had (each redefined the same
+ * --sw-* palette + card/button/input/success patterns under its own
+ * prefix). Defined ONCE here:
+ *   - design tokens (--sw-*)
+ *   - shared primitives: .sw-card, .sw-btn (+ teal/gold/ghost variants),
+ *     .sw-input, .sw-placeholder, .sw-error, .sw-success, .sw-aborted,
+ *     the plane processing animation
+ * Each card section below adds only its UNIQUE structure.
+ *
+ * All cards render inside .miaw-card (the chat message container).
+ */
+
+.miaw-card {
+    /* ---- design tokens (single source of truth) ---- */
+    --sw-navy: #0b1d3a;
+    --sw-navy-deep: #06122a;
+    --sw-blue-soft: #12305f;
+    --sw-mute: #a8bcd8;
+    --sw-teal: #14b8a6;
+    --sw-teal-hover: #0d9488;
+    --sw-teal-active: #0f766e;
+    --sw-gold: #f3c14a;
+    --sw-gold-hover: #e6b134;
+    --sw-card-bg: #1f2836;
+    --sw-card-border: rgba(168, 188, 216, 0.18);
+    --sw-card-divider: rgba(168, 188, 216, 0.15);
+    --sw-input-bg: #141b27;
+    --sw-radius: 0.75rem;
+    --sw-text: #ffffff;
+    --sw-text-mute: #a8bcd8;
+    --sw-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+    font-family: var(--sw-font);
+    margin: 0.25rem 0;
+    color: var(--sw-text);
+}
+
+/* ============================ SHARED PRIMITIVES ============================ */
+
+/* Generic dark card surface — seatmap/flight/payment/profile all build on it */
+.miaw-card .sw-card {
+    background-color: var(--sw-card-bg);
+    border: 1px solid var(--sw-card-border);
+    border-radius: var(--sw-radius);
+    padding: 1rem 1.125rem 1.125rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+.miaw-card .sw-card__header { margin-bottom: 0.125rem; }
+.miaw-card .sw-card__title { margin: 0; font-size: 0.9375rem; font-weight: 700; letter-spacing: -0.01em; }
+.miaw-card .sw-card__sub { margin: 0.25rem 0 0; font-size: 0.75rem; color: var(--sw-text-mute); }
+
+.miaw-card .sw-placeholder {
+    color: var(--sw-text-mute); background-color: var(--sw-card-bg);
+    border: 1px solid var(--sw-card-border); border-radius: 0.5rem;
+    padding: 0.75rem 1rem; font-size: 0.8125rem; font-style: italic; margin: 0;
+}
+.miaw-card .sw-error {
+    color: #ffd9d4; background-color: rgba(186, 5, 23, 0.4);
+    border: 1px solid rgba(186, 5, 23, 0.5); border-radius: 0.5rem;
+    padding: 0.55rem 0.75rem; font-size: 0.75rem; margin: 0;
+}
+.miaw-card .sw-notice {
+    color: var(--sw-gold); font-size: 0.75rem; margin: 0;
+}
+
+/* Buttons: base + variants (teal primary, gold, ghost) */
+.miaw-card .sw-btn {
+    border: 1px solid var(--sw-card-border); border-radius: 0.55rem;
+    padding: 0.7rem 1rem; font-size: 0.875rem; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+    transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.miaw-card .sw-btn:active { transform: scale(0.98); }
+.miaw-card .sw-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+.miaw-card .sw-btn_teal {
+    background-color: var(--sw-teal); color: #04201c; border-color: var(--sw-teal);
+    box-shadow: 0 4px 12px rgba(20, 184, 166, 0.2);
+}
+.miaw-card .sw-btn_teal:hover { background-color: var(--sw-teal-hover); border-color: var(--sw-teal-hover); }
+.miaw-card .sw-btn_teal:active { background-color: var(--sw-teal-active); }
+.miaw-card .sw-btn_gold {
+    background-color: var(--sw-gold); color: #2a1e02; border-color: var(--sw-gold);
+}
+.miaw-card .sw-btn_gold:hover { background-color: var(--sw-gold-hover); border-color: var(--sw-gold-hover); }
+.miaw-card .sw-btn_ghost { background-color: #141b27; color: var(--sw-text-mute); }
+.miaw-card .sw-btn_ghost:hover { border-color: var(--sw-mute); color: var(--sw-text); }
+
+/* Text inputs (profile form) */
+.miaw-card .sw-input {
+    width: 100%; box-sizing: border-box;
+    background-color: var(--sw-input-bg); color: var(--sw-text);
+    border: 1px solid var(--sw-card-border); border-radius: 0.5rem;
+    padding: 0.6rem 0.75rem; font-size: 0.875rem; font-family: inherit;
+}
+.miaw-card .sw-input:focus { outline: none; border-color: var(--sw-teal); }
+.miaw-card .sw-label { display: block; font-size: 0.75rem; color: var(--sw-text-mute); margin-bottom: 0.25rem; }
+
+/* Success / aborted (seatmap + payment + profile share these) */
+.miaw-card .sw-success {
+    display: flex; align-items: center; gap: 0.75rem;
+    background-color: var(--sw-card-bg); border: 1px solid rgba(20, 184, 166, 0.4);
+    border-radius: var(--sw-radius); padding: 0.85rem 1rem; color: var(--sw-text);
+}
+.miaw-card .sw-success__icon { color: var(--sw-teal); font-weight: 700; font-size: 1.1rem; flex-shrink: 0; }
+.miaw-card .sw-success__title { font-size: 0.875rem; font-weight: 700; }
+.miaw-card .sw-success__sub { font-size: 0.75rem; color: var(--sw-text-mute); margin-top: 0.15rem; }
+.miaw-card .sw-aborted {
+    display: flex; align-items: center; gap: 0.6rem;
+    background-color: var(--sw-card-bg); border: 1px solid var(--sw-card-border);
+    border-radius: var(--sw-radius); padding: 0.85rem 1rem; color: var(--sw-text-mute);
+}
+.miaw-card .sw-aborted__icon { font-weight: 700; font-size: 1rem; flex-shrink: 0; }
+.miaw-card .sw-aborted__title { font-size: 0.875rem; font-weight: 600; }
+
+/* Shared processing animation (flying plane) — seatmap + payment */
+.miaw-card .sw-anim {
+    background-color: var(--sw-card-bg); border: 1px solid var(--sw-card-border);
+    border-radius: var(--sw-radius); padding: 1.5rem 1.125rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); color: var(--sw-text);
+    display: flex; flex-direction: column; gap: 0.75rem; align-items: center;
+}
+.miaw-card .sw-anim__sky { position: relative; width: 100%; height: 2.4rem; overflow: hidden; }
+.miaw-card .sw-anim__plane {
+    position: absolute; top: 0.2rem; left: 0; font-size: 1.7rem; color: var(--sw-text);
+    animation: swPlaneFly 1.8s linear infinite;
+}
+@keyframes swPlaneFly {
+    0%   { left: -10%; transform: translateY(0); opacity: 0; }
+    15%  { opacity: 1; }
+    50%  { transform: translateY(-6px); }
+    85%  { opacity: 1; }
+    100% { left: 105%; transform: translateY(0); opacity: 0; }
+}
+.miaw-card .sw-anim__caption { font-size: 0.8125rem; color: var(--sw-text-mute); letter-spacing: 0.02em; }
+
+/* ============================ SEATMAP ============================ */
+.miaw-card .sw-seat-cabin {
+    display: flex; flex-direction: column; gap: 0.3rem;
+    max-height: 14rem; overflow-y: auto; padding: 0.4rem 0.2rem;
+    background-color: rgba(6, 18, 42, 0.5); border-radius: 0.5rem;
+}
+.miaw-card .sw-seat-row { display: flex; align-items: center; gap: 0.3rem; justify-content: center; }
+.miaw-card .sw-seat-row__num { width: 1.4rem; font-size: 0.7rem; color: var(--sw-text-mute); text-align: right; flex-shrink: 0; }
+.miaw-card .sw-seat {
+    width: 2rem; height: 2rem; border-radius: 0.35rem; border: 1px solid var(--sw-card-border);
+    font-size: 0.65rem; font-weight: 600; font-family: inherit; cursor: pointer; color: var(--sw-text);
+    transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.1s ease;
+}
+.miaw-card .sw-seat:nth-child(4) { margin-left: 0.9rem; }
+.miaw-card .sw-seat_available { background-color: #15324f; }
+.miaw-card .sw-seat_available:hover { border-color: var(--sw-mute); transform: scale(1.05); }
+.miaw-card .sw-seat_selected { background-color: var(--sw-teal); border-color: var(--sw-teal); color: #04201c; box-shadow: 0 0 10px rgba(20, 184, 166, 0.5); }
+.miaw-card .sw-seat_current { background-color: transparent; border-color: var(--sw-teal); color: var(--sw-teal); }
+.miaw-card .sw-seat_current:hover { transform: scale(1.05); }
+.miaw-card .sw-seat_taken { background-color: #2a3340; color: #5c6b7e; border-color: transparent; cursor: not-allowed; }
+.miaw-card .sw-seat-legend { display: flex; gap: 0.85rem; flex-wrap: wrap; font-size: 0.7rem; color: var(--sw-text-mute); }
+.miaw-card .sw-seat-legend__item { display: inline-flex; align-items: center; gap: 0.3rem; }
+.miaw-card .sw-seat-swatch { width: 0.8rem; height: 0.8rem; border-radius: 0.2rem; display: inline-block; }
+.miaw-card .sw-seat-swatch_available { background-color: #15324f; border: 1px solid var(--sw-card-border); }
+.miaw-card .sw-seat-swatch_selected { background-color: var(--sw-teal); }
+.miaw-card .sw-seat-swatch_taken { background-color: #2a3340; }
+.miaw-card .sw-seat-selection { margin: 0; font-size: 0.8125rem; font-weight: 600; color: var(--sw-text); }
+.miaw-card .sw-seat-actions { display: flex; gap: 0.5rem; margin-top: 0.25rem; }
+.miaw-card .sw-seat-actions .sw-btn { flex: 1; }
+
+/* ============================ FLIGHT OPTIONS ============================ */
+.miaw-card .sw-flight-list { display: flex; flex-direction: column; gap: 0.625rem; }
+.miaw-card .sw-flight-card {
+    background-color: var(--sw-card-bg); border: 1px solid var(--sw-card-border);
+    border-radius: var(--sw-radius); padding: 0.875rem 1rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    display: flex; flex-direction: column; gap: 0.625rem; color: var(--sw-text);
+}
+.miaw-card .sw-flight-route { display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 0.75rem; }
+.miaw-card .sw-flight-endpoint { display: flex; flex-direction: column; line-height: 1.15; }
+.miaw-card .sw-flight-endpoint_arrival { text-align: right; align-items: flex-end; }
+.miaw-card .sw-flight-time { font-weight: 700; font-size: 1.0625rem; color: var(--sw-text); letter-spacing: -0.02em; }
+.miaw-card .sw-flight-airport { font-size: 0.8125rem; font-weight: 600; color: var(--sw-text-mute); margin-top: 0.125rem; letter-spacing: 0.04em; }
+.miaw-card .sw-flight-connector { position: relative; align-self: center; height: 1px; background-color: rgba(168, 188, 216, 0.3); margin: 0.5rem 0.25rem 0; }
+.miaw-card .sw-flight-connector__label { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background-color: var(--sw-card-bg); padding: 0 0.5rem; font-size: 0.6875rem; color: var(--sw-text-mute); text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; font-weight: 500; }
+.miaw-card .sw-flight-meta { display: flex; align-items: center; gap: 0.875rem; font-size: 0.75rem; color: var(--sw-text-mute); }
+.miaw-card .sw-flight-meta__item { display: inline-flex; align-items: center; gap: 0.25rem; }
+.miaw-card .sw-flight-meta__icon { font-size: 0.75rem; opacity: 0.7; }
+.miaw-card .sw-flight-card__footer { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; border-top: 1px solid var(--sw-card-divider); padding-top: 0.625rem; }
+.miaw-card .sw-flight-card__pricing { display: flex; flex-direction: column; gap: 0.125rem; line-height: 1.1; }
+.miaw-card .sw-fare-chip { font-size: 0.6875rem; font-weight: 600; color: var(--sw-text-mute); text-transform: uppercase; letter-spacing: 0.1em; }
+.miaw-card .sw-flight-price { font-size: 1.125rem; font-weight: 700; color: var(--sw-text); letter-spacing: -0.01em; }
+.miaw-card .sw-book-button { white-space: nowrap; }  /* uses .sw-btn .sw-btn_teal */
+
+/* ============================ PAYMENT ============================ */
+.miaw-card .sw-pay-options { display: flex; flex-direction: column; gap: 0.5rem; }
+.miaw-card .sw-pay-btn { display: flex; align-items: center; gap: 0.6rem; justify-content: center; }
+.miaw-card .sw-pay-btn__icon { font-size: 1rem; }
+.miaw-card .sw-pay-btn_apple { background-color: #000; color: #fff; border-color: #000; }
+.miaw-card .sw-pay-btn_card { background-color: var(--sw-input-bg); color: var(--sw-text); }
+/* Demo Pay is the real path — uses the gold variant to stand out. */
+
+/* ============================ PROFILE FORM ============================ */
+.miaw-card .sw-form-row { display: flex; flex-direction: column; gap: 0.25rem; }
+.miaw-card .sw-form-row_avatar { align-items: center; }
+.miaw-card .sw-avatar {
+    position: relative; width: 5rem; height: 5rem; border-radius: 50%;
+    background-color: var(--sw-input-bg); background-size: cover; background-position: center;
+    border: 1px dashed var(--sw-card-border); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; cursor: pointer; overflow: hidden;
+}
+.miaw-card .sw-avatar__icon { font-size: 1.3rem; }
+.miaw-card .sw-avatar__hint { font-size: 0.55rem; color: var(--sw-text-mute); margin-top: 0.1rem; text-align: center; }
+.miaw-card .sw-avatar__file { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.miaw-card .sw-form-consent { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.75rem; color: var(--sw-text-mute); cursor: pointer; }
+.miaw-card .sw-form-consent input { margin-top: 0.15rem; }
+.miaw-card .sw-form-submit { width: 100%; }  /* uses .sw-btn .sw-btn_teal */

@@ -290,9 +290,10 @@ async function loadEswSnippet(deviceId) {
                 postContactUpsert(csPayload);
             },
 
-            // Seat confirm: change the seat through the proof-cookie'd
-            // Heroku->Apex path (ownership-checked server-side), then the UI
-            // cues the agent "seat change confirmed" — ECv2-faithful.
+            // Card writes all go through the proof-cookie'd Heroku->Apex
+            // path (ownership-checked server-side); the UI cues the agent
+            // after each — ECv2-faithful (the LWCs did Apex + verify-cue).
+
             onSeatConfirm: async (sel) => {
                 const res = await fetch('/api/website/bookings/seat-by-id', {
                     method: 'POST',
@@ -304,6 +305,39 @@ async function loadEswSnippet(deviceId) {
                     })
                 });
                 if (!res.ok) throw new Error(`seat change ${res.status}`);
+                return res.json();
+            },
+
+            // Demo Pay: charge the booking. Route keys on the code in the URL.
+            onPay: async (sel) => {
+                const res = await fetch(`/api/website/bookings/${encodeURIComponent(sel.bookingCode)}/pay`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                if (!res.ok) throw new Error(`payment ${res.status}`);
+                return res.json();
+            },
+
+            // Profile save: reuse the existing PUT /profile route (handles
+            // text fields + avatar base64 + the avatar->public-URL pipeline).
+            onSaveProfile: async (data) => {
+                const body = {
+                    firstName: data.firstName, lastName: data.lastName,
+                    email: data.email, phone: data.phone
+                };
+                if (data.avatarBase64) {
+                    body.avatarBase64 = data.avatarBase64;
+                    body.avatarFileName = data.avatarFileName;
+                }
+                const res = await fetch('/api/website/profile', {
+                    method: 'PUT',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                if (!res.ok) throw new Error(`profile save ${res.status}`);
                 return res.json();
             }
         });

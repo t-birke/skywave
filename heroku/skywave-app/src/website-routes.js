@@ -438,6 +438,30 @@ export function buildWebsiteRouter({ allowedOrigin }) {
         }
     });
 
+    // ------- POST /bookings/:code/pay: Demo Pay on a booking -------
+    //
+    // Used by the custom MIAW chat client's payment card. Same proof-cookie
+    // + resolve pattern; the Apex shim verifies ownership before charging.
+    router.post('/bookings/:code/pay', requireProof, async (req, res) => {
+        const code = req.params.code;
+        if (!/^[A-Z0-9]{4,12}$/.test(code)) {
+            return res.status(400).json({ error: 'invalid_code' });
+        }
+        try {
+            const me = await apexInvoke('POST', '/skywave/website/resolve', {
+                deviceId: req.deviceId, trackingStatus: 'websdk'
+            });
+            const data = await apexInvoke('POST', '/skywave/website/bookings/manage/pay', {
+                contactId: me.contactId, bookingCode: code
+            });
+            res.json(data);
+        } catch (err) {
+            const status = err.response?.status ?? 500;
+            console.error('pay booking failed', status, err.response?.data ?? err.message);
+            res.status(status).json(err.response?.data ?? { error: 'payment_failed' });
+        }
+    });
+
     // ------- POST /session/abandon: stamp mid-funnel exit + partial survey -------
     //
     // Fired by the consumer site when the visitor X's the demo modal

@@ -9,6 +9,7 @@
 
 import { MiawClient } from './miaw-client.js';
 import { renderSeatMapCard } from './miaw-seatmap.js';
+import { renderFlightCard, renderPaymentCard, renderProfileCard } from './miaw-cards.js';
 
 const SEND_ICON = '<svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>';
 const CHAT_ICON = '<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>';
@@ -59,7 +60,7 @@ export class MiawUI {
 
     _injectStyles() {
         [['miaw-ui-css', '/assets/miaw-ui.css'],
-         ['miaw-seatmap-css', '/assets/miaw-seatmap.css']].forEach(([id, href]) => {
+         ['miaw-cards-css', '/assets/miaw-cards.css']].forEach(([id, href]) => {
             if (document.getElementById(id)) return;
             const link = document.createElement('link');
             link.id = id; link.rel = 'stylesheet'; link.href = href;
@@ -200,15 +201,33 @@ export class MiawUI {
         this._clearProgress();
         // Optional lead-in text from the ExperienceType message.
         if (c.message) this._renderMessage({ direction: 'inbound', text: c.message });
-        // Find each action-output value and render the matching card.
+        // Route each action-output value to the matching card renderer. We
+        // key on the action name in `type` (copilotActionOutput/<action>_<id>)
+        // — payment + profile share the `formData` output field, so the field
+        // name alone can't disambiguate.
         (c.values || []).forEach((v) => {
             const type = v.type || '';
+            const val = v.value || {};
             const card = document.createElement('div');
             card.className = 'miaw-card';
-            if (type.includes('present_seat_map') && v.value?.seatMapData?.seatMapJSON) {
-                renderSeatMapCard(card, v.value.seatMapData.seatMapJSON, {
-                    onConfirm: (sel) => this._confirmSeat(sel),
+
+            if (type.includes('present_seat_map') && val.seatMapData?.seatMapJSON) {
+                renderSeatMapCard(card, val.seatMapData.seatMapJSON, {
+                    onConfirm: (sel) => this._cardAction(() => this.opts.onSeatConfirm?.(sel), 'seat change confirmed'),
                     onAbort: () => this.client.sendText('seat change aborted')
+                });
+            } else if (type.includes('search_flights') && val.flightResult?.flightsJSON) {
+                renderFlightCard(card, val.flightResult.flightsJSON, {
+                    // Flight pick is a pure cue — the agent drives the booking.
+                    onBook: (flightNumber) => this.client.sendText(`Book flight ${flightNumber}`)
+                });
+            } else if (type.includes('present_payment_form') && val.formData?.paymentStateJSON) {
+                renderPaymentCard(card, val.formData.paymentStateJSON, {
+                    onPay: (sel) => this._cardAction(() => this.opts.onPay?.(sel), 'Payment completed')
+                });
+            } else if (type.includes('present_profile_form') && val.formData?.formStateJSON) {
+                renderProfileCard(card, val.formData.formStateJSON, {
+                    onSave: (data) => this._cardAction(() => this.opts.onSaveProfile?.(data), 'Profile created')
                 });
             } else {
                 // Unknown CLT — show its lead-in only; don't crash the demo.
@@ -220,17 +239,13 @@ export class MiawUI {
         this._scrollToEnd();
     }
 
-    // Seat confirm: do the Apex change via the host app's existing
-    // Heroku->Apex path (NOT the guest imperative call), then cue the agent
-    // exactly like the LWC did ("seat change confirmed").
-    async _confirmSeat(selection) {
-        try {
-            if (this.opts.onSeatConfirm) await this.opts.onSeatConfirm(selection);
-            await this.client.sendText('seat change confirmed');
-        } catch (e) {
-            console.error('[miaw-ui] seat confirm failed', e);
-            this._systemLine('Could not change the seat. Please try again.');
-        }
+    // Shared card-action runner: perform the upstream write (through the
+    // host app's proof-cookie'd Heroku->Apex path), then cue the agent —
+    // exactly the verify-only cue pattern the LWCs used. Rethrows so the
+    // card can show its own error state.
+    async _cardAction(upstream, cue) {
+        if (upstream) await upstream();
+        await this.client.sendText(cue);
     }
 
     // ---- typing / progress ----------------------------------------------

@@ -15,6 +15,11 @@
  *     against contactId before the change so the proof-cookie'd visitor can
  *     only edit their own segment.
  *
+ *   POST /services/apexrest/skywave/website/bookings/manage/pay
+ *     { "contactId": "003...", "bookingCode": "QLG6JJ" }
+ *     Used by the custom MIAW chat client's payment card (Demo Pay).
+ *     Ownership-checked, then delegates to Skywave_ProcessPayment.
+ *
  * Thin shim: route dispatch + JSON shaping. All domain logic lives in
  * Skywave_BookingEngine, which is the single source of truth shared
  * with the chat agent's path.
@@ -74,6 +79,25 @@ global with sharing class Skywave_WebsiteManageBooking {
             Skywave_BookingEngine.SeatChangeResult r =
                 Skywave_BookingEngine.changeSeatBySegmentId(segmentId, newSeat.toUpperCase());
             respondSeat(res, r);
+        } else if (action == 'pay') {
+            // Ownership gate: the booking must belong to the resolved contact.
+            List<Booking__c> owned = [
+                SELECT Id FROM Booking__c
+                WHERE Confirmation_Code__c = :bookingCode AND Contact__c = :contactId
+                LIMIT 1
+            ];
+            if (owned.isEmpty()) { errorOut(res, 404, 'booking_not_found'); return; }
+            Skywave_ProcessPayment.Result r =
+                Skywave_ProcessPayment.processPayment(bookingCode, 'Demo card');
+            if (!r.success) {
+                res.statusCode = 400;
+                res.responseBody = Blob.valueOf(JSON.serialize(new Map<String, Object>{
+                    'error' => 'payment_failed', 'message' => r.message }));
+                return;
+            }
+            res.statusCode = 200;
+            res.responseBody = Blob.valueOf(JSON.serialize(new Map<String, Object>{
+                'ok' => true, 'bookingCode' => r.bookingCode }));
         } else {
             errorOut(res, 400, 'unknown_action');
         }

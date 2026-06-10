@@ -172,9 +172,15 @@ Moving parts (all in `heroku/skywave-app/public/assets/`):
 - `miaw-ui.js` + `miaw-ui.css` — pixel-exact ECv2 chrome (frame geometry
   from the served `init.min.css`, animation keyframes lifted verbatim,
   colors driven at runtime from the `embedded-service-config` `branding[]`).
-- `miaw-seatmap.js` + `miaw-seatmap.css` — standalone port of the
-  `skywaveSeatMapRenderer` LWC; renders the CLT payload that arrives over
-  the wire as a `formatType:"ExperienceType"` message.
+  `_renderClt` routes each `formatType:"ExperienceType"` message to a card
+  renderer by the action name in `values[].type`.
+- `miaw-seatmap.js` + `miaw-cards.js` — standalone ports of the four CLT
+  renderer LWCs (seatmap, flight options, payment, profile form), rendering
+  the action-output JSON that arrives over the wire.
+- `miaw-cards.css` — **one shared stylesheet** for all four cards: design
+  tokens + primitives (`.sw-card`, `.sw-btn`, `.sw-input`, `.sw-success`,
+  `.sw-anim`, …) defined once. Replaces the per-LWC style duplication (each
+  LWC had re-declared the same `--sw-*` palette under its own prefix).
 - `site.js` `loadEswSnippet()` now boots `MiawUI` instead of the ECv2
   snippet (same name/signature; visibility logic unchanged).
 
@@ -183,11 +189,18 @@ conversation UUID, which the platform exposes as
 `Conversation.ConversationIdentifier` — exactly what `chat_start` already
 sends — so the existing PE-trigger resolution path works as-is.
 
-Seat confirm runs through the proof-cookie'd Heroku→Apex path
-(`POST /api/website/bookings/seat-by-id` → `…/manage/seatById` →
-`Skywave_BookingEngine.changeSeatBySegmentId`, ownership-checked), then the
-UI cues the agent `"seat change confirmed"` — same flow the LWC had, but the
-write no longer runs as the ESW guest user.
+CLT card actions run through the proof-cookie'd Heroku→Apex path, then the
+UI cues the agent (the same verify-only cue the LWCs sent), but the writes
+no longer run as the ESW guest user:
+- **seatmap** → `POST /api/website/bookings/seat-by-id` →
+  `…/manage/seatById` → `changeSeatBySegmentId` → cue `"seat change confirmed"`
+- **payment** → `POST /api/website/bookings/:code/pay` → `…/manage/pay` →
+  `Skywave_ProcessPayment` → cue `"Payment completed"`
+- **profile** → `PUT /api/website/profile` (existing route) → cue `"Profile created"`
+- **flight pick** → cue-only `"Book flight <n>"` (the agent drives the booking)
+
+The two new `manage/*` Apex actions verify booking ownership against the
+resolved contact before writing.
 
 Reference assets + the recovered styling spec live in `docs/ecv2-reference/`.
 
