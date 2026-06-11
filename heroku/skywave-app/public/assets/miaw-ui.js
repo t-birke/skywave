@@ -180,6 +180,16 @@ export class MiawUI {
         if (this._sending) return;
         const text = this.input.value.trim();
         if (!text) return;
+        // iOS Safari can deliver a second send for one tap AFTER the first
+        // fully resolves (touch + the ~300ms-delayed synthesized click), by
+        // which point _sending is already back to false. Guard on the exact
+        // text within a short window too, so a duplicate first message can't
+        // slip through. (Legitimate repeat sends of the same text >1.5s apart
+        // still go through.)
+        const now = (performance && performance.now) ? performance.now() : 0;
+        if (this._lastSentText === text && (now - (this._lastSentAt || 0)) < 1500) return;
+        this._lastSentText = text;
+        this._lastSentAt = now;
         this._sending = true;
         this.input.value = '';
         this._autoGrow();

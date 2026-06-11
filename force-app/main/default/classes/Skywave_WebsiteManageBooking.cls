@@ -46,7 +46,12 @@ global with sharing class Skywave_WebsiteManageBooking {
         String contactId = String.valueOf(body.get('contactId'));
         String bookingCode = String.valueOf(body.get('bookingCode'));
         if (String.isBlank(contactId)) { errorOut(res, 400, 'missing_contactId'); return; }
-        if (String.isBlank(bookingCode)) { errorOut(res, 400, 'missing_bookingCode'); return; }
+        // bookingCode is required by cancel/seat/pay (they key on it), but NOT
+        // by seatById (which keys on bookingSegmentId). Each branch validates
+        // its own inputs below.
+        if (String.isBlank(bookingCode) && action != 'seatById') {
+            errorOut(res, 400, 'missing_bookingCode'); return;
+        }
 
         if (action == 'cancel') {
             Skywave_BookingEngine.CancelResult r =
