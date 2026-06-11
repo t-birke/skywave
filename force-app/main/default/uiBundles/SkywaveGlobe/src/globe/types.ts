@@ -19,6 +19,8 @@ export interface GlobeMarker {
   /** Optional secondary line shown in the hover tooltip. */
   sublabel?: string;
   status: MarkerStatus;
+  /** Optional avatar image rendered as an always-on sprite on the dot. */
+  avatarUrl?: string | null;
 }
 
 export interface GlobeArcData {

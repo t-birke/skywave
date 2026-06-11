@@ -1,33 +1,60 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { HoloGlobe } from '@/globe/HoloGlobe';
-import { latLngToArray } from '@/globe/data/geo';
-import type { GlobeMarker } from '@/globe/types';
+import { toMarkers, toArcs, type Visitor } from '@/data/visitors';
 
-const GLOBE_RADIUS = 1;
+// Placeholder visitors — replaced by the live Skywave feed in a later step.
+// Avatar images use a deterministic public source just for local preview.
+const av = (seed: string) => `https://i.pravatar.cc/80?u=${seed}`;
 
-// Placeholder markers — replaced by live Skywave session data in a later step.
-const DEMO_POINTS: { id: string; lat: number; lng: number; label: string; status: GlobeMarker['status'] }[] = [
-  { id: 'jfk', lat: 40.6413, lng: -73.7781, label: 'JFK', status: 'active' },
-  { id: 'lhr', lat: 51.47, lng: -0.4543, label: 'LHR', status: 'active' },
-  { id: 'nbo', lat: -1.3192, lng: 36.9278, label: 'NBO', status: 'idle' },
-  { id: 'sin', lat: 1.3644, lng: 103.9915, label: 'SIN', status: 'alert' },
+const DEMO_VISITORS: Visitor[] = [
+  {
+    sessionId: 'sess-amelia',
+    firstName: 'Amelia',
+    lastName: 'Cruz',
+    avatarUrl: av('amelia'),
+    seat: '14A',
+    route: { legs: [{ from: 'LAX', to: 'JFK' }, { from: 'JFK', to: 'NBO' }], isConnection: true },
+  },
+  {
+    sessionId: 'sess-ben',
+    firstName: 'Ben',
+    lastName: 'Okafor',
+    avatarUrl: av('ben'),
+    seat: '2C',
+    route: { legs: [{ from: 'LHR', to: 'JFK' }], isConnection: false },
+  },
+  {
+    sessionId: 'sess-chen',
+    firstName: 'Chen',
+    avatarUrl: av('chen'),
+    city: 'Singapore',
+    lat: 1.3521,
+    lon: 103.8198,
+  },
+  {
+    sessionId: 'sess-dara',
+    firstName: 'Dara',
+    avatarUrl: av('dara'),
+    city: 'São Paulo',
+    lat: -23.55,
+    lon: -46.63,
+    alert: true,
+  },
 ];
 
 export default function Home() {
-  const markers = useMemo<GlobeMarker[]>(
-    () =>
-      DEMO_POINTS.map(p => ({
-        id: p.id,
-        position: latLngToArray(p.lat, p.lng, GLOBE_RADIUS * 1.01),
-        label: p.label,
-        status: p.status,
-      })),
-    []
-  );
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const markers = useMemo(() => toMarkers(DEMO_VISITORS), []);
+  const arcs = useMemo(() => toArcs(DEMO_VISITORS), []);
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#0a0e1a' }}>
-      <HoloGlobe markers={markers} />
+      <HoloGlobe
+        markers={markers}
+        arcs={arcs}
+        selectedId={selectedId}
+        onSelectMarker={id => setSelectedId(prev => (prev === id ? null : id))}
+      />
     </div>
   );
 }

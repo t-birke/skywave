@@ -16,6 +16,7 @@ interface GlobeMarkerProps {
   position: [number, number, number];
   label: string;
   sublabel?: string;
+  avatarUrl?: string | null;
   selected: boolean;
   dimmed: boolean;
   onSelect: (id: string) => void;
@@ -27,6 +28,7 @@ export function GlobeMarker({
   position,
   label,
   sublabel,
+  avatarUrl,
   selected,
   dimmed,
   onSelect,
@@ -100,18 +102,46 @@ export function GlobeMarker({
         <meshBasicMaterial transparent opacity={0} depthWrite={false} depthTest={false} />
       </mesh>
 
-      {/* Visible dot */}
-      <mesh ref={dotRef}>
-        <sphereGeometry args={[dotSize, 12, 12]} />
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={1}
-          toneMapped={false}
-          depthTest={false}
-          depthWrite={false}
-        />
-      </mesh>
+      {/* Visible dot — hidden when an avatar sprite stands in for it. */}
+      {!avatarUrl && (
+        <mesh ref={dotRef}>
+          <sphereGeometry args={[dotSize, 12, 12]} />
+          <meshBasicMaterial
+            color={color}
+            transparent
+            opacity={1}
+            toneMapped={false}
+            depthTest={false}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+
+      {/* Always-on avatar sprite, ringed in the status color. */}
+      {avatarUrl && (
+        <Html center style={{ pointerEvents: 'none' }} position={[0, 0, 0]}>
+          <div
+            style={{
+              width: selected ? '34px' : '26px',
+              height: selected ? '34px' : '26px',
+              borderRadius: '50%',
+              border: `2px solid ${color}`,
+              boxShadow: `0 0 8px ${color}`,
+              overflow: 'hidden',
+              background: '#0d1117',
+              opacity: dimmed ? 0.35 : 1,
+              transition: 'width 0.2s, height 0.2s',
+            }}
+          >
+            <img
+              src={avatarUrl}
+              alt=""
+              referrerPolicy="no-referrer"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
+          </div>
+        </Html>
+      )}
 
       {/* Outer ring */}
       <mesh ref={ringRef}>
@@ -143,12 +173,12 @@ export function GlobeMarker({
         </mesh>
       )}
 
-      {/* Persistent label */}
+      {/* Persistent label — pushed clear of the avatar sprite when present. */}
       {!dimmed && (
         <Html
           center
           style={{ pointerEvents: 'none', whiteSpace: 'nowrap' }}
-          position={[0, -0.06, 0]}
+          position={[0, avatarUrl ? -0.1 : -0.06, 0]}
         >
           <div
             style={{

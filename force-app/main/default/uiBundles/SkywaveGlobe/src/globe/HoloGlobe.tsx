@@ -232,6 +232,7 @@ export function HoloGlobe({
               position={m.position}
               label={m.label}
               sublabel={m.sublabel}
+              avatarUrl={m.avatarUrl}
               selected={m.id === selectedId}
               dimmed={selectedId != null && m.id !== selectedId}
               onSelect={onSelectMarker ?? (() => {})}
