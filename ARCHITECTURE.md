@@ -153,8 +153,9 @@ Key non-obvious points (each is a memory entry):
 
 ### 3a''. Chat transport: custom MIAW client (branch `custom-chat-client`)
 
-> Status: on the `custom-chat-client` branch, not yet on `main`. `main`
-> still embeds the official ECv2 widget.
+> Status: on the `custom-chat-client` branch, deployed to the `skywave-app`
+> dyno. `main` still embeds the official ECv2 widget; merge after the live
+> iPhone sign-off.
 
 The official ECv2 embedded client dies on **iOS Safari** in a "too many HTTP
 redirects" loop: its session cookie is set on `*.my.site.com` but the host
@@ -166,16 +167,11 @@ auth JWT comes back in the response *body* and lives in first-party
 `localStorage` on the Heroku origin — nothing for ITP to block, no redirect.
 
 Moving parts (all in `heroku/skywave-app/public/assets/` unless noted):
-- `miaw-client.js` — transport on the official custom-client surface
-  `/iamessage/api/v2`: `access-token` → `conversation` → SSE receive (via
-  `fetch`+`ReadableStream`; `EventSource` can't set the required
-  `Authorization`/`X-Org-Id` headers) → `message` → `DELETE`. Uses the
-  **authenticated** token endpoint when an identity token is available
-  (see Identity below), else the unauthenticated one.
-- `src/miaw-identity.js` + route `GET /api/website/chat-identity-token` —
-  mints the RS256 `customerIdentityToken` (sub=deviceId) used for verified
-  identity. Private key in `.secrets/` / Heroku config var; public JWK in the
-  org Keyset.
+- `miaw-client.js` — transport on `/iamessage/v1` against the **Web**
+  deployment (`Skywave_MIAW`): unauth `accessToken` → `conversation` → SSE
+  receive (via `fetch`+`ReadableStream`; `EventSource` can't set the required
+  `Authorization`/`X-Org-Id` headers) → `message` → `DELETE`. The unauth token
+  comes back in the response body → first-party `localStorage` (the iOS fix).
 - `miaw-ui.js` + `miaw-ui.css` — pixel-exact ECv2 chrome (frame geometry
   from the served `init.min.css`, animation keyframes lifted verbatim,
   colors driven at runtime from the `embedded-service-config` `branding[]`).
@@ -191,32 +187,41 @@ Moving parts (all in `heroku/skywave-app/public/assets/` unless noted):
 - `site.js` `loadEswSnippet()` now boots `MiawUI` instead of the ECv2
   snippet (same name/signature; visibility logic unchanged).
 
-**Identity — MIAW User Verification (the do-it-right rail).** The custom
-client requires a Custom Client (`deploymentType=api`) Embedded Service
-deployment (`Skywave_MIAW_Api`). On conversation start the client fetches a
-server-signed JWT (`customerIdentityToken`, `sub=<deviceId>`) from the
-proof-gated `/api/website/chat-identity-token` and passes it to the
-authenticated access-token endpoint. Salesforce verifies it against the
-`Skywave_Identity_Keyset` (the channel's `embeddedConfig/authMode=Auth`) and
-stamps `sub` onto `MessagingEndUser.MessagingPlatformKey` as
-`v2/iamessage/AUTH/Skywave_Identity/uid:<deviceId>`. The agent's
-`@MessagingEndUser.MessagingPlatformKey` linked variable feeds
-`Skywave_ResolveSession`, which extracts the deviceId and resolves the
-Contact by `Session_Id__c` — **the same key the website resolver and the
-upsert trigger use**, so the agent and website resolve the identical Contact.
-This unifies identity on the stable deviceId (survives new conversations and
-devices) and is why the seat/payment ownership checks pass.
+> **Why the Web deployment and NOT the Custom Client (`api`) API?** Verified
+> live: **CLTs only render on the Web/v1 path** — the agent returns them as
+> `formatType:"ExperienceType"` carrying the full `seatMapJSON` our renderers
+> consume. The custom-client `/api/v2` deployment **flattens every CLT to
+> plain text** (CLT rendering is delegated to the Lightning runtime, which the
+> raw API never invokes — the structured payload is absent from the response
+> entirely). Since the CLT cards are the demo centerpiece, Web/v1 wins. The
+> iOS fix is independent of the deployment type (it's the first-party token).
 
-> Why not routing attributes / a prechat field? Empirically proven (v1 & v2,
-> Web & API deployments, with a corrected flow) that `routingAttributes`
-> never reach the session-handler flow — the platform doesn't hydrate the
-> flow input. User Verification is the supported mechanism. Legacy
-> `chat_start` → `Conversation.ConversationIdentifier` →
-> `Skywave_Conversation_Id__c` remains only as a resolver fallback.
+**Identity — deviceId via the `chat_ready` handshake.** On conversation open
+the client POSTs `chat_start` (deviceId + the client conversation UUID) to
+`Skywave_ContactUpsert` → PE → `Skywave_Contact_Update_Trigger`, which upserts
+the Contact (keyed on `Session_Id__c = deviceId`) and stamps
+`Skywave_Conversation_Id__c` (resolving the UUID to the internal
+`Conversation.ConversationIdentifier`). **After committing that stamp**, the
+trigger publishes a `Demo_State_Change__e(Client_Action__c='chat_ready',
+Target_Session_Id__c=deviceId)`; the relay fans it to the client over WS, and
+`MiawUI` **gates the visitor's first message** on it (4s safety timeout). This
+guarantees the stamp lands *before* the agent's turn-1 `resolve_session` runs,
+so it resolves THIS device's Contact instead of racing into the
+`Skywave_Demo_Seed__c` fallback. The agent and website both resolve the same
+deviceId-keyed Contact, so the seat/payment ownership checks pass.
+`Skywave_ResolveSession` resolves by `Session_Id__c` (deviceId) first, then by
+`Skywave_Conversation_Id__c`, then demo-seed, then mint.
 
-> Note: User Verification works on **external websites** (our Heroku app) —
-> NOT Experience Builder/Commerce sites. The custom-client-on-Heroku route is
-> what makes it available.
+> Dead ends ruled out (kept here so we don't revisit): (1) `routingAttributes`
+> / hidden prechat never reach the session-handler flow — the platform doesn't
+> hydrate the flow input (proven v1 & v2). (2) **MIAW User Verification**
+> (authenticated token + `customerIdentityToken` sub=deviceId →
+> `MessagingPlatformKey`) DOES unify identity cleanly and is the "proper"
+> rail — but it requires the Custom Client (`api`) deployment, which flattens
+> CLTs. Auth mode is a single shared channel flag, so verified-identity and
+> CLT rendering are mutually exclusive on one channel. The keypair +
+> `src/miaw-identity.js` + the Keyset are parked (gitignored key in
+> `.secrets/`) in case CLT support reaches the API path (e.g. AXL).
 
 CLT card actions run through the proof-cookie'd Heroku→Apex path, then the
 UI cues the agent (the same verify-only cue the LWCs sent), but the writes
