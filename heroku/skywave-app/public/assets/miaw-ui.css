@@ -2,11 +2,15 @@
  * miaw-ui.css — pixel-exact ECv2 look & feel for the custom chat client.
  *
  * Values are NOT invented: frame chrome is transcribed from the served
- * init.min.css, keyframes are verbatim from the home_view LWR bundle, and
- * colors come from the embedded-service-config branding[] (resolved at
- * runtime into the --miaw-* custom properties below; the defaults here are
- * the current Skywave_MIAW values so it looks right even before config
- * loads). See docs/ecv2-reference/ECV2_LOOK_AND_FEEL.md.
+ * init.min.css; the FAB pill, header, agent-avatar rows, sender/timestamp
+ * metadata, centered system lines and the dual-ring "Thinking" spinner are
+ * recovered VERBATIM from the live ECv2 home_view LWR bundle (icon glyphs
+ * confirmed by rendering each to PNG). Colors come from the
+ * embedded-service-config branding[] (resolved at runtime into the --miaw-*
+ * custom properties below; the defaults here are the current Skywave_MIAW
+ * values so it looks right even before config loads). See
+ * docs/ecv2-reference/ECV2_LOOK_AND_FEEL.md and
+ * docs/ecv2-reference/raw-assets/icons-and-affordances.json.
  *
  * Goal: visually indistinguishable from real ECv2, because in production
  * we'd ship real ECv2 behind a custom domain.
@@ -31,7 +35,6 @@
     --miaw-font: Arial, sans-serif;
 
     /* Geometry — from init.min.css (frame chrome). */
-    --miaw-button-w: 214px;
     --miaw-button-h: 56px;
     --miaw-panel-w: 480px;
     --miaw-panel-h: 742px;
@@ -49,26 +52,46 @@
     font-family: var(--miaw-font);
 }
 
-/* Launch button (FAB) — pill, header color, fades in like ECv2's fab. */
+/* Launch button (FAB) — recovered from ECv2 .chat-fab-container: pill,
+   height 56px, border-radius 20px, 0.5rem padding, the exact shadow. */
 .miaw-fab {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    justify-content: center;
     height: var(--miaw-button-h);
-    padding: 0 20px;
+    padding: 0.5rem;
     border: none;
-    border-radius: 9999px;
-    background: var(--miaw-button-bg);
+    border-radius: 20px;
+    background-color: var(--miaw-button-bg);
     color: var(--miaw-header-fg);
     font-family: var(--miaw-font);
-    font-size: 16px;
-    font-weight: 700;
     cursor: pointer;
-    box-shadow: 2px 2px 20px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 300ms ease-in-out;
     animation: fabFadeInWithDelay 0.3s ease 0.2s both;
 }
-.miaw-fab:hover { filter: brightness(1.1); }
-.miaw-fab svg { width: 24px; height: 24px; fill: currentColor; }
+/* .chat-fab-content: icon + text in a row, gap 16px, side margins 1rem. */
+.miaw-fab__icon {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 1rem;
+}
+.miaw-fab__icon svg { width: 22px; height: 22px; fill: currentColor; }
+.miaw-fab__text {
+    margin-right: 1rem;
+    margin-left: 16px;
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: 0.02px;
+    white-space: nowrap;
+    user-select: none;
+}
+.miaw-fab:hover { filter: brightness(1.12); }
+.miaw-fab:focus-visible {
+    outline: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1),
+        inset 0 0 0 2px #939393, inset 0 0 0 4px #ffffff;
+}
 
 /* The chat panel. Hidden (0×0) when closed; transitions to full size. */
 .miaw-panel {
@@ -116,23 +139,81 @@
 
 /* ============================== HEADER ============================== */
 .miaw-header {
+    position: relative;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
-    padding: 16px 20px;
+    padding: 16px 18px;
     background: var(--miaw-header-bg);
     color: var(--miaw-header-fg);
     flex: 0 0 auto;
 }
-.miaw-header .miaw-title { font-size: 16px; font-weight: 700; flex: 1; }
-.miaw-header .miaw-close {
-    background: none; border: none; color: var(--miaw-header-fg);
-    cursor: pointer; padding: 4px; font-size: 20px; line-height: 1;
-    opacity: 0.9;
+.miaw-header__brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
 }
-.miaw-header .miaw-close:hover { opacity: 1; }
+.miaw-header__icon { display: inline-flex; align-items: center; }
+.miaw-header__icon svg { width: 24px; height: 24px; fill: currentColor; }
+.miaw-header .miaw-title {
+    font-size: 19px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.miaw-header__actions { display: inline-flex; align-items: center; gap: 6px; }
+.miaw-iconbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px; height: 36px;
+    border: none; border-radius: 9999px;
+    background: transparent;
+    color: var(--miaw-header-fg);
+    cursor: pointer;
+    opacity: 0.95;
+    transition: background-color 0.15s ease;
+}
+.miaw-iconbtn:hover { background: rgba(255, 255, 255, 0.14); opacity: 1; }
+.miaw-menu-btn svg { width: 20px; height: 20px; fill: currentColor; }
+.miaw-min-btn svg { width: 22px; height: 22px; fill: currentColor; }
 
-/* ============================ MESSAGE LIST ============================ */
+/* End-chat popover — dark card hanging under the kebab, like ECv2. */
+.miaw-menu {
+    position: absolute;
+    top: calc(100% - 6px);
+    right: 46px;
+    min-width: 200px;
+    background: var(--miaw-header-bg);
+    color: var(--miaw-header-fg);
+    border-radius: 10px;
+    box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.35), 0 4px 12px -2px rgba(0, 0, 0, 0.25);
+    padding: 6px;
+    z-index: 5;
+    animation: slide-in-tr 0.15s ease forwards;
+}
+.miaw-menu[hidden] { display: none; }
+.miaw-menu__item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: var(--miaw-header-fg);
+    font-family: var(--miaw-font);
+    font-size: 16px;
+    padding: 12px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.miaw-menu__item:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* ====================== BODY (messages + welcome) ====================== */
+.miaw-body { position: relative; flex: 1 1 auto; min-height: 0; display: flex; }
+
 .miaw-messages {
     flex: 1 1 auto;
     overflow-y: auto;
@@ -140,13 +221,64 @@
     padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;
     background: #FFFFFF;
 }
 
+/* ---- launching "hello" (centered, pulsing) ---- */
+.miaw-welcome {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    pointer-events: none;
+    background: #FFFFFF;
+}
+.miaw-welcome[hidden] { display: none; }
+.miaw-welcome__icon svg {
+    width: 56px; height: 56px;
+    color: var(--miaw-primary-text);
+    fill: currentColor;
+}
+.miaw-welcome__hi {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--miaw-primary-text);
+    animation: miaw-hello-pulse 1.4s ease-in-out infinite;
+}
+
+/* ---- message rows: avatar (inbound) + bubble column ---- */
+.miaw-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    max-width: 100%;
+}
+.miaw-row.inbound { align-self: stretch; }
+.miaw-row.outbound { align-self: flex-end; flex-direction: column; align-items: flex-end; }
+
+/* Agent avatar to the LEFT of inbound bubbles (the person+sparkle glyph). */
+.miaw-avatar {
+    flex: 0 0 auto;
+    width: 28px; height: 28px;
+    margin-top: 2px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--miaw-primary-text);
+}
+.miaw-avatar svg { width: 26px; height: 26px; fill: currentColor; }
+
+.miaw-col { display: flex; flex-direction: column; min-width: 0; max-width: 100%; }
+.miaw-row.inbound .miaw-col { align-items: flex-start; }
+.miaw-row.outbound .miaw-col { align-items: flex-end; }
+
 /* Each bubble enters with the exact ECv2 fadeInUp. */
 .miaw-msg {
-    max-width: 80%;
+    max-width: 100%;
     padding: 10px 14px;
     border-radius: 16px;
     font-size: 15px;
@@ -158,13 +290,11 @@
     animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 .miaw-msg.inbound {
-    align-self: flex-start;
     background: var(--miaw-agent-bg);
     color: var(--miaw-agent-fg);
     border-bottom-left-radius: 4px;
 }
 .miaw-msg.outbound {
-    align-self: flex-end;
     background: var(--miaw-user-bg);
     color: var(--miaw-user-fg);
     border-bottom-right-radius: 4px;
@@ -172,46 +302,79 @@
 .miaw-msg a { color: var(--miaw-agent-link); }
 .miaw-msg.outbound a { color: var(--miaw-user-fg); text-decoration: underline; }
 
+/* Sender · time / Sent · time metadata line under each bubble. */
+.miaw-meta {
+    margin: 3px 2px 6px 2px;
+    font-size: 13px;
+    color: var(--miaw-secondary-text);
+    line-height: 1rem;
+}
+
+/* ---- centered system / event lines ---- */
+.miaw-sysblock { margin: 12px 0; }
+.miaw-sysline {
+    align-self: center;
+    text-align: center;
+    color: var(--miaw-secondary-text);
+    font-size: 13px;
+    line-height: 1rem;
+    margin: 4px 0;
+}
+
 /* CLT card container (seatmap etc.) — full-width, no bubble chrome. */
 .miaw-card {
     align-self: stretch;
     max-width: 100%;
+    margin: 4px 0;
     opacity: 0;
     transform: translateY(20px);
     animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* ========================= TYPING INDICATOR ========================= */
-.miaw-typing {
+/* ===================== "THINKING" SPINNER (verbatim ECv2) ===================== */
+/* Recovered from cwc-progress-indicator: dual counter-rotating rings + label,
+   sitting bottom-left in the transcript (just above the composer). */
+.miaw-thinking {
     align-self: flex-start;
     display: flex;
-    gap: 4px;
-    padding: 12px 14px;
-    background: var(--miaw-agent-bg);
-    border-radius: 16px;
-    border-bottom-left-radius: 4px;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 6px 0 2px 0;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
-.miaw-typing .dot {
-    width: 8px; height: 8px; border-radius: 9999px;
-    background-color: var(--miaw-secondary-text);
-    opacity: 0; transform: scale(0);
-    animation: dot-pop-in 400ms cubic-bezier(0, 0.7, 0.2, 1) forwards;
+.miaw-spinner {
+    position: relative;
+    flex-shrink: 0;
+    height: 1.75rem;
+    width: 1.75rem;
+    border-radius: 0.375rem;
+    background-color: #fff;
 }
-/* staggered, then gently looped via the jump bob like ECv2 */
-.miaw-typing .dot:nth-child(1) { animation-delay: 0ms; }
-.miaw-typing .dot:nth-child(2) { animation-delay: 120ms; }
-.miaw-typing .dot:nth-child(3) { animation-delay: 240ms; }
-.miaw-typing.settled .dot { animation: jump 1s ease-in-out infinite; opacity: 1; transform: none; }
-.miaw-typing.settled .dot:nth-child(2) { animation-delay: 0.15s; }
-.miaw-typing.settled .dot:nth-child(3) { animation-delay: 0.3s; }
-
-/* progress line ("Checking your flights") */
-.miaw-progress {
-    align-self: flex-start;
-    font-size: 13px;
+.miaw-spinner__outer {
+    position: absolute;
+    inset: 0;
+    height: 1.75rem; width: 1.75rem;
+    border-radius: 50%;
+    border: 2px solid var(--miaw-secondary-text);
+    clip-path: polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 50%);
+    animation: spinClockwise 1.5s linear infinite;
+}
+.miaw-spinner__inner {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    height: 1rem; width: 1rem;
+    border-radius: 50%;
+    border: 2px solid var(--miaw-secondary-text);
+    border-bottom-color: transparent;
+    clip-path: inset(0 0 50% 0);
+    animation: spinCounterClockwise 2s linear infinite;
+}
+.miaw-thinking__label {
+    font-size: 0.95rem;
     color: var(--miaw-secondary-text);
-    font-style: italic;
-    padding: 2px 4px;
 }
 
 /* ============================== FOOTER ============================== */
@@ -228,10 +391,10 @@
     flex: 1;
     resize: none;
     max-height: 96px;
-    min-height: 40px;
-    padding: 10px 14px;
+    min-height: 44px;
+    padding: 11px 16px;
     border: 1px solid var(--miaw-input-outline);
-    border-radius: 20px;
+    border-radius: 9999px;
     font-family: var(--miaw-font);
     font-size: 15px;
     line-height: 1.3;
@@ -240,7 +403,7 @@
 .miaw-input:focus { border-color: var(--miaw-primary-btn-bg); }
 .miaw-send {
     flex: 0 0 auto;
-    width: 40px; height: 40px;
+    width: 44px; height: 44px;
     border: none; border-radius: 9999px;
     background: var(--miaw-primary-btn-bg);
     color: var(--miaw-primary-btn-fg);
@@ -251,40 +414,37 @@
 .miaw-send svg { width: 20px; height: 20px; fill: currentColor; }
 
 /* ===================== ANIMATIONS (verbatim ECv2) ===================== */
-/* Lifted from docs/ecv2-reference/raw-assets/keyframes-decoded.css —
-   values exactly as the real client defines them. */
-@keyframes dot-pop-in {
-    0% { transform: scale(0); opacity: 0; }
-    50% { transform: scale(1.2); opacity: 1; }
-    100% { transform: scale(1); opacity: 1; }
-}
+/* Lifted from docs/ecv2-reference/raw-assets/keyframes-decoded.css and the
+   home_view progress-indicator stylesheet — values exactly as the real
+   client defines them. */
 @keyframes fadeInUp {
     to { opacity: 1; transform: translateY(0); }
-}
-@keyframes fadeOutDown {
-    from { opacity: 1; transform: translateY(0); }
-    to { opacity: 0; transform: translateY(20px); }
 }
 @keyframes fabFadeInWithDelay {
     from { opacity: 0; }
     to { opacity: 1; }
 }
-@keyframes container-fade-out {
-    from { opacity: 1; }
-    to { opacity: 0; }
+@keyframes slide-in-tr {
+    0% { transform: translate(10px, -10px); opacity: 0; }
+    100% { transform: translate(0, 0); opacity: 1; }
 }
-@keyframes jump {
-    0%, 60%, 100% { transform: translateY(0); }
-    30% { transform: translateY(-4px); }
+@keyframes spinClockwise {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
-@keyframes shimmer {
-    from { background-position: 200% 0; }
-    to { background-position: -200% 0; }
+@keyframes spinCounterClockwise {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(-360deg); }
+}
+@keyframes miaw-hello-pulse {
+    0%, 100% { opacity: 0.45; transform: scale(0.98); }
+    50% { opacity: 1; transform: scale(1.02); }
 }
 
 /* Accessibility: honor reduced-motion exactly like ECv2 does. */
 @media (prefers-reduced-motion: reduce) {
-    .miaw-fab, .miaw-msg, .miaw-card, .miaw-typing .dot, .miaw-panel {
+    .miaw-fab, .miaw-msg, .miaw-card, .miaw-thinking, .miaw-panel,
+    .miaw-welcome__hi, .miaw-spinner__outer, .miaw-spinner__inner, .miaw-menu {
         animation: none !important;
         transition: none !important;
         opacity: 1 !important;

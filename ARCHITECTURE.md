@@ -176,7 +176,20 @@ Moving parts (all in `heroku/skywave-app/public/assets/` unless noted):
   from the served `init.min.css`, animation keyframes lifted verbatim,
   colors driven at runtime from the `embedded-service-config` `branding[]`).
   `_renderClt` routes each `formatType:"ExperienceType"` message to a card
-  renderer by the action name in `values[].type`.
+  renderer by the action name in `values[].type`. The ECv2 affordances are
+  recovered VERBATIM from the live `home_view` LWR bundle (re-pull via the
+  steps in `ECV2_LOOK_AND_FEEL.md`; cached in
+  `raw-assets/icons-and-affordances.json`): the FAB pill ("Ask Me Anything" +
+  speech-bubble glyph), the header (bubble glyph + kebab→"End chat" menu +
+  chevron-down minimize), the person+sparkle agent avatar left of inbound
+  bubbles, per-message sender/timestamp metadata ("…Agent · 5:12 PM" /
+  "Sent · …"), centered system lines ("Switched to text", "<agent> joined",
+  "Just now"), the launching "hello" state, and the dual counter-rotating
+  ring "Thinking" spinner (`spinClockwise`/`spinCounterClockwise`). Icon path
+  data was confirmed by rendering each glyph to PNG. The composer keeps a
+  paper-plane send (we don't support the ECv2 voice waveform). Strings that
+  are deployment-configured (button label, placeholder, header title) are NOT
+  in the bundle — taken from the client screenshots.
 - `miaw-seatmap.js` + `miaw-cards.js` — standalone ports of the four CLT
   renderer LWCs (seatmap, flight options, payment, profile form), rendering
   the action-output JSON that arrives over the wire. On reload the transcript

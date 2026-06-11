@@ -273,7 +273,7 @@ async function loadEswSnippet(deviceId) {
             developerName: esw.escName,
             scrt2Url: esw.scrt2Url,
             deviceId,
-            title: 'Skywave Airlines',
+            title: 'Skywave Airlines Agent',
 
             // Conversation opened: stamp identity via the existing trigger
             // path (carry IP geo too, exactly like the old ConversationStarted

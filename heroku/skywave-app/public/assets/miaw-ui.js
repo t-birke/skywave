@@ -1,9 +1,16 @@
 // miaw-ui.js — pixel-exact ECv2 chat UI over the MiawClient transport.
 //
-// Renders the launch button, panel, header, message bubbles, typing
-// indicator and composer in plain DOM, styled by miaw-ui.css to be visually
-// indistinguishable from the real ECv2 widget. Subscribes to MiawClient
-// events and renders custom Lightning type cards (the seatmap) inline.
+// Renders the launch button, panel, header (with End-chat menu + minimize),
+// agent-avatar message rows, sender/timestamp labels, centered system lines,
+// the launching "hello" state and the dual-ring "Thinking" spinner — all in
+// plain DOM, styled by miaw-ui.css to be visually indistinguishable from the
+// real ECv2 widget.
+//
+// The glyphs and the affordance CSS are NOT invented: they were recovered
+// verbatim from the live ECv2 `home_view` LWR bundle (icon paths confirmed by
+// rendering each to PNG). See docs/ecv2-reference/raw-assets/
+// icons-and-affordances.json. The few strings that are deployment-configured
+// (button label, placeholder, header title) come from the client screenshots.
 //
 // No framework, no build step — matches the rest of the consumer site.
 
@@ -11,8 +18,15 @@ import { MiawClient } from './miaw-client.js';
 import { renderSeatMapCard } from './miaw-seatmap.js';
 import { renderFlightCard, renderPaymentCard, renderProfileCard } from './miaw-cards.js';
 
-const SEND_ICON = '<svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>';
-const CHAT_ICON = '<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>';
+// ECv2 icons — path data recovered verbatim from the home_view cwc-icon set.
+const svg = (vb, d, extra = '') =>
+    `<svg viewBox="${vb}" fill="currentColor" aria-hidden="true"${extra}><path d="${d}"/></svg>`;
+const BUBBLE_ICON = svg('0 0 20 20', 'M10 1.25C14.8325 1.25 18.75 5.16751 18.75 10C18.75 11.3951 18.4213 12.7154 17.8389 13.8877L18.7217 17.5137C18.8042 17.8528 18.7038 18.2103 18.457 18.457C18.2103 18.7038 17.8528 18.8042 17.5137 18.7217L13.8877 17.8389C12.7154 18.4213 11.3951 18.75 10 18.75C5.16751 18.75 1.25 14.8325 1.25 10C1.25 5.16751 5.16751 1.25 10 1.25ZM10 3.25C6.27208 3.25 3.25 6.27208 3.25 10C3.25 13.7279 6.27208 16.75 10 16.75C11.1896 16.75 12.3049 16.4434 13.2734 15.9053L13.3574 15.8633C13.5573 15.7757 13.7814 15.7556 13.9951 15.8076L16.3896 16.3896L15.8076 13.9951C15.7482 13.7508 15.7832 13.4932 15.9053 13.2734C16.4434 12.3049 16.75 11.1896 16.75 10C16.75 6.27208 13.7279 3.25 10 3.25Z');
+const CHEVRON_ICON = svg('0 0 24 24', 'M20.5928 6.79321C20.9832 6.40283 21.6163 6.40291 22.0068 6.79321C22.3971 7.18373 22.3972 7.81681 22.0068 8.20728L12.707 17.5071C12.5196 17.6946 12.2651 17.8 12 17.8C11.7349 17.8 11.4805 17.6945 11.293 17.5071L1.99316 8.20728C1.60264 7.81675 1.60264 7.18373 1.99316 6.79321C2.3837 6.40277 3.01673 6.40272 3.40723 6.79321L12 15.386L20.5928 6.79321Z');
+const KEBAB_ICON = svg('0 0 24 24', 'M12 7 a2 2 0 1 1 0 -4 a2 2 0 1 1 0 4 M12 14 a2 2 0 1 1 0 -4 a2 2 0 1 1 0 4 M12 21 a2 2 0 1 1 0 -4 a2 2 0 1 1 0 4');
+const AGENT_AVATAR_ICON = svg('0 0 24 24', 'M11.9995 2.2998C13.4906 2.2998 14.8778 2.83477 15.8941 3.84961C16.9139 4.86819 17.4995 6.30962 17.4995 8.00781C17.4994 9.80895 16.7593 11.3685 15.7329 12.4746C15.5854 12.6336 15.4291 12.7839 15.2671 12.9268C15.2696 12.9274 15.2725 12.9281 15.2749 12.9287L15.2222 12.9658C14.9193 13.228 14.5943 13.4595 14.2544 13.6533L12.9946 14.5508C12.6513 14.5178 12.3176 14.5 12.0005 14.5C10.588 14.5 8.84981 14.8141 7.35793 15.5557C5.87619 16.2925 4.70604 17.4118 4.23293 19.0088C4.18702 19.1643 4.22002 19.3008 4.34133 19.4326C4.47777 19.5806 4.71784 19.7002 5.00051 19.7002H16.2173C16.2783 19.9704 16.343 20.3175 16.4107 20.7715C16.4637 21.1271 16.5777 21.4348 16.73 21.7002H5.00051C4.17915 21.7002 3.39853 21.3607 2.86965 20.7861C2.32598 20.1951 2.0484 19.3437 2.31594 18.4404C2.99008 16.1647 4.644 14.6717 6.46828 13.7646C7.19793 13.402 7.96599 13.1265 8.73195 12.9268C8.57 12.7839 8.41363 12.6335 8.26613 12.4746C7.23973 11.3685 6.49964 9.80893 6.49953 8.00781C6.49953 6.30963 7.0852 4.86819 8.105 3.84961C9.12122 2.83476 10.5084 2.29982 11.9995 2.2998ZM18.9995 11.5C19.2059 11.5 19.4686 11.6189 19.5669 11.8877L19.5982 12.0127L19.6802 12.5195C19.8732 13.6247 20.0901 14.1921 20.4487 14.5508C20.8586 14.9606 21.5409 15.1858 22.9868 15.4014C23.344 15.4546 23.4995 15.7641 23.4995 16C23.4995 16.2359 23.3441 16.5454 22.9868 16.5986C21.5409 16.8141 20.8586 17.0393 20.4487 17.4492C20.0389 17.8591 19.8137 18.5413 19.5982 19.9873C19.5449 20.3445 19.2354 20.5 18.9995 20.5C18.7636 20.4999 18.4541 20.3444 18.4009 19.9873C18.1854 18.5413 17.9602 17.8591 17.5503 17.4492C17.1404 17.0394 16.4582 16.8141 15.0122 16.5986C14.6551 16.5453 14.4995 16.2359 14.4995 16C14.4995 15.7641 14.6551 15.4547 15.0122 15.4014L15.5191 15.3193C16.6242 15.1263 17.1916 14.9094 17.5503 14.5508C17.9602 14.1409 18.1854 13.4587 18.4009 12.0127L18.4321 11.8877C18.5304 11.619 18.7932 11.5001 18.9995 11.5ZM11.9995 4.2998C10.9908 4.29982 10.1278 4.65685 9.51906 5.26465C8.91405 5.86886 8.49953 6.78219 8.49953 8.00781C8.49964 9.24856 9.00966 10.3349 9.73293 11.1143C10.4746 11.9133 11.3506 12.2998 11.9995 12.2998C12.6485 12.2998 13.5244 11.9133 14.2661 11.1143C14.9894 10.3349 15.4994 9.24857 15.4995 8.00781C15.4995 6.78217 15.085 5.86886 14.48 5.26465C13.8712 4.65686 13.0083 4.2998 11.9995 4.2998Z');
+// Composer keeps the paper-plane (NOT the ECv2 voice waveform — no voice).
+const SEND_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>';
 
 // Map config branding[] -> our CSS custom properties.
 const BRANDING_TO_VAR = {
@@ -40,7 +54,11 @@ export class MiawUI {
         this.title = opts.title || 'Chat';
         this.open = false;
         this.typingEl = null;
-        this.progressEl = null;
+        this.busyEl = null;
+        this.welcomeEl = null;
+        this.menuOpen = false;
+        this._lastDir = null;          // for avatar grouping (consecutive inbound)
+        this._systemHeaderShown = false;
         // Identity handshake gate: the FIRST user message waits until the
         // org confirms (via the WS 'chat_ready' client_action) that this
         // device's Contact carries the ConvId — so the agent's turn-1
@@ -58,6 +76,11 @@ export class MiawUI {
             routingAttributes: opts.deviceId ? { Session_ID: opts.deviceId } : undefined
         });
         this._bindClient();
+        this._onDocClick = (e) => {
+            if (this.menuOpen && this.menu && !this.menu.contains(e.target) && e.target !== this.menuBtn && !this.menuBtn.contains(e.target)) {
+                this._closeMenu();
+            }
+        };
     }
 
     // Called by the host when the WS 'chat_ready' arrives (Contact stamped).
@@ -105,16 +128,32 @@ export class MiawUI {
         root.className = 'miaw-root';
         root.innerHTML = `
             <button class="miaw-fab" type="button" aria-label="Open chat">
-                ${CHAT_ICON}<span>Let's chat</span>
+                <span class="miaw-fab__icon">${BUBBLE_ICON}</span>
+                <span class="miaw-fab__text">Ask Me Anything</span>
             </button>
             <section class="miaw-panel" role="dialog" aria-label="Chat window">
                 <header class="miaw-header">
-                    <span class="miaw-title"></span>
-                    <button class="miaw-close" type="button" aria-label="Minimize chat">&#x2014;</button>
+                    <span class="miaw-header__brand">
+                        <span class="miaw-header__icon">${BUBBLE_ICON}</span>
+                        <span class="miaw-title"></span>
+                    </span>
+                    <span class="miaw-header__actions">
+                        <button class="miaw-iconbtn miaw-menu-btn" type="button" aria-label="Conversation options" aria-haspopup="true">${KEBAB_ICON}</button>
+                        <button class="miaw-iconbtn miaw-min-btn" type="button" aria-label="Minimize chat">${CHEVRON_ICON}</button>
+                    </span>
+                    <div class="miaw-menu" role="menu" hidden>
+                        <button class="miaw-menu__item" type="button" role="menuitem" data-act="end">End chat</button>
+                    </div>
                 </header>
-                <div class="miaw-messages" aria-live="polite"></div>
+                <div class="miaw-body">
+                    <div class="miaw-messages" aria-live="polite"></div>
+                    <div class="miaw-welcome" hidden>
+                        <span class="miaw-welcome__icon">${AGENT_AVATAR_ICON}</span>
+                        <div class="miaw-welcome__hi">Hello</div>
+                    </div>
+                </div>
                 <footer class="miaw-footer">
-                    <textarea class="miaw-input" rows="1" placeholder="Type a message…" aria-label="Message"></textarea>
+                    <textarea class="miaw-input" rows="1" placeholder="Type your message..." aria-label="Message"></textarea>
                     <button class="miaw-send" type="button" aria-label="Send" disabled>${SEND_ICON}</button>
                 </footer>
             </section>`;
@@ -124,17 +163,52 @@ export class MiawUI {
         this.fab = root.querySelector('.miaw-fab');
         this.panel = root.querySelector('.miaw-panel');
         this.messages = root.querySelector('.miaw-messages');
+        this.welcome = root.querySelector('.miaw-welcome');
+        this.menu = root.querySelector('.miaw-menu');
+        this.menuBtn = root.querySelector('.miaw-menu-btn');
         this.input = root.querySelector('.miaw-input');
         this.sendBtn = root.querySelector('.miaw-send');
         root.querySelector('.miaw-title').textContent = this.title;
 
         this.fab.addEventListener('click', () => this.show());
-        root.querySelector('.miaw-close').addEventListener('click', () => this.hide());
+        root.querySelector('.miaw-min-btn').addEventListener('click', () => this.hide());
+        this.menuBtn.addEventListener('click', (e) => { e.stopPropagation(); this._toggleMenu(); });
+        this.menu.querySelector('[data-act="end"]').addEventListener('click', () => this._endChat());
         this.sendBtn.addEventListener('click', () => this._onSend());
         this.input.addEventListener('input', () => this._autoGrow());
         this.input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this._onSend(); }
         });
+    }
+
+    // ---- header menu -----------------------------------------------------
+
+    _toggleMenu() { this.menuOpen ? this._closeMenu() : this._openMenu(); }
+    _openMenu() {
+        this.menuOpen = true;
+        this.menu.hidden = false;
+        this.menuBtn.setAttribute('aria-expanded', 'true');
+        document.addEventListener('click', this._onDocClick, true);
+    }
+    _closeMenu() {
+        this.menuOpen = false;
+        if (this.menu) this.menu.hidden = true;
+        this.menuBtn?.setAttribute('aria-expanded', 'false');
+        document.removeEventListener('click', this._onDocClick, true);
+    }
+
+    async _endChat() {
+        this._closeMenu();
+        try { await this.client.end(); } catch (e) { /* best-effort */ }
+        // Reset to a clean closed state so reopening starts a fresh chat.
+        this.hide();
+        this.messages.innerHTML = '';
+        this._started = false;
+        this._systemHeaderShown = false;
+        this._lastDir = null;
+        this.typingEl = this.busyEl = null;
+        this._firstMessageSent = false;
+        this._chatReady = new Promise((resolve) => { this._resolveChatReady = resolve; });
     }
 
     // ---- show / hide -----------------------------------------------------
@@ -149,15 +223,19 @@ export class MiawUI {
         // own errors, but keep it out of the fatal path too).
         if (!this._started) {
             this._started = true;
+            this._showWelcome();   // pulsing "hello" while we connect
             try {
                 await this.client.startStream();
                 await this.client.openConversation();
             } catch (e) {
                 console.error('[miaw-ui] start failed', e);
                 this._started = false;  // allow a retry on next open
+                this._dismissWelcome();
                 this._systemLine('Sorry — chat is unavailable right now.');
                 return;
             }
+            // ECv2-style session header at the very top of the transcript.
+            this._renderSystemHeader();
             // Non-fatal backfill (resumed conversations); ignore failures.
             this.client.loadEntries().catch(() => {});
         }
@@ -166,6 +244,7 @@ export class MiawUI {
 
     hide() {
         this.open = false;
+        this._closeMenu();
         this.panel.classList.remove('open');
         this.fab.style.display = 'inline-flex';
     }
@@ -225,30 +304,67 @@ export class MiawUI {
         this.client.on('message', (m) => this._renderMessage(m));
         this.client.on('clt', (c) => this._renderClt(c));
         this.client.on('typing', (t) => this._setTyping(t.active));
-        this.client.on('progress', (p) => this._setProgress(p.text));
+        this.client.on('progress', (p) => this._setBusy(p.text));
         this.client.on('conversationOpened', (e) => {
             this.opts.onConversationOpened?.(e.conversationId);
         });
     }
 
+    // Format a timestamp like ECv2's metadata line: "5:12 PM".
+    _fmtTime(ts) {
+        const d = ts ? new Date(ts) : new Date();
+        try { return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+        catch (_) { return ''; }
+    }
+
     _renderMessage(m) {
         this._clearTyping();
-        this._clearProgress();
+        this._clearBusy();
+        this._dismissWelcome();
         if (m.text == null && m.raw) return;  // unsupported types: skip silently
-        const el = document.createElement('div');
-        el.className = `miaw-msg ${m.direction === 'outbound' ? 'outbound' : 'inbound'}`;
-        // Linkify lightly; agent text is plain. (RichText would be sanitized
-        // upstream; keep it simple and safe here with textContent.)
-        el.textContent = m.text || '';
-        this.messages.appendChild(el);
+        const inbound = m.direction !== 'outbound';
+
+        const row = document.createElement('div');
+        row.className = `miaw-row ${inbound ? 'inbound' : 'outbound'}`;
+
+        // Agent avatar to the LEFT of inbound bubbles. Grouped: the avatar
+        // shows only on the first of a run of consecutive agent messages; the
+        // spacer keeps later bubbles aligned (matches ECv2 grouping).
+        if (inbound) {
+            const av = document.createElement('span');
+            av.className = 'miaw-avatar';
+            if (this._lastDir !== 'inbound') av.innerHTML = AGENT_AVATAR_ICON;
+            row.appendChild(av);
+        }
+
+        const col = document.createElement('div');
+        col.className = 'miaw-col';
+        const bubble = document.createElement('div');
+        bubble.className = `miaw-msg ${inbound ? 'inbound' : 'outbound'}`;
+        bubble.textContent = m.text || '';
+        col.appendChild(bubble);
+
+        // Sender · time (inbound) / Sent · time (outbound) metadata line.
+        const meta = document.createElement('div');
+        meta.className = 'miaw-meta';
+        const time = this._fmtTime(m.timestamp);
+        meta.textContent = inbound
+            ? `${m.senderDisplayName || this.title}${time ? ' · ' + time : ''}`
+            : `Sent${time ? ' · ' + time : ''}`;
+        col.appendChild(meta);
+
+        row.appendChild(col);
+        this.messages.appendChild(row);
+        this._lastDir = inbound ? 'inbound' : 'outbound';
         this._scrollToEnd();
     }
 
     _renderClt(c) {
         this._clearTyping();
-        this._clearProgress();
+        this._clearBusy();
+        this._dismissWelcome();
         // Optional lead-in text from the ExperienceType message.
-        if (c.message) this._renderMessage({ direction: 'inbound', text: c.message });
+        if (c.message) this._renderMessage({ direction: 'inbound', text: c.message, senderDisplayName: c.senderDisplayName, timestamp: c.timestamp });
         // Route each action-output value to the matching card renderer. We
         // key on the action name in `type` (copilotActionOutput/<action>_<id>)
         // — payment + profile share the `formData` output field, so the field
@@ -299,43 +415,69 @@ export class MiawUI {
             }
             this.messages.appendChild(card);
         });
+        // A full-width card breaks the avatar group: the next agent message
+        // should show its avatar again.
+        this._lastDir = null;
         this._scrollToEnd();
     }
 
-    // ---- typing / progress ----------------------------------------------
+    // ---- system lines ----------------------------------------------------
 
-    _setTyping(active) {
-        if (!active) { this._clearTyping(); return; }
-        if (this.typingEl) return;
-        const el = document.createElement('div');
-        el.className = 'miaw-typing';
-        el.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
-        this.messages.appendChild(el);
-        // After the pop-in finishes, switch to the gentle looping bob.
-        setTimeout(() => el.classList.add('settled'), 450);
-        this.typingEl = el;
-        this._scrollToEnd();
+    // ECv2 opens every conversation with centered status lines: a routing
+    // note ("Switched to text") and the agent-joined block + "Just now".
+    _renderSystemHeader() {
+        if (this._systemHeaderShown) return;
+        this._systemHeaderShown = true;
+        this._systemLine('Switched to text');
+        const block = document.createElement('div');
+        block.className = 'miaw-sysblock';
+        const joined = document.createElement('div');
+        joined.className = 'miaw-sysline';
+        joined.textContent = `${this.title} joined`;
+        const when = document.createElement('div');
+        when.className = 'miaw-sysline';
+        when.textContent = 'Just now';
+        block.appendChild(joined);
+        block.appendChild(when);
+        this.messages.appendChild(block);
     }
-    _clearTyping() { if (this.typingEl) { this.typingEl.remove(); this.typingEl = null; } }
-
-    _setProgress(text) {
-        this._clearProgress();
-        const el = document.createElement('div');
-        el.className = 'miaw-progress';
-        el.textContent = text;
-        this.messages.appendChild(el);
-        this.progressEl = el;
-        this._scrollToEnd();
-    }
-    _clearProgress() { if (this.progressEl) { this.progressEl.remove(); this.progressEl = null; } }
 
     _systemLine(text) {
         const el = document.createElement('div');
-        el.className = 'miaw-progress';
+        el.className = 'miaw-sysline';
         el.textContent = text;
         this.messages.appendChild(el);
         this._scrollToEnd();
     }
+
+    // ---- launching welcome ----------------------------------------------
+
+    _showWelcome() { if (this.welcome) this.welcome.hidden = false; }
+    _dismissWelcome() { if (this.welcome) this.welcome.hidden = true; }
+
+    // ---- typing / "Thinking" --------------------------------------------
+
+    // The chatbot typing/progress indicator: ECv2's dual counter-rotating
+    // rings + a label ("Thinking", or the action progress text). Lives as the
+    // last item in the transcript, so it sits just above the composer.
+    _setTyping(active) { active ? this._setBusy('Thinking') : this._clearBusy(); }
+
+    _setBusy(text) {
+        this._dismissWelcome();
+        if (!this.busyEl) {
+            const el = document.createElement('div');
+            el.className = 'miaw-thinking';
+            el.innerHTML =
+                '<span class="miaw-spinner"><span class="miaw-spinner__outer"></span><span class="miaw-spinner__inner"></span></span>'
+                + '<span class="miaw-thinking__label"></span>';
+            this.messages.appendChild(el);
+            this.busyEl = el;
+        }
+        this.busyEl.querySelector('.miaw-thinking__label').textContent = text || 'Thinking';
+        this._scrollToEnd();
+    }
+    _clearBusy() { if (this.busyEl) { this.busyEl.remove(); this.busyEl = null; } }
+    _clearTyping() { if (this.typingEl) { this.typingEl.remove(); this.typingEl = null; } }
 
     _scrollToEnd() {
         // Next frame so layout settles before scrolling.

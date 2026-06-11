@@ -1,0 +1,69 @@
+{
+  "_note": "Recovered verbatim from the live ECv2 home_view LWR bundle (site /ESADeployment, 2026-06-11). Icon path data is from the bundle's cwc-icon dictionary; the friendly names were confirmed by rendering each glyph to PNG and viewing it. Chrome strings ('Ask Me Anything', 'Type your message…') are DEPLOYMENT-CONFIGURED labels, NOT in the bundle — taken from the client's own screenshots. CSS blocks are token-stripped (the bundle carries LWC scope tokens like \"+i+\").",
+
+  "icons": {
+    "bubble": {
+      "use": "FAB left glyph + header-left glyph",
+      "viewBox": "0 0 20 20",
+      "path": "M10 1.25C14.8325 1.25 18.75 5.16751 18.75 10C18.75 11.3951 18.4213 12.7154 17.8389 13.8877L18.7217 17.5137C18.8042 17.8528 18.7038 18.2103 18.457 18.457C18.2103 18.7038 17.8528 18.8042 17.5137 18.7217L13.8877 17.8389C12.7154 18.4213 11.3951 18.75 10 18.75C5.16751 18.75 1.25 14.8325 1.25 10C1.25 5.16751 5.16751 1.25 10 1.25ZM10 3.25C6.27208 3.25 3.25 6.27208 3.25 10C3.25 13.7279 6.27208 16.75 10 16.75C11.1896 16.75 12.3049 16.4434 13.2734 15.9053L13.3574 15.8633C13.5573 15.7757 13.7814 15.7556 13.9951 15.8076L16.3896 16.3896L15.8076 13.9951C15.7482 13.7508 15.7832 13.4932 15.9053 13.2734C16.4434 12.3049 16.75 11.1896 16.75 10C16.75 6.27208 13.7279 3.25 10 3.25Z"
+    },
+    "chevronDown": {
+      "use": "header minimize button",
+      "viewBox": "0 0 24 24",
+      "path": "M20.5928 6.79321C20.9832 6.40283 21.6163 6.40291 22.0068 6.79321C22.3971 7.18373 22.3972 7.81681 22.0068 8.20728L12.707 17.5071C12.5196 17.6946 12.2651 17.8 12 17.8C11.7349 17.8 11.4805 17.6945 11.293 17.5071L1.99316 8.20728C1.60264 7.81675 1.60264 7.18373 1.99316 6.79321C2.3837 6.40277 3.01673 6.40272 3.40723 6.79321L12 15.386L20.5928 6.79321Z"
+    },
+    "kebab": {
+      "use": "header menu (End chat)",
+      "viewBox": "0 0 24 24",
+      "path": "M12 7 a2 2 0 1 1 0 -4 a2 2 0 1 1 0 4 M12 14 a2 2 0 1 1 0 -4 a2 2 0 1 1 0 4 M12 21 a2 2 0 1 1 0 -4 a2 2 0 1 1 0 4"
+    },
+    "agentAvatar": {
+      "use": "person+sparkle glyph left of each agent bubble (ICON_AGENT_AI)",
+      "viewBox": "0 0 24 24",
+      "path": "M11.9995 2.2998C13.4906 2.2998 14.8778 2.83477 15.8941 3.84961C16.9139 4.86819 17.4995 6.30962 17.4995 8.00781C17.4994 9.80895 16.7593 11.3685 15.7329 12.4746C15.5854 12.6336 15.4291 12.7839 15.2671 12.9268C15.2696 12.9274 15.2725 12.9281 15.2749 12.9287L15.2222 12.9658C14.9193 13.228 14.5943 13.4595 14.2544 13.6533L12.9946 14.5508C12.6513 14.5178 12.3176 14.5 12.0005 14.5C10.588 14.5 8.84981 14.8141 7.35793 15.5557C5.87619 16.2925 4.70604 17.4118 4.23293 19.0088C4.18702 19.1643 4.22002 19.3008 4.34133 19.4326C4.47777 19.5806 4.71784 19.7002 5.00051 19.7002H16.2173C16.2783 19.9704 16.343 20.3175 16.4107 20.7715C16.4637 21.1271 16.5777 21.4348 16.73 21.7002H5.00051C4.17915 21.7002 3.39853 21.3607 2.86965 20.7861C2.32598 20.1951 2.0484 19.3437 2.31594 18.4404C2.99008 16.1647 4.644 14.6717 6.46828 13.7646C7.19793 13.402 7.96599 13.1265 8.73195 12.9268C8.57 12.7839 8.41363 12.6335 8.26613 12.4746C7.23973 11.3685 6.49964 9.80893 6.49953 8.00781C6.49953 6.30963 7.0852 4.86819 8.105 3.84961C9.12122 2.83476 10.5084 2.29982 11.9995 2.2998ZM18.9995 11.5C19.2059 11.5 19.4686 11.6189 19.5669 11.8877L19.5982 12.0127L19.6802 12.5195C19.8732 13.6247 20.0901 14.1921 20.4487 14.5508C20.8586 14.9606 21.5409 15.1858 22.9868 15.4014C23.344 15.4546 23.4995 15.7641 23.4995 16C23.4995 16.2359 23.3441 16.5454 22.9868 16.5986C21.5409 16.8141 20.8586 17.0393 20.4487 17.4492C20.0389 17.8591 19.8137 18.5413 19.5982 19.9873C19.5449 20.3445 19.2354 20.5 18.9995 20.5C18.7636 20.4999 18.4541 20.3444 18.4009 19.9873C18.1854 18.5413 17.9602 17.8591 17.5503 17.4492C17.1404 17.0394 16.4582 16.8141 15.0122 16.5986C14.6551 16.5453 14.4995 16.2359 14.4995 16C14.4995 15.7641 14.6551 15.4547 15.0122 15.4014L15.5191 15.3193C16.6242 15.1263 17.1916 14.9094 17.5503 14.5508C17.9602 14.1409 18.1854 13.4587 18.4009 12.0127L18.4321 11.8877C18.5304 11.619 18.7932 11.5001 18.9995 11.5ZM11.9995 4.2998C10.9908 4.29982 10.1278 4.65685 9.51906 5.26465C8.91405 5.86886 8.49953 6.78219 8.49953 8.00781C8.49964 9.24856 9.00966 10.3349 9.73293 11.1143C10.4746 11.9133 11.3506 12.2998 11.9995 12.2998C12.6485 12.2998 13.5244 11.9133 14.2661 11.1143C14.9894 10.3349 15.4994 9.24857 15.4995 8.00781C15.4995 6.78217 15.085 5.86886 14.48 5.26465C13.8712 4.65686 13.0083 4.2998 11.9995 4.2998Z"
+    },
+    "send_paperplane": {
+      "use": "composer send button (we keep the paper-plane, NOT the ECv2 voice waveform, per user)",
+      "viewBox": "0 0 24 24",
+      "path": "M2 21l21-9L2 3v7l15 2-15 2v7z"
+    }
+  },
+
+  "css": {
+    "fab_container": ".chat-fab-container { position: fixed; display: inline-flex; height: 56px; align-items: center; justify-content: center; border-radius: 20px; padding: 0.5rem; transition: all 300ms ease-in-out; background-color: var(--agentic-chat-button-background, #2e2e2e); box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; border: none; }",
+    "fab_content": ".chat-fab-content { display: flex; align-items: center; margin: 0 1rem; gap: 16px; }",
+    "fab_text": ".chat-fab-text { font-weight: 400; letter-spacing: 0.02px; white-space: nowrap; user-select: none; color: var(--agentic-chat-button-text-color, #ffffff); font-family: var(--agentic-message-font-family, Arial, sans-serif); font-size: var(--slds-g-font-scale-2, 1rem); }",
+    "fab_focus": ".chat-fab-container:focus { outline: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1), inset 0 0 0 2px #939393, inset 0 0 0 4px #ffffff; }",
+    "message_block": ".message-block { position: relative; border-radius: 0.25rem; padding: 0.25rem; transition: background-color 0.2s ease-in-out; font-size: 1rem; flex-grow: 1; }",
+    "message_block_inbound_hover": ".message-block_inbound:hover, .message-block_inbound:focus-within { background-color: var(--slds-g-color-neutral-base-95, #f3f3f3); }",
+    "system_message_container": ".cwc-system-message-container { display: flex; min-width: 0; flex: 1; flex-direction: column; margin-top: 0.75rem; margin-bottom: 0.75rem; }",
+    "system_message_text": ".cwc-system-message-text, .cwc-system-message-timestamp { color: var(--agentic-message-metadata-text-color, #181818); font-size: inherit; line-height: 1rem; text-align: center; }",
+    "welcome_container": ".welcome-container { text-align: center; height: 100%; overflow: auto; display: flex; justify-content: center; align-items: center; }",
+    "welcome_wrapper": ".welcome-wrapper { max-width: 600px; display: flex; flex-direction: column; justify-content: center; }",
+    "welcome_heading": ".copilot-welcome-heading { text-align: center; font-size: 1.25rem; margin-top: 1rem; }",
+    "welcome_text": ".copilot-welcome-text { text-align: start; font-size: 13px; margin-top: 0.5rem; margin-bottom: 1rem; max-width: 334px; margin-left: auto; margin-right: auto; }",
+    "thinking_spinner_container": ".spinner-container { z-index: 50; display: flex; align-items: center; justify-content: flex-start; gap: 0.5rem; animation: fadeInUp 0.3s cubic-bezier(0.16,1,0.3,1) forwards; opacity: 0; transform: translateY(20px); }",
+    "thinking_spinner_wrapper": ".spinner-wrapper { display: flex; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 0.375rem; background-color: white; position: relative; height: 1.75rem; width: 1.75rem; }",
+    "thinking_outer": ".outer-spinner { position: absolute; inset: 0; height: 1.75rem; width: 1.75rem; border-radius: 50%; border: 2px solid var(--agentic-progress-indicator-color, #5c5c5c); clip-path: polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 50%); animation: spinClockwise 1.5s linear infinite; }",
+    "thinking_inner": ".inner-spinner { position: absolute; inset: 0; margin: auto; height: 1rem; width: 1rem; border-radius: 50%; border: 2px solid var(--agentic-progress-indicator-color, #5c5c5c); border-bottom-color: transparent; clip-path: inset(0 0 50% 0); animation: spinCounterClockwise 2s linear infinite; }",
+    "thinking_text": ".message-text { font-size: 0.875em; color: var(--agentic-progress-indicator-color, #5c5c5c); }"
+  },
+
+  "keyframes": {
+    "spinClockwise": "@keyframes spinClockwise { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }",
+    "spinCounterClockwise": "@keyframes spinCounterClockwise { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }"
+  },
+
+  "labels_from_screenshots": {
+    "_note": "Deployment-configured, NOT in the bundle. Source = client screenshots 2026-06-11.",
+    "fab": "Ask Me Anything",
+    "input_placeholder": "Type your message...",
+    "header_title": "Skywave Airlines Agent",
+    "menu_end_chat": "End chat",
+    "system_switched_to_text": "Switched to text",
+    "system_joined": "{agent} joined",
+    "system_just_now": "Just now",
+    "delivery_sent": "Sent",
+    "thinking": "Thinking"
+  }
+}
