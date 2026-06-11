@@ -261,7 +261,10 @@ export class MiawUI {
 
             if (type.includes('present_seat_map') && val.seatMapData?.seatMapJSON) {
                 renderSeatMapCard(card, val.seatMapData.seatMapJSON, {
-                    onConfirm: (sel) => this._cardAction(() => this.opts.onSeatConfirm?.(sel), 'seat change confirmed'),
+                    // Change ONLY in onConfirm; cue from onComplete (after the
+                    // change + animation) so the agent never verifies early.
+                    onConfirm: (sel) => this.opts.onSeatConfirm?.(sel),
+                    onComplete: () => this.client.sendText('seat change confirmed'),
                     onAbort: () => this.client.sendText('seat change aborted')
                 });
             } else if (type.includes('search_flights') && val.flightResult?.flightsJSON) {
@@ -271,11 +274,19 @@ export class MiawUI {
                 });
             } else if (type.includes('present_payment_form') && val.formData?.paymentStateJSON) {
                 renderPaymentCard(card, val.formData.paymentStateJSON, {
-                    onPay: (sel) => this._cardAction(() => this.opts.onPay?.(sel), 'Payment completed')
+                    // onPay charges ONLY (must resolve before the card shows
+                    // completed). The cue is sent from onComplete — after BOTH
+                    // the charge and the animation finish — so the agent's
+                    // confirm_booking never runs while the card is still
+                    // "Processing…" (the early-cue bug).
+                    onPay: (sel) => this.opts.onPay?.(sel),
+                    onComplete: () => this.client.sendText('Payment completed')
                 });
             } else if (type.includes('present_profile_form') && val.formData?.formStateJSON) {
                 renderProfileCard(card, val.formData.formStateJSON, {
-                    onSave: (data) => this._cardAction(() => this.opts.onSaveProfile?.(data), 'Profile created')
+                    // Save ONLY in onSave; cue from onComplete (after success).
+                    onSave: (data) => this.opts.onSaveProfile?.(data),
+                    onComplete: () => this.client.sendText('Profile created')
                 });
             } else {
                 // Unknown CLT — show its lead-in only; don't crash the demo.
@@ -285,15 +296,6 @@ export class MiawUI {
             this.messages.appendChild(card);
         });
         this._scrollToEnd();
-    }
-
-    // Shared card-action runner: perform the upstream write (through the
-    // host app's proof-cookie'd Heroku->Apex path), then cue the agent —
-    // exactly the verify-only cue pattern the LWCs used. Rethrows so the
-    // card can show its own error state.
-    async _cardAction(upstream, cue) {
-        if (upstream) await upstream();
-        await this.client.sendText(cue);
     }
 
     // ---- typing / progress ----------------------------------------------

@@ -126,6 +126,10 @@ export function renderSeatMapCard(container, seatMapJSON, handlers) {
             state.frozen = true;
             state.view = 'processing';
             paint();
+            // onConfirm performs ONLY the seat change (no cue). The agent cue
+            // fires from onComplete — after BOTH the change and the animation
+            // finish — so the agent never verifies while the card is still
+            // "Changing your seat…" (same early-cue race as payment).
             const timer = new Promise((r) => setTimeout(r, ANIMATION_MS));
             const confirm = Promise.resolve(handlers.onConfirm?.({
                 bookingSegmentId: state.bookingSegmentId,
@@ -134,7 +138,7 @@ export function renderSeatMapCard(container, seatMapJSON, handlers) {
                 flightNumber: state.flightNumber
             }));
             Promise.all([timer, confirm])
-                .then(() => { state.view = 'completed'; paint(); })
+                .then(() => { state.view = 'completed'; paint(); handlers.onComplete?.(); })
                 .catch(() => { state.view = undefined; state.frozen = false; state.error = 'Could not change the seat.'; paint(); });
         });
     }

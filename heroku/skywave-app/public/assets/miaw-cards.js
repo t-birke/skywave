@@ -115,10 +115,14 @@ export function renderPaymentCard(container, paymentStateJSON, handlers) {
             if (state.view) return;
             state.error = ''; state.notice = '';
             state.view = 'processing'; paint();
+            // Run the charge + the animation timer in parallel, but DON'T cue
+            // the agent until BOTH resolve — onPay performs ONLY the charge
+            // (no cue); the cue is sent here, after Promise.all, so the agent's
+            // confirm_booking never runs before the card shows completed.
             const timer = new Promise((r) => setTimeout(r, PAY_ANIMATION_MS));
             const pay = Promise.resolve(handlers.onPay?.({ bookingCode: state.bookingCode }));
             Promise.all([timer, pay])
-                .then(() => { state.view = 'completed'; paint(); })
+                .then(() => { state.view = 'completed'; paint(); handlers.onComplete?.(); })
                 .catch(() => { state.view = undefined; state.error = 'Payment failed.'; paint(); });
         });
     }
@@ -253,7 +257,9 @@ export function renderProfileCard(container, formStateJSON, handlers) {
             email: state.email, phone: state.phone,
             avatarBase64: state.avatarBase64, avatarFileName: state.avatarFileName
         }))
-            .then(() => { state.submitting = false; state.submitted = true; paint(); })
+            // Cue the agent only AFTER the save resolves and the success state
+            // is shown — never before (consistent with seat/payment).
+            .then(() => { state.submitting = false; state.submitted = true; paint(); handlers.onComplete?.(); })
             .catch(() => { state.submitting = false; state.error = 'Profile save failed.'; paint(); });
     }
 
