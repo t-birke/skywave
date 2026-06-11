@@ -161,13 +161,20 @@ export class MiawUI {
     // ---- send ------------------------------------------------------------
 
     async _onSend() {
+        // Re-entrancy guard. iOS Safari can fire the send twice for one tap
+        // (touch + synthesized click, or keyboard "Go" + button), which —
+        // even with the input-clear below — can double-send if both reads
+        // land before the clear. A simple in-flight flag is the robust fix.
+        if (this._sending) return;
         const text = this.input.value.trim();
         if (!text) return;
+        this._sending = true;
         this.input.value = '';
         this._autoGrow();
         this.sendBtn.disabled = true;
         try { await this.client.sendText(text); }
         catch (e) { console.error('[miaw-ui] send failed', e); this._systemLine('Message failed to send.'); }
+        finally { this._sending = false; }
     }
 
     _autoGrow() {

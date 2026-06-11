@@ -205,13 +205,13 @@ export class MiawClient extends Emitter {
 
     // Backfill prior entries (e.g. resumed conversation). Best-effort and
     // NEVER throws — a fresh conversation has nothing to backfill, and a
-    // transport hiccup here must not block chat startup. The endpoint is a
-    // POST (with a JSON body), not a GET — a GET returns 405.
+    // transport hiccup here must not block chat startup. On v2 this is a
+    // GET /conversation/<id>/entries (the v1 POST /queries/... path 404s).
     async loadEntries() {
         if (!this.conversationId) return [];
         try {
-            const res = await fetch(`${this.cfg.scrt2Url}${API}/queries/conversation/${this.conversationId}/entries`, {
-                method: 'POST', headers: this._authHeaders(), body: '{}'
+            const res = await fetch(`${this.cfg.scrt2Url}${API}/conversation/${this.conversationId}/entries?limit=30`, {
+                method: 'GET', headers: this._authHeaders(false)
             });
             if (!res.ok) { console.warn('[miaw] loadEntries', res.status); return []; }
             const j = await res.json();
