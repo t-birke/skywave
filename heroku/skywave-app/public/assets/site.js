@@ -356,6 +356,13 @@ async function loadEswSnippet(deviceId) {
         return false;
     }
 
+    // CRITICAL: re-sync visibility now that the root EXISTS. loadEswSnippet is
+    // called fire-and-forget and mount() is async, so the syncEswButtonVisibility
+    // calls at the call sites (resumeSession/render) ran BEFORE miawUi.root
+    // existed and were no-ops. Without this, a resumed (already-consented,
+    // survey-done) visitor gets no FAB — intermittently, worse on slower iOS
+    // where the mount loses the race against other sync calls.
+    syncEswButtonVisibility();
     return true;
 }
 
