@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8"?>
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
     <actionCalls>
         <description>Route the messaging session to the Skywave Airlines Agent</description>
@@ -8,9 +8,6 @@
         <locationY>0</locationY>
         <actionName>routeWork</actionName>
         <actionType>routeWork</actionType>
-        <connector>
-            <targetReference>Get_Messaging_Session</targetReference>
-        </connector>
         <flowTransactionModel>CurrentTransaction</flowTransactionModel>
         <inputParameters>
             <name>recordId</name>
@@ -21,7 +18,7 @@
         <inputParameters>
             <name>serviceChannelId</name>
             <value>
-                <stringValue>%%SF_SKYWAVE_FLOW_CHANNEL_ID%%</stringValue>
+                <stringValue>0N9g8000000jG9aCAE</stringValue>
             </value>
         </inputParameters>
         <inputParameters>
@@ -51,7 +48,7 @@
         <inputParameters>
             <name>queueId</name>
             <value>
-                <stringValue>%%SF_SKYWAVE_FLOW_QUEUE_ID%%</stringValue>
+                <stringValue>00Gg80000036oBhEAI</stringValue>
             </value>
         </inputParameters>
         <inputParameters>
@@ -81,7 +78,7 @@
         <inputParameters>
             <name>copilotId</name>
             <value>
-                <stringValue>%%SF_SKYWAVE_FLOW_AGENT_ID%%</stringValue>
+                <stringValue>0Xxg8000000ZLxdCAG</stringValue>
             </value>
         </inputParameters>
         <inputParameters>
@@ -95,6 +92,22 @@
     </actionCalls>
     <apiVersion>66.0</apiVersion>
     <areMetricsLoggedToDataCloud>false</areMetricsLoggedToDataCloud>
+    <assignments>
+        <name>set_session_id</name>
+        <label>set session id</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <assignmentItems>
+            <assignToReference>input_record.Session_ID__c</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>Session_ID</elementReference>
+            </value>
+        </assignmentItems>
+        <connector>
+            <targetReference>update_messaging_session</targetReference>
+        </connector>
+    </assignments>
     <environments>Default</environments>
     <interviewLabel>Route to Agent {!$Flow.CurrentDateTime}</interviewLabel>
     <label>Skywave Route to Agent</label>
@@ -117,58 +130,32 @@
         </value>
     </processMetadataValues>
     <processType>RoutingFlow</processType>
-    <recordLookups>
-        <description>Get the related messaging session that you would like to route to an agent.</description>
-        <name>Get_Messaging_Session</name>
-        <label>Get Messaging Session</label>
-        <locationX>0</locationX>
-        <locationY>0</locationY>
-        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
-        <filterLogic>and</filterLogic>
-        <filters>
-            <field>Id</field>
-            <operator>EqualTo</operator>
-            <value>
-                <elementReference>recordId</elementReference>
-            </value>
-        </filters>
-        <getFirstRecordOnly>true</getFirstRecordOnly>
-        <object>MessagingSession</object>
-        <storeOutputAutomatically>true</storeOutputAutomatically>
-    </recordLookups>
     <recordUpdates>
-        <description>Persist the Session_ID prechat value onto the MessagingSession custom field so the agent's linked variable can read it.</description>
-        <name>Set_Session_ID</name>
-        <label>Set Session ID on MessagingSession</label>
+        <name>update_messaging_session</name>
+        <label>update messaging session</label>
         <locationX>0</locationX>
         <locationY>0</locationY>
         <connector>
             <targetReference>Route_to_Agent</targetReference>
         </connector>
-        <filterLogic>and</filterLogic>
-        <filters>
-            <field>Id</field>
-            <operator>EqualTo</operator>
-            <value>
-                <elementReference>recordId</elementReference>
-            </value>
-        </filters>
-        <inputAssignments>
-            <field>Session_ID__c</field>
-            <value>
-                <elementReference>Session_ID</elementReference>
-            </value>
-        </inputAssignments>
-        <object>MessagingSession</object>
+        <inputReference>input_record</inputReference>
     </recordUpdates>
     <start>
         <locationX>0</locationX>
         <locationY>0</locationY>
         <connector>
-            <targetReference>Set_Session_ID</targetReference>
+            <targetReference>set_session_id</targetReference>
         </connector>
     </start>
     <status>Active</status>
+    <variables>
+        <name>input_record</name>
+        <dataType>SObject</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+        <objectType>MessagingSession</objectType>
+    </variables>
     <variables>
         <description>The recordId is used to assign a messaging session to an Agent</description>
         <name>recordId</name>
@@ -178,7 +165,7 @@
         <isOutput>false</isOutput>
     </variables>
     <variables>
-        <description>The Session_ID hidden prechat parameter from Skywave_Channel — the visitor's anonymous deviceId. Mapped here via MessagingChannel.customParameters.actionParameterMappings, then written to MessagingSession.Session_ID__c by the Set_Session_ID element.</description>
+        <description>The Session_ID hidden prechat parameter from Skywave_Channel — the visitor&apos;s anonymous deviceId. Mapped here via MessagingChannel.customParameters.actionParameterMappings, then written to MessagingSession.Session_ID__c by the Set_Session_ID element.</description>
         <name>Session_ID</name>
         <dataType>String</dataType>
         <isCollection>false</isCollection>

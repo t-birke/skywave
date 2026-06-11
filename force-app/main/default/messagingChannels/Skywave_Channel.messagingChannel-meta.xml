@@ -16,11 +16,16 @@
         <actionParameterMappings>
             <actionParameterName>Session_ID</actionParameterName>
         </actionParameterMappings>
-        <name>Session_ID</name>
-        <masterLabel>Session ID</masterLabel>
         <externalParameterName>Session_ID</externalParameterName>
+        <masterLabel>Session ID</masterLabel>
+        <maxLength>0</maxLength>
+        <name>Session_ID</name>
         <parameterDataType>String</parameterDataType>
     </customParameters>
+    <isEstimatedWaitTimeEnabled>false</isEstimatedWaitTimeEnabled>
+    <isQueuePositionEnabled>false</isQueuePositionEnabled>
+    <isSynchronousChatEnabled>false</isSynchronousChatEnabled>
+    <isVoiceModeEnabled>true</isVoiceModeEnabled>
     <masterLabel>Skywave Channel</masterLabel>
     <messagingChannelType>EmbeddedMessaging</messagingChannelType>
     <messagingKeywords>

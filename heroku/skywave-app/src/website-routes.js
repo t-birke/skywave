@@ -21,6 +21,7 @@ import {
     setProofCookie, requireProof
 } from './proof-cookie.js';
 import { apexInvoke } from './sf-api.js';
+import { mintIdentityToken, isIdentityConfigured } from './miaw-identity.js';
 import {
     helmetMiddleware, strictSameOrigin, ipRateLimit, cookieRateLimit,
     auditLog, validate
@@ -435,6 +436,32 @@ export function buildWebsiteRouter({ allowedOrigin }) {
             const status = err.response?.status ?? 500;
             console.error('change seat by id failed', status, err.response?.data ?? err.message);
             res.status(status).json(err.response?.data ?? { error: 'seat_change_failed' });
+        }
+    });
+
+    // ------- GET /chat-identity-token: customerIdentityToken for MIAW User Verification -------
+    //
+    // The custom chat client calls this (proof-gated) to obtain a signed JWT it
+    // passes to the *authenticated* MIAW access-token endpoint. The JWT's `sub`
+    // is the visitor's deviceId, which the platform stamps onto
+    // MessagingEndUser.MessagingPlatformKey (uid:<deviceId>) so the agent
+    // resolves the same deviceId-keyed Contact the website does.
+    //
+    // Our "verified" bar is exactly this: a valid proof cookie (which implies a
+    // Contact exists, minted at /session/init). The private signing key never
+    // leaves the server. Returns { configured:false } when identity signing
+    // isn't set up, so the client cleanly falls back to the unauthenticated
+    // token (anonymous chat still works).
+    router.get('/chat-identity-token', requireProof, (req, res) => {
+        if (!isIdentityConfigured()) {
+            return res.json({ configured: false });
+        }
+        try {
+            const token = mintIdentityToken(req.deviceId);
+            res.json({ configured: true, customerIdentityToken: token });
+        } catch (err) {
+            console.error('chat-identity-token mint failed', err.message);
+            res.status(500).json({ error: 'identity_token_failed' });
         }
     });
 
