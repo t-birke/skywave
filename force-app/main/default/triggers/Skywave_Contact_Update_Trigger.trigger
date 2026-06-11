@@ -146,6 +146,9 @@ trigger Skywave_Contact_Update_Trigger on Skywave_Contact_Update__e (after inser
     // Apply each device's events to its (possibly new) Contact.
     List<Contact> toUpsert = new List<Contact>();
     List<Demo_Event__e> demoEventsToPublish = new List<Demo_Event__e>();
+    // deviceIds whose Contact got a chat_start ConvId stamp this batch — we
+    // fan out a 'chat_ready' Demo_State_Change__e to each after the upsert.
+    Set<String> chatReadyDeviceIds = new Set<String>();
     for (String deviceId : eventsByDeviceId.keySet()) {
         Contact c = existingByDeviceId.get(deviceId);
         if (c == null) {
@@ -240,6 +243,12 @@ trigger Skywave_Contact_Update_Trigger on Skywave_Contact_Update__e (after inser
                         // drop the value.
                         c.Skywave_Conversation_Id__c = ev.Conversation_Id__c;
                     }
+                    // Tell the website (via the relay → WS) that this device's
+                    // Contact now carries the ConvId, so the chat client can
+                    // release the first message KNOWING the agent's turn-1
+                    // resolve_session will match this Contact (not the demo
+                    // seed). Deterministic handshake — replaces the old race.
+                    chatReadyDeviceIds.add(deviceId);
                 }
             }
         }
@@ -253,5 +262,18 @@ trigger Skywave_Contact_Update_Trigger on Skywave_Contact_Update__e (after inser
     }
     if (!demoEventsToPublish.isEmpty()) {
         EventBus.publish(demoEventsToPublish);
+    }
+    // Signal chat-ready AFTER the upsert commits the ConvId stamp. This is a
+    // Demo_State_Change__e (the relay → targeted-WS channel), distinct from
+    // the Demo_Event__e monitor firehose above.
+    List<Demo_State_Change__e> chatReadyEvents = new List<Demo_State_Change__e>();
+    for (String deviceId : chatReadyDeviceIds) {
+        chatReadyEvents.add(new Demo_State_Change__e(
+            Client_Action__c     = 'chat_ready',
+            Target_Session_Id__c = deviceId
+        ));
+    }
+    if (!chatReadyEvents.isEmpty()) {
+        EventBus.publish(chatReadyEvents);
     }
 }

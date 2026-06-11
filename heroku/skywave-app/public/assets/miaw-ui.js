@@ -33,7 +33,7 @@ const BRANDING_TO_VAR = {
 };
 
 export class MiawUI {
-    // opts: { orgId, developerName, scrt2Url, deviceId, getIdentityToken?,
+    // opts: { orgId, developerName, scrt2Url, deviceId,
     //         title?, onConversationOpened?, onSeatConfirm?, onPay?, onSaveProfile? }
     constructor(opts) {
         this.opts = opts;
@@ -41,15 +41,27 @@ export class MiawUI {
         this.open = false;
         this.typingEl = null;
         this.progressEl = null;
+        // Identity handshake gate: the FIRST user message waits until the
+        // org confirms (via the WS 'chat_ready' client_action) that this
+        // device's Contact carries the ConvId — so the agent's turn-1
+        // resolve_session matches this Contact, not the demo seed. Resolved
+        // by markChatReady(); a safety timeout prevents hanging if the event
+        // is missed (worst case: the legacy race, no worse than before).
+        this._chatReady = new Promise((resolve) => { this._resolveChatReady = resolve; });
+        this._firstMessageSent = false;
         this.client = new MiawClient({
             orgId: opts.orgId,
             developerName: opts.developerName,
             scrt2Url: opts.scrt2Url,
-            // Verified identity rides the access token (MIAW User Verification).
-            getIdentityToken: opts.getIdentityToken
+            // deviceId rides the conversation as Session_ID; the chat_start
+            // bridge stamps it onto the Contact for agent resolution.
+            routingAttributes: opts.deviceId ? { Session_ID: opts.deviceId } : undefined
         });
         this._bindClient();
     }
+
+    // Called by the host when the WS 'chat_ready' arrives (Contact stamped).
+    markChatReady() { this._resolveChatReady?.(); }
 
     // ---- lifecycle -------------------------------------------------------
 
@@ -172,7 +184,20 @@ export class MiawUI {
         this.input.value = '';
         this._autoGrow();
         this.sendBtn.disabled = true;
-        try { await this.client.sendText(text); }
+        try {
+            // Gate the FIRST message on the identity handshake so the agent
+            // resolves this device's Contact (not the demo seed). Subsequent
+            // messages send immediately. Safety timeout (4s) avoids hanging
+            // if the chat_ready event is missed.
+            if (!this._firstMessageSent) {
+                await Promise.race([
+                    this._chatReady,
+                    new Promise((r) => setTimeout(r, 4000))
+                ]);
+                this._firstMessageSent = true;
+            }
+            await this.client.sendText(text);
+        }
         catch (e) { console.error('[miaw-ui] send failed', e); this._systemLine('Message failed to send.'); }
         finally { this._sending = false; }
     }

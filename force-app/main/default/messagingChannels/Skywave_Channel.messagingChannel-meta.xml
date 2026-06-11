@@ -22,16 +22,6 @@
         <name>Session_ID</name>
         <parameterDataType>String</parameterDataType>
     </customParameters>
-    <embeddedConfig>
-        <authMode>Auth</authMode>
-        <messagingAuthorizations>
-            <authIdentifier>Skywave_Identity</authIdentifier>
-            <authorizationType>PublicKeyCertificateSet</authorizationType>
-            <enabled>true</enabled>
-            <publicKeyCertificateSetName>Skywave_Identity_Keyset</publicKeyCertificateSetName>
-        </messagingAuthorizations>
-        <verifiedUserJwtExpirationTime>60</verifiedUserJwtExpirationTime>
-    </embeddedConfig>
     <isEstimatedWaitTimeEnabled>false</isEstimatedWaitTimeEnabled>
     <isQueuePositionEnabled>false</isQueuePositionEnabled>
     <isSynchronousChatEnabled>false</isSynchronousChatEnabled>

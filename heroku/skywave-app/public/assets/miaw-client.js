@@ -14,21 +14,22 @@
 // Schemas are STRICT (extra properties 400). This module is transport only —
 // no DOM. The UI layer (miaw-ui.js) subscribes to the events emitted here.
 //
-// IDENTITY (MIAW User Verification): when the host page exposes a
-// customerIdentityToken (a server-signed JWT with sub=deviceId, fetched from
-// /api/website/chat-identity-token), we use the AUTHENTICATED token endpoint.
-// The platform stamps sub onto MessagingEndUser.MessagingPlatformKey
-// (uid:<deviceId>), and the agent resolves the same deviceId-keyed Contact the
-// website does. Without an identity token (anonymous / pre-consent) we fall
-// back to the UNAUTHENTICATED endpoint so chat still works.
+// TRANSPORT CHOICE — /iamessage/v1 against the WEB deployment (Skywave_MIAW),
+// NOT the custom-client /api/v2. Why: CLT cards (the seatmap/flight/payment
+// /profile centerpiece) only render on the Web path — the agent returns them
+// as `formatType:"ExperienceType"` with the structured seatMapJSON our card
+// renderers consume. The custom-client API delegates CLT rendering to the
+// Lightning runtime and FLATTENS the card to plain text (no payload at all) —
+// verified live. The iOS fix is preserved regardless: the unauth token comes
+// back in the response body and lives in first-party localStorage on THIS
+// origin, so there's nothing for ITP to block (no my.site.com cookie, no
+// redirect loop). Identity is handled by the awaited chat_start bridge in the
+// UI/host layer (deviceId → internal ConvId → Contact), not by this transport.
+const API = '/iamessage/v1';
 
-// Official custom-client REST surface (requires an api-type Embedded Service
-// deployment). NB: /api/v2 — distinct from the internal /iamessage/v1 path.
-const API = '/iamessage/api/v2';
-
-// v2 token endpoints. capabilitiesVersion enum here is "1"/"62"/"63" (NOT the
-// v1 "260" set) — 1 is the baseline; 62 adds progress indicators, 63 streaming.
-const CAP_VERSION = '1';
+// v1 capabilitiesVersion enum tops out at the version set the Web client uses;
+// "260" enables the rich content types (incl. ExperienceType CLT cards).
+const CAP_VERSION = '260';
 
 // localStorage keys are namespaced per (org, deployment) so two demos on
 // the same browser don't collide.
@@ -55,13 +56,9 @@ class Emitter {
 }
 
 export class MiawClient extends Emitter {
-    // config: {
-    //   orgId(18), developerName, scrt2Url,
-    //   getIdentityToken?: async () => string|null   // signed customerIdentityToken
-    // }
-    // When getIdentityToken returns a token, the AUTHENTICATED endpoint is used
-    // (verified identity → deviceId-keyed Contact). When it returns null/throws,
-    // we fall back to the UNAUTHENTICATED endpoint (anonymous chat).
+    // config: { orgId(18), developerName, scrt2Url, routingAttributes? }
+    // routingAttributes carries Session_ID=deviceId on conversation create
+    // (the deviceId the chat_start bridge also stamps onto the Contact).
     constructor(config) {
         super();
         this.cfg = config;
@@ -93,43 +90,21 @@ export class MiawClient extends Emitter {
     }
 
     async mintToken() {
-        // Try for a signed identity token (verified path). Best-effort:
-        // a failure here just means we mint an anonymous token instead.
-        let identityToken = null;
-        if (typeof this.cfg.getIdentityToken === 'function') {
-            try { identityToken = await this.cfg.getIdentityToken(); }
-            catch (e) { console.warn('[miaw] identity token fetch failed; anonymous', e?.message || e); }
-        }
-
-        // Common base body (v2 shape): esDeveloperName + platform + context.
-        // context is required for web apps; deviceId is OMITTED on web (the
-        // service generates one). appName is ignored for web.
-        const base = {
-            orgId: this.cfg.orgId,
-            esDeveloperName: this.cfg.developerName,
-            capabilitiesVersion: CAP_VERSION,
-            platform: 'Web',
-            context: { clientVersion: '1.0.0' }
-        };
-
-        let path, body;
-        if (identityToken) {
-            path = `${API}/authorization/authenticated/access-token`;
-            body = { ...base, authorizationType: 'JWT', customerIdentityToken: identityToken };
-        } else {
-            path = `${API}/authorization/unauthenticated/access-token`;
-            body = base;
-        }
-
-        const res = await fetch(`${this.cfg.scrt2Url}${path}`, {
+        // v1 unauthenticated token (Web deployment). STRICT: developerName
+        // (not esDeveloperName), no platform/context keys. The token comes
+        // back in the response body → first-party localStorage (iOS fix).
+        const res = await fetch(`${this.cfg.scrt2Url}${API}/authorization/unauthenticated/accessToken`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
+            body: JSON.stringify({
+                orgId: this.cfg.orgId,
+                developerName: this.cfg.developerName,
+                capabilitiesVersion: CAP_VERSION
+            })
         });
         if (!res.ok) throw new Error(`accessToken ${res.status}: ${await res.text()}`);
         const j = await res.json();
         this.token = j.accessToken;
-        this.verified = Boolean(identityToken);
         if (j.lastEventId != null) this.lastEventId = String(j.lastEventId);
         localStorage.setItem(storeKey(this.cfg.orgId, this.cfg.developerName, 'token'), this.token);
         return this.token;
@@ -143,19 +118,20 @@ export class MiawClient extends Emitter {
 
     // --- conversation -----------------------------------------------------
 
-    // Create the conversation. The CLIENT generates the id (lowercase UUID).
-    // Identity rides the access token (MIAW User Verification), so no
-    // routingAttributes are needed for identity here.
+    // Create the conversation. The CLIENT generates the id (a UUID); the
+    // platform maps it to the internal MessagingSession.ConversationId that
+    // the chat_start bridge resolves to the deviceId's Contact. STRICT v1:
+    // no esDeveloperName here. routingAttributes carries Session_ID=deviceId.
     async openConversation() {
         await this.ensureToken();
         if (this.conversationId) return this.conversationId;
-        const id = uuid().toLowerCase();
+        const id = uuid();
         const res = await fetch(`${this.cfg.scrt2Url}${API}/conversation`, {
             method: 'POST',
             headers: this._authHeaders(),
             body: JSON.stringify({
                 conversationId: id,
-                esDeveloperName: this.cfg.developerName
+                ...(this.cfg.routingAttributes ? { routingAttributes: this.cfg.routingAttributes } : {})
             })
         });
         // A cached token whose conversation already exists 409s — treat as
@@ -175,8 +151,7 @@ export class MiawClient extends Emitter {
         return id;
     }
 
-    // Send a plain-text message. v2 nests the message under `message` and
-    // returns 202 Accepted (not 200).
+    // Send a plain-text message. STRICT v1: messageType + id are TOP-LEVEL.
     async sendText(text) {
         if (!this.conversationId) await this.openConversation();
         const id = uuid();
@@ -184,12 +159,10 @@ export class MiawClient extends Emitter {
             method: 'POST',
             headers: this._authHeaders(),
             body: JSON.stringify({
-                message: {
-                    id,
-                    messageType: 'StaticContentMessage',
-                    staticContent: { formatType: 'Text', text }
-                },
-                esDeveloperName: this.cfg.developerName
+                messageType: 'StaticContentMessage',
+                id,
+                staticContent: { formatType: 'Text', text },
+                isNewMessagingSession: false
             })
         });
         if (!res.ok) throw new Error(`sendMessage ${res.status}: ${await res.text()}`);
@@ -204,14 +177,13 @@ export class MiawClient extends Emitter {
     }
 
     // Backfill prior entries (e.g. resumed conversation). Best-effort and
-    // NEVER throws — a fresh conversation has nothing to backfill, and a
-    // transport hiccup here must not block chat startup. On v2 this is a
-    // GET /conversation/<id>/entries (the v1 POST /queries/... path 404s).
+    // NEVER throws. v1 path: POST /queries/conversation/<id>/entries (a GET
+    // 405s here).
     async loadEntries() {
         if (!this.conversationId) return [];
         try {
-            const res = await fetch(`${this.cfg.scrt2Url}${API}/conversation/${this.conversationId}/entries?limit=30`, {
-                method: 'GET', headers: this._authHeaders(false)
+            const res = await fetch(`${this.cfg.scrt2Url}${API}/queries/conversation/${this.conversationId}/entries`, {
+                method: 'POST', headers: this._authHeaders(), body: '{}'
             });
             if (!res.ok) { console.warn('[miaw] loadEntries', res.status); return []; }
             const j = await res.json();

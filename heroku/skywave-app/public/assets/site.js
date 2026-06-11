@@ -275,27 +275,6 @@ async function loadEswSnippet(deviceId) {
             deviceId,
             title: 'Skywave Airlines',
 
-            // Verified identity (MIAW User Verification): fetch a server-signed
-            // customerIdentityToken (sub=deviceId) from our proof-gated route.
-            // The platform stamps it onto MessagingEndUser.MessagingPlatformKey
-            // so the agent resolves the same deviceId-keyed Contact the website
-            // does — fixing the seat/payment ownership mismatch. Returns null
-            // when not consented / not configured → client uses the anonymous
-            // token and chat still works.
-            getIdentityToken: async () => {
-                try {
-                    const r = await fetch('/api/website/chat-identity-token', {
-                        credentials: 'same-origin'
-                    });
-                    if (!r.ok) return null;
-                    const j = await r.json();
-                    return j.configured ? j.customerIdentityToken : null;
-                } catch (e) {
-                    console.warn('[miaw] identity token fetch failed', e);
-                    return null;
-                }
-            },
-
             // Conversation opened: stamp identity via the existing trigger
             // path (carry IP geo too, exactly like the old ConversationStarted
             // handler) so the visitor's Contact is resolvable on turn 1.
@@ -872,6 +851,13 @@ function connectWs(wsUrl) {
                 if (msg.action === 'profile_created') {
                     state.profileAlreadyComplete = true;
                     refreshIdentity();
+                }
+                if (msg.action === 'chat_ready') {
+                    // The Contact-update trigger has committed this device's
+                    // ConvId stamp. Release the chat client's first message so
+                    // the agent's turn-1 resolve_session matches this Contact
+                    // (not the demo seed). Deterministic identity handshake.
+                    miawUi?.markChatReady();
                 }
                 return;
             }
