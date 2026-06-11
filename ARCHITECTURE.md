@@ -165,10 +165,17 @@ with a **custom chat client that talks to the scrt2 REST API directly**. The
 auth JWT comes back in the response *body* and lives in first-party
 `localStorage` on the Heroku origin — nothing for ITP to block, no redirect.
 
-Moving parts (all in `heroku/skywave-app/public/assets/`):
-- `miaw-client.js` — transport: unauth `accessToken` → `conversation` →
-  SSE receive (via `fetch`+`ReadableStream`; `EventSource` can't set the
-  required `Authorization`/`X-Org-Id` headers) → `message` → `DELETE`.
+Moving parts (all in `heroku/skywave-app/public/assets/` unless noted):
+- `miaw-client.js` — transport on the official custom-client surface
+  `/iamessage/api/v2`: `access-token` → `conversation` → SSE receive (via
+  `fetch`+`ReadableStream`; `EventSource` can't set the required
+  `Authorization`/`X-Org-Id` headers) → `message` → `DELETE`. Uses the
+  **authenticated** token endpoint when an identity token is available
+  (see Identity below), else the unauthenticated one.
+- `src/miaw-identity.js` + route `GET /api/website/chat-identity-token` —
+  mints the RS256 `customerIdentityToken` (sub=deviceId) used for verified
+  identity. Private key in `.secrets/` / Heroku config var; public JWK in the
+  org Keyset.
 - `miaw-ui.js` + `miaw-ui.css` — pixel-exact ECv2 chrome (frame geometry
   from the served `init.min.css`, animation keyframes lifted verbatim,
   colors driven at runtime from the `embedded-service-config` `branding[]`).
@@ -184,10 +191,32 @@ Moving parts (all in `heroku/skywave-app/public/assets/`):
 - `site.js` `loadEswSnippet()` now boots `MiawUI` instead of the ECv2
   snippet (same name/signature; visibility logic unchanged).
 
-Identity is **unchanged** from §3a: the custom client generates its own
-conversation UUID, which the platform exposes as
-`Conversation.ConversationIdentifier` — exactly what `chat_start` already
-sends — so the existing PE-trigger resolution path works as-is.
+**Identity — MIAW User Verification (the do-it-right rail).** The custom
+client requires a Custom Client (`deploymentType=api`) Embedded Service
+deployment (`Skywave_MIAW_Api`). On conversation start the client fetches a
+server-signed JWT (`customerIdentityToken`, `sub=<deviceId>`) from the
+proof-gated `/api/website/chat-identity-token` and passes it to the
+authenticated access-token endpoint. Salesforce verifies it against the
+`Skywave_Identity_Keyset` (the channel's `embeddedConfig/authMode=Auth`) and
+stamps `sub` onto `MessagingEndUser.MessagingPlatformKey` as
+`v2/iamessage/AUTH/Skywave_Identity/uid:<deviceId>`. The agent's
+`@MessagingEndUser.MessagingPlatformKey` linked variable feeds
+`Skywave_ResolveSession`, which extracts the deviceId and resolves the
+Contact by `Session_Id__c` — **the same key the website resolver and the
+upsert trigger use**, so the agent and website resolve the identical Contact.
+This unifies identity on the stable deviceId (survives new conversations and
+devices) and is why the seat/payment ownership checks pass.
+
+> Why not routing attributes / a prechat field? Empirically proven (v1 & v2,
+> Web & API deployments, with a corrected flow) that `routingAttributes`
+> never reach the session-handler flow — the platform doesn't hydrate the
+> flow input. User Verification is the supported mechanism. Legacy
+> `chat_start` → `Conversation.ConversationIdentifier` →
+> `Skywave_Conversation_Id__c` remains only as a resolver fallback.
+
+> Note: User Verification works on **external websites** (our Heroku app) —
+> NOT Experience Builder/Commerce sites. The custom-client-on-Heroku route is
+> what makes it available.
 
 CLT card actions run through the proof-cookie'd Heroku→Apex path, then the
 UI cues the agent (the same verify-only cue the LWCs sent), but the writes
