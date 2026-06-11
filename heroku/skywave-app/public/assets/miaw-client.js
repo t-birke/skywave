@@ -188,7 +188,9 @@ export class MiawClient extends Emitter {
             if (!res.ok) { console.warn('[miaw] loadEntries', res.status); return []; }
             const j = await res.json();
             const entries = j.conversationEntries || j.entries || [];
-            entries.forEach((e) => this._dispatchEntry(e));
+            // The endpoint returns NEWEST-first; dispatch oldest-first so the
+            // backfilled transcript renders top-to-bottom in chronological order.
+            [...entries].reverse().forEach((e) => this._dispatchEntry(e));
             return entries;
         } catch (e) {
             console.warn('[miaw] loadEntries failed (non-fatal)', e?.message || e);
