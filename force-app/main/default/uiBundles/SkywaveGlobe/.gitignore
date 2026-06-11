@@ -1,0 +1,8 @@
+# Generated build artifacts — rebuilt via `npm run build` before each deploy.
+# dist/ IS the deploy payload (served by Salesforce) but is regenerated, not source.
+node_modules/
+dist/
+build/
+.vite/
+coverage/
+*.tsbuildinfo
