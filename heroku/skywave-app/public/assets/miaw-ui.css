@@ -416,6 +416,14 @@
     outline: none;
 }
 .miaw-input:focus { border-color: var(--miaw-primary-btn-bg); }
+/* Locked while the agent gets ready (join -> first message): dim + not-allowed,
+   so it's clear the field isn't accepting input yet. */
+.miaw-input:disabled {
+    background: #F5F5F5;
+    color: var(--miaw-secondary-text);
+    cursor: not-allowed;
+    opacity: 0.85;
+}
 .miaw-send {
     position: absolute;
     right: 6px;
