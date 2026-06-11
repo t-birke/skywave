@@ -253,6 +253,10 @@ export class MiawUI {
         // key on the action name in `type` (copilotActionOutput/<action>_<id>)
         // — payment + profile share the `formData` output field, so the field
         // name alone can't disambiguate.
+        // historical=true: this card was replayed from the transcript on
+        // reload. Render it in its final, non-interactive "done" state (we
+        // assume the action succeeded) so re-tapping can't re-fire the action.
+        const done = c.historical === true;
         (c.values || []).forEach((v) => {
             const type = v.type || '';
             const val = v.value || {};
@@ -266,12 +270,12 @@ export class MiawUI {
                     onConfirm: (sel) => this.opts.onSeatConfirm?.(sel),
                     onComplete: () => this.client.sendText('seat change confirmed'),
                     onAbort: () => this.client.sendText('seat change aborted')
-                });
+                }, { done });
             } else if (type.includes('search_flights') && val.flightResult?.flightsJSON) {
                 renderFlightCard(card, val.flightResult.flightsJSON, {
                     // Flight pick is a pure cue — the agent drives the booking.
                     onBook: (flightNumber) => this.client.sendText(`Book flight ${flightNumber}`)
-                });
+                }, { done });
             } else if (type.includes('present_payment_form') && val.formData?.paymentStateJSON) {
                 renderPaymentCard(card, val.formData.paymentStateJSON, {
                     // onPay charges ONLY (must resolve before the card shows
@@ -281,13 +285,13 @@ export class MiawUI {
                     // "Processing…" (the early-cue bug).
                     onPay: (sel) => this.opts.onPay?.(sel),
                     onComplete: () => this.client.sendText('Payment completed')
-                });
+                }, { done });
             } else if (type.includes('present_profile_form') && val.formData?.formStateJSON) {
                 renderProfileCard(card, val.formData.formStateJSON, {
                     // Save ONLY in onSave; cue from onComplete (after success).
                     onSave: (data) => this.opts.onSaveProfile?.(data),
                     onComplete: () => this.client.sendText('Profile created')
-                });
+                }, { done });
             } else {
                 // Unknown CLT — show its lead-in only; don't crash the demo.
                 card.remove();

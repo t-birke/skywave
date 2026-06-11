@@ -179,7 +179,12 @@ Moving parts (all in `heroku/skywave-app/public/assets/` unless noted):
   renderer by the action name in `values[].type`.
 - `miaw-seatmap.js` + `miaw-cards.js` — standalone ports of the four CLT
   renderer LWCs (seatmap, flight options, payment, profile form), rendering
-  the action-output JSON that arrives over the wire.
+  the action-output JSON that arrives over the wire. On reload the transcript
+  is backfilled via `loadEntries()`, which dispatches each entry with
+  `historical=true`; `_renderClt` passes `{done:true}` so replayed cards
+  render in their final, non-interactive state (seat confirmed / payment
+  completed / profile saved; flight Book disabled). We assume the action
+  succeeded — the live action already ran, so a re-tap must not re-fire it.
 - `miaw-cards.css` — **one shared stylesheet** for all four cards: design
   tokens + primitives (`.sw-card`, `.sw-btn`, `.sw-input`, `.sw-success`,
   `.sw-anim`, …) defined once. Replaces the per-LWC style duplication (each

@@ -189,8 +189,9 @@ export class MiawClient extends Emitter {
             const j = await res.json();
             const entries = j.conversationEntries || j.entries || [];
             // The endpoint returns NEWEST-first; dispatch oldest-first so the
-            // backfilled transcript renders top-to-bottom in chronological order.
-            [...entries].reverse().forEach((e) => this._dispatchEntry(e));
+            // backfilled transcript renders top-to-bottom in chronological
+            // order. historical=true → interactive cards render in done state.
+            [...entries].reverse().forEach((e) => this._dispatchEntry(e, true));
             return entries;
         } catch (e) {
             console.warn('[miaw] loadEntries failed (non-fatal)', e?.message || e);
@@ -335,7 +336,10 @@ export class MiawClient extends Emitter {
     }
 
     // Turn one conversationEntry into a normalized 'message' or 'clt' event.
-    _dispatchEntry(ce) {
+    // historical=true marks entries replayed from the transcript on reload, so
+    // the UI renders interactive cards (seatmap/payment/profile) in a final,
+    // non-interactive "done" state — re-tapping them must not re-fire actions.
+    _dispatchEntry(ce, historical = false) {
         const entryId = ce.identifier || ce.id;
         if (entryId && this._seenEntryIds.has(entryId)) return;
         if (entryId) this._seenEntryIds.add(entryId);
@@ -351,7 +355,8 @@ export class MiawClient extends Emitter {
             direction,
             sender,
             senderDisplayName: ce.senderDisplayName,
-            timestamp: ce.clientTimestamp || pj.timestamp || Date.now()
+            timestamp: ce.clientTimestamp || pj.timestamp || Date.now(),
+            historical
         };
 
         // Custom Lightning type cards (seatmap, booking cards) arrive as

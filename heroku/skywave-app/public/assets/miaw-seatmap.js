@@ -25,7 +25,11 @@ function decorateSeat(s, selectedSeat, frozen) {
 // container: the .miaw-card element to render into.
 // seatMapJSON: stringified payload from the action output.
 // handlers: { onConfirm(selection), onAbort() }
-export function renderSeatMapCard(container, seatMapJSON, handlers) {
+// options: { done } — done=true renders the final "confirmed" state with no
+//   interactive controls (a card replayed from the transcript on reload). We
+//   assume the change succeeded; the exact picked seat isn't in the payload,
+//   so we show the seat the card was opened with.
+export function renderSeatMapCard(container, seatMapJSON, handlers, options = {}) {
     let parsed;
     try { parsed = typeof seatMapJSON === 'string' ? JSON.parse(seatMapJSON) : seatMapJSON; }
     catch (e) { container.innerHTML = '<p class="sw-error">Could not load the seat map.</p>'; return; }
@@ -38,6 +42,7 @@ export function renderSeatMapCard(container, seatMapJSON, handlers) {
         selectedSeat: (parsed.currentSeat || '').toUpperCase(),
         rows: parsed.rows || [],
         frozen: false,
+        view: options.done ? 'completed' : undefined,
         error: ''
     };
 

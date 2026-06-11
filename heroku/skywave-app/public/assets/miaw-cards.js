@@ -10,7 +10,10 @@
 // ============================ FLIGHT OPTIONS ============================
 // Cue-only: clicking Book just sends "Book flight <number>" to the agent,
 // which drives the booking. No direct write (mirrors the LWC).
-export function renderFlightCard(container, flightsJSON, handlers) {
+// options: { done } — done=true renders the options read-only (a card
+// replayed from the transcript on reload); the Book buttons are disabled so
+// a re-tap can't re-send the booking cue.
+export function renderFlightCard(container, flightsJSON, handlers, options = {}) {
     let parsed;
     try { parsed = typeof flightsJSON === 'string' ? JSON.parse(flightsJSON) : flightsJSON; }
     catch (e) { container.innerHTML = '<p class="sw-error">Error loading flight options</p>'; return; }
@@ -47,10 +50,12 @@ export function renderFlightCard(container, flightsJSON, handlers) {
                     <span class="sw-fare-chip">${f.fareClass ?? ''}</span>
                     <span class="sw-flight-price">${f.price ?? ''}</span>
                 </div>
-                <button type="button" class="sw-btn sw-btn_teal sw-book-button" data-flightnumber="${f.flightNumber ?? ''}">Book</button>
+                <button type="button" class="sw-btn sw-btn_teal sw-book-button" data-flightnumber="${f.flightNumber ?? ''}"${options.done ? ' disabled' : ''}>Book</button>
             </footer>
         </article>`).join('')}</div>`;
 
+    // Replayed-from-transcript cards are read-only — don't wire the cue.
+    if (options.done) return;
     container.querySelectorAll('.sw-book-button').forEach((btn) => {
         btn.addEventListener('click', () => {
             handlers.onBook?.(btn.dataset.flightnumber);
@@ -62,7 +67,10 @@ export function renderFlightCard(container, flightsJSON, handlers) {
 // Demo Pay performs the charge through the UI layer (Heroku->Apex), plays
 // the 3s animation, shows in-card success, then cues "Payment completed".
 const PAY_ANIMATION_MS = 3000;
-export function renderPaymentCard(container, paymentStateJSON, handlers) {
+// options: { done } — done=true renders the final "Payment completed" state
+// (a card replayed from the transcript on reload); no pay buttons, so a
+// re-tap can't re-charge. We assume the payment succeeded.
+export function renderPaymentCard(container, paymentStateJSON, handlers, options = {}) {
     let parsed;
     try { parsed = typeof paymentStateJSON === 'string' ? JSON.parse(paymentStateJSON) : paymentStateJSON; }
     catch (e) { container.innerHTML = '<p class="sw-error">Could not load payment form.</p>'; return; }
@@ -70,7 +78,7 @@ export function renderPaymentCard(container, paymentStateJSON, handlers) {
     const state = {
         bookingCode: parsed.bookingCode || '',
         totalCharged: parsed.totalCharged || '',
-        view: undefined, notice: '', error: ''
+        view: options.done ? 'completed' : undefined, notice: '', error: ''
     };
 
     function paint() {
@@ -136,7 +144,10 @@ const AVATAR_OUTPUT_SIZE = 512;
 const AVATAR_OUTPUT_QUALITY = 0.5;
 const MAX_AVATAR_BYTES = 20 * 1024 * 1024;
 
-export function renderProfileCard(container, formStateJSON, handlers) {
+// options: { done } — done=true renders the final "Profile saved" state (a
+// card replayed from the transcript on reload); no form, so a re-submit can't
+// re-save. We assume the save succeeded.
+export function renderProfileCard(container, formStateJSON, handlers, options = {}) {
     let parsed;
     try { parsed = typeof formStateJSON === 'string' ? JSON.parse(formStateJSON) : formStateJSON; }
     catch (e) { container.innerHTML = '<p class="sw-error">Could not load profile form.</p>'; return; }
@@ -145,7 +156,7 @@ export function renderProfileCard(container, formStateJSON, handlers) {
         firstName: parsed.firstName || '', lastName: parsed.lastName || '',
         email: parsed.email || '', phone: parsed.phone || '', consent: false,
         avatarBase64: '', avatarFileName: '', avatarPreview: '',
-        submitting: false, submitted: false, error: ''
+        submitting: false, submitted: options.done === true, error: ''
     };
 
     const isValid = () =>
