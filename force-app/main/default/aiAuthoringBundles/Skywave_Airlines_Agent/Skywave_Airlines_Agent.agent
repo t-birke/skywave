@@ -20,9 +20,12 @@ variables:
     ContactId: linked string
         source: @MessagingEndUser.ContactId
         description: "MessagingEndUser ContactId"
+    Session_Key: linked string
+        source: @MessagingEndUser.MessagingPlatformKey
+        description: "Verified-session key (User Verification), format ...AUTH/<config>/uid:<deviceId>. Skywave_ResolveSession extracts the deviceId and resolves the Contact by Session_Id__c (same key the website uses). Primary identity path; Conversation_Id is the fallback."
     Conversation_Id: linked string
         source: @MessagingSession.ConversationId
-        description: "Join key for Skywave_ResolveSession to look up the visitor's anonymous Contact."
+        description: "Legacy join key for Skywave_ResolveSession (pre-User-Verification fallback)."
     testingSession: mutable string = "0dwg8000000Csz7AAC"
         label: "Testing Session (studio override)"
         description: "Studio-preview override for Conversation_Id (real chat ignores it). Points at a Contact with valid survey data so the preview hydrates."
@@ -126,6 +129,7 @@ start_agent agent_router:
 
             if @variables.survey_resolved is False:
                 run @actions.resolve_session
+                    with sessionKey = @variables.Session_Key
                     with conversationId = @variables.Conversation_Id
                     with testingSession = @variables.testingSession
                     set @variables.survey_summary = @outputs.summary
@@ -248,6 +252,12 @@ start_agent agent_router:
             target: "apex://Skywave_ResolveSession"
 
             inputs:
+                "sessionKey": string
+                    description: "Verified-session MessagingPlatformKey (...AUTH/<config>/uid:<deviceId>) from the @MessagingEndUser.MessagingPlatformKey linked variable. Resolver extracts the deviceId and matches Contact.Session_Id__c. Primary identity path."
+                    label: "Session Key"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
                 "conversationId": string
                     description: "The MessagingSession.ConversationId, sourced from the @MessagingSession.ConversationId linked variable. Optional because studio preview can't seed it; falls back to testingSession when blank."
                     label: "Conversation Id"
