@@ -252,7 +252,12 @@ function postContactUpsert(payload) {
 // and stamps the visitor's Contact so Skywave_ResolveSession matches. No
 // new identity mechanism — verified against the org.
 async function loadEswSnippet(deviceId) {
-    if (eswReady) return true;
+    // Idempotency guard — set SYNCHRONOUSLY before the async mount. There
+    // are two call sites (session-start and resume); without flipping the
+    // flag up front, both can slip past `if (eswReady)` during the await
+    // gap and mount TWO MiawUI instances → two FABs, two message handlers,
+    // every message rendered twice. Flip first; roll back only on failure.
+    if (eswReady || miawUi) return true;
     const esw = config.esw || {};
     // siteUrl is the published LWR site; scrt2Url + orgId + escName are what
     // the REST client needs. escName is the EmbeddedServiceConfig dev name.
@@ -260,6 +265,7 @@ async function loadEswSnippet(deviceId) {
         console.warn('[miaw] config incomplete; skipping chat client load', esw);
         return false;
     }
+    eswReady = true;  // claim the slot before any await
 
     try {
         miawUi = new MiawUI({
@@ -344,10 +350,12 @@ async function loadEswSnippet(deviceId) {
         await miawUi.mount();
     } catch (e) {
         console.warn('[miaw] chat client init failed', e);
+        // Roll back the claimed slot so a later call can retry cleanly.
+        eswReady = false;
+        miawUi = null;
         return false;
     }
 
-    eswReady = true;
     return true;
 }
 
