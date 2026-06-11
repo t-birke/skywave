@@ -182,14 +182,19 @@ Moving parts (all in `heroku/skywave-app/public/assets/` unless noted):
   `raw-assets/icons-and-affordances.json`): the FAB pill ("Ask Me Anything" +
   speech-bubble glyph), the header (bubble glyph + kebab→"End chat" menu +
   chevron-down minimize), the person+sparkle agent avatar left of inbound
-  bubbles, per-message sender/timestamp metadata ("…Agent · 5:12 PM" /
+  bubbles (cards are indented to the same 36px gutter so they line up with
+  the bubbles), per-message sender/timestamp metadata ("…Agent · 5:12 PM" /
   "Sent · …"), centered system lines ("Switched to text", "<agent> joined",
-  "Just now"), the launching "hello" state, and the dual counter-rotating
-  ring "Thinking" spinner (`spinClockwise`/`spinCounterClockwise`). Icon path
-  data was confirmed by rendering each glyph to PNG. The composer keeps a
-  paper-plane send (we don't support the ECv2 voice waveform). Strings that
-  are deployment-configured (button label, placeholder, header title) are NOT
-  in the bundle — taken from the client screenshots.
+  "Just now"), the launching state (just the word "Hello", large + pulsing,
+  no icon), and the dual counter-rotating ring "Thinking" spinner
+  (`spinClockwise`/`spinCounterClockwise`) — pinned bottom-left above the
+  composer (ECv2's `position`ed `.spinner-container`, `left:0; z-index:50`),
+  not inline, so it stays put on a short transcript. Icon path data was
+  confirmed by rendering each glyph to PNG. The composer send button is the
+  ECv2 `arrowup` glyph (encircled up-arrow) shown INSIDE the input pill only
+  once there's text — NOT the voice waveform. Strings that are
+  deployment-configured (button label, placeholder, header title) are NOT in
+  the bundle — taken from the client screenshots.
 - `miaw-seatmap.js` + `miaw-cards.js` — standalone ports of the four CLT
   renderer LWCs (seatmap, flight options, payment, profile form), rendering
   the action-output JSON that arrives over the wire. On reload the transcript

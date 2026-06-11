@@ -25,8 +25,11 @@ const BUBBLE_ICON = svg('0 0 20 20', 'M10 1.25C14.8325 1.25 18.75 5.16751 18.75 
 const CHEVRON_ICON = svg('0 0 24 24', 'M20.5928 6.79321C20.9832 6.40283 21.6163 6.40291 22.0068 6.79321C22.3971 7.18373 22.3972 7.81681 22.0068 8.20728L12.707 17.5071C12.5196 17.6946 12.2651 17.8 12 17.8C11.7349 17.8 11.4805 17.6945 11.293 17.5071L1.99316 8.20728C1.60264 7.81675 1.60264 7.18373 1.99316 6.79321C2.3837 6.40277 3.01673 6.40272 3.40723 6.79321L12 15.386L20.5928 6.79321Z');
 const KEBAB_ICON = svg('0 0 24 24', 'M12 7 a2 2 0 1 1 0 -4 a2 2 0 1 1 0 4 M12 14 a2 2 0 1 1 0 -4 a2 2 0 1 1 0 4 M12 21 a2 2 0 1 1 0 -4 a2 2 0 1 1 0 4');
 const AGENT_AVATAR_ICON = svg('0 0 24 24', 'M11.9995 2.2998C13.4906 2.2998 14.8778 2.83477 15.8941 3.84961C16.9139 4.86819 17.4995 6.30962 17.4995 8.00781C17.4994 9.80895 16.7593 11.3685 15.7329 12.4746C15.5854 12.6336 15.4291 12.7839 15.2671 12.9268C15.2696 12.9274 15.2725 12.9281 15.2749 12.9287L15.2222 12.9658C14.9193 13.228 14.5943 13.4595 14.2544 13.6533L12.9946 14.5508C12.6513 14.5178 12.3176 14.5 12.0005 14.5C10.588 14.5 8.84981 14.8141 7.35793 15.5557C5.87619 16.2925 4.70604 17.4118 4.23293 19.0088C4.18702 19.1643 4.22002 19.3008 4.34133 19.4326C4.47777 19.5806 4.71784 19.7002 5.00051 19.7002H16.2173C16.2783 19.9704 16.343 20.3175 16.4107 20.7715C16.4637 21.1271 16.5777 21.4348 16.73 21.7002H5.00051C4.17915 21.7002 3.39853 21.3607 2.86965 20.7861C2.32598 20.1951 2.0484 19.3437 2.31594 18.4404C2.99008 16.1647 4.644 14.6717 6.46828 13.7646C7.19793 13.402 7.96599 13.1265 8.73195 12.9268C8.57 12.7839 8.41363 12.6335 8.26613 12.4746C7.23973 11.3685 6.49964 9.80893 6.49953 8.00781C6.49953 6.30963 7.0852 4.86819 8.105 3.84961C9.12122 2.83476 10.5084 2.29982 11.9995 2.2998ZM18.9995 11.5C19.2059 11.5 19.4686 11.6189 19.5669 11.8877L19.5982 12.0127L19.6802 12.5195C19.8732 13.6247 20.0901 14.1921 20.4487 14.5508C20.8586 14.9606 21.5409 15.1858 22.9868 15.4014C23.344 15.4546 23.4995 15.7641 23.4995 16C23.4995 16.2359 23.3441 16.5454 22.9868 16.5986C21.5409 16.8141 20.8586 17.0393 20.4487 17.4492C20.0389 17.8591 19.8137 18.5413 19.5982 19.9873C19.5449 20.3445 19.2354 20.5 18.9995 20.5C18.7636 20.4999 18.4541 20.3444 18.4009 19.9873C18.1854 18.5413 17.9602 17.8591 17.5503 17.4492C17.1404 17.0394 16.4582 16.8141 15.0122 16.5986C14.6551 16.5453 14.4995 16.2359 14.4995 16C14.4995 15.7641 14.6551 15.4547 15.0122 15.4014L15.5191 15.3193C16.6242 15.1263 17.1916 14.9094 17.5503 14.5508C17.9602 14.1409 18.1854 13.4587 18.4009 12.0127L18.4321 11.8877C18.5304 11.619 18.7932 11.5001 18.9995 11.5ZM11.9995 4.2998C10.9908 4.29982 10.1278 4.65685 9.51906 5.26465C8.91405 5.86886 8.49953 6.78219 8.49953 8.00781C8.49964 9.24856 9.00966 10.3349 9.73293 11.1143C10.4746 11.9133 11.3506 12.2998 11.9995 12.2998C12.6485 12.2998 13.5244 11.9133 14.2661 11.1143C14.9894 10.3349 15.4994 9.24857 15.4995 8.00781C15.4995 6.78217 15.085 5.86886 14.48 5.26465C13.8712 4.65686 13.0083 4.2998 11.9995 4.2998Z');
-// Composer keeps the paper-plane (NOT the ECv2 voice waveform — no voice).
-const SEND_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>';
+// Composer send button — the ECv2 "arrowup" glyph (recovered verbatim from
+// the home_view named-icon registry, PNG-confirmed). It renders as a white
+// arrow on the circular blue button, i.e. the encircled up-arrow that ECv2
+// shows INSIDE the input pill once you start typing. (NOT the voice waveform.)
+const SEND_ICON = '<svg viewBox="0 0 520 520" fill="currentColor" aria-hidden="true"><path d="M414 210c8-8 8-19 0-27L264 36a20 20 0 0 0-28 0L86 183c-8 8-8 19 0 27l28 27c8 8 20 8 28 0l47-46c8-8 22-2 22 9v270c0 10 9 20 20 20h40c11 0 20-11 20-20V200c0-12 14-17 22-9l47 46c8 8 20 8 28 0z"/></svg>';
 
 // Map config branding[] -> our CSS custom properties.
 const BRANDING_TO_VAR = {
@@ -148,13 +151,14 @@ export class MiawUI {
                 <div class="miaw-body">
                     <div class="miaw-messages" aria-live="polite"></div>
                     <div class="miaw-welcome" hidden>
-                        <span class="miaw-welcome__icon">${AGENT_AVATAR_ICON}</span>
                         <div class="miaw-welcome__hi">Hello</div>
                     </div>
                 </div>
                 <footer class="miaw-footer">
-                    <textarea class="miaw-input" rows="1" placeholder="Type your message..." aria-label="Message"></textarea>
-                    <button class="miaw-send" type="button" aria-label="Send" disabled>${SEND_ICON}</button>
+                    <div class="miaw-composer">
+                        <textarea class="miaw-input" rows="1" placeholder="Type your message..." aria-label="Message"></textarea>
+                        <button class="miaw-send" type="button" aria-label="Send" hidden>${SEND_ICON}</button>
+                    </div>
                 </footer>
             </section>`;
         parent.appendChild(root);
@@ -162,6 +166,7 @@ export class MiawUI {
         this.root = root;
         this.fab = root.querySelector('.miaw-fab');
         this.panel = root.querySelector('.miaw-panel');
+        this.body = root.querySelector('.miaw-body');
         this.messages = root.querySelector('.miaw-messages');
         this.welcome = root.querySelector('.miaw-welcome');
         this.menu = root.querySelector('.miaw-menu');
@@ -271,8 +276,7 @@ export class MiawUI {
         this._lastSentAt = now;
         this._sending = true;
         this.input.value = '';
-        this._autoGrow();
-        this.sendBtn.disabled = true;
+        this._autoGrow();        // empties -> hides the send button (ECv2 behavior)
         try {
             // Gate the FIRST message on the identity handshake so the agent
             // resolves this device's Contact (not the demo seed). Subsequent
@@ -295,7 +299,9 @@ export class MiawUI {
         const el = this.input;
         el.style.height = 'auto';
         el.style.height = Math.min(el.scrollHeight, 96) + 'px';
-        this.sendBtn.disabled = el.value.trim().length === 0;
+        // ECv2 shows the send affordance INSIDE the pill only once there's
+        // text; with an empty field the placeholder occupies the full width.
+        this.sendBtn.hidden = el.value.trim().length === 0;
     }
 
     // ---- transport events ------------------------------------------------
@@ -470,7 +476,11 @@ export class MiawUI {
             el.innerHTML =
                 '<span class="miaw-spinner"><span class="miaw-spinner__outer"></span><span class="miaw-spinner__inner"></span></span>'
                 + '<span class="miaw-thinking__label"></span>';
-            this.messages.appendChild(el);
+            // Pinned bottom-left of the body (above the composer), NOT in the
+            // scrolling message flow — matches ECv2's positioned
+            // .spinner-container (left:0; z-index:50). On a short transcript it
+            // stays at the bottom instead of floating up under the last message.
+            this.body.appendChild(el);
             this.busyEl = el;
         }
         this.busyEl.querySelector('.miaw-thinking__label').textContent = text || 'Thinking';
