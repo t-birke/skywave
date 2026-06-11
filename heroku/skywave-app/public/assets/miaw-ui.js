@@ -33,8 +33,8 @@ const BRANDING_TO_VAR = {
 };
 
 export class MiawUI {
-    // opts: { orgId, developerName, scrt2Url, deviceId, title?,
-    //         onConversationOpened?, onSeatConfirm? }
+    // opts: { orgId, developerName, scrt2Url, deviceId, getIdentityToken?,
+    //         title?, onConversationOpened?, onSeatConfirm?, onPay?, onSaveProfile? }
     constructor(opts) {
         this.opts = opts;
         this.title = opts.title || 'Chat';
@@ -45,7 +45,8 @@ export class MiawUI {
             orgId: opts.orgId,
             developerName: opts.developerName,
             scrt2Url: opts.scrt2Url,
-            routingAttributes: opts.deviceId ? { Session_ID: opts.deviceId } : undefined
+            // Verified identity rides the access token (MIAW User Verification).
+            getIdentityToken: opts.getIdentityToken
         });
         this._bindClient();
     }
