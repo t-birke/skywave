@@ -194,7 +194,13 @@ Moving parts (all in `heroku/skywave-app/public/assets/` unless noted):
   ECv2 `arrowup` glyph (encircled up-arrow) shown INSIDE the input pill only
   once there's text — NOT the voice waveform. Strings that are
   deployment-configured (button label, placeholder, header title) are NOT in
-  the bundle — taken from the client screenshots.
+  the bundle — taken from the client screenshots. **Agent-ready gate:** the
+  composer is disabled from chat-open until the agent's FIRST message (or CLT
+  card) lands — during the join→welcome lag the bot isn't listening yet, so
+  anything typed then is silently dropped on the platform. While gated the
+  field reads "Agent is getting ready…" and the bottom-left spinner shows
+  "Agent is getting ready"; `_releaseAgentGate()` (fired from the first inbound
+  `message`/`clt`, or a 30s safety timeout) re-enables + focuses it.
 - `miaw-seatmap.js` + `miaw-cards.js` — standalone ports of the four CLT
   renderer LWCs (seatmap, flight options, payment, profile form), rendering
   the action-output JSON that arrives over the wire. On reload the transcript

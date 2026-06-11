@@ -62,6 +62,12 @@ export class MiawUI {
         this.menuOpen = false;
         this._lastDir = null;          // for avatar grouping (consecutive inbound)
         this._systemHeaderShown = false;
+        // Agent-ready gate: the composer is locked from open until the agent's
+        // FIRST message (the welcome) actually lands. The bot session isn't
+        // listening yet during the join->welcome lag, so anything typed in that
+        // window is dropped on the platform — we prevent it and show why.
+        this._agentReady = false;
+        this._agentReadyTimer = null;
         // Identity handshake gate: the FIRST user message waits until the
         // org confirms (via the WS 'chat_ready' client_action) that this
         // device's Contact carries the ConvId — so the agent's turn-1
@@ -214,6 +220,13 @@ export class MiawUI {
         this.typingEl = this.busyEl = null;
         this._firstMessageSent = false;
         this._chatReady = new Promise((resolve) => { this._resolveChatReady = resolve; });
+        // Reset the agent-ready gate so a reopened chat re-locks until its
+        // fresh welcome lands.
+        clearTimeout(this._agentReadyTimer);
+        this._agentReadyTimer = null;
+        this._agentReady = false;
+        this.input.disabled = false;
+        this.input.placeholder = 'Type your message...';
     }
 
     // ---- show / hide -----------------------------------------------------
@@ -241,10 +254,15 @@ export class MiawUI {
             }
             // ECv2-style session header at the very top of the transcript.
             this._renderSystemHeader();
+            // Lock the composer until the agent's first message lands — see
+            // _lockComposer. (A resumed conversation that backfills prior
+            // messages will release the gate as those replay through 'message'.)
+            this._lockComposer();
             // Non-fatal backfill (resumed conversations); ignore failures.
             this.client.loadEntries().catch(() => {});
         }
-        setTimeout(() => this.input.focus(), 350);
+        // Focus only when the agent is ready; otherwise the lock owns the field.
+        if (this._agentReady) setTimeout(() => this.input.focus(), 350);
     }
 
     hide() {
@@ -252,6 +270,35 @@ export class MiawUI {
         this._closeMenu();
         this.panel.classList.remove('open');
         this.fab.style.display = 'inline-flex';
+    }
+
+    // ---- agent-ready gate -----------------------------------------------
+
+    // Lock the composer between "agent joined" and the agent's first message.
+    // The bot isn't listening during that lag, so early input is lost — we
+    // disable the field, swap the placeholder, and show the bottom-left
+    // spinner with "Agent is getting ready". A safety timeout releases the
+    // gate so a missed/failed welcome can never strand the user.
+    _lockComposer() {
+        this._agentReady = false;
+        this.input.disabled = true;
+        this.input.placeholder = 'Agent is getting ready…';
+        this.sendBtn.hidden = true;
+        this._setBusy('Agent is getting ready');
+        clearTimeout(this._agentReadyTimer);
+        this._agentReadyTimer = setTimeout(() => this._releaseAgentGate(), 30000);
+    }
+
+    // Open the composer the instant the agent is actually live (first inbound
+    // message or CLT card). Idempotent — backfill/typing can call it freely.
+    _releaseAgentGate() {
+        clearTimeout(this._agentReadyTimer);
+        this._agentReadyTimer = null;
+        if (this._agentReady) return;
+        this._agentReady = true;
+        this.input.disabled = false;
+        this.input.placeholder = 'Type your message...';
+        if (this.open) setTimeout(() => this.input.focus(), 50);
     }
 
     // ---- send ------------------------------------------------------------
@@ -262,6 +309,9 @@ export class MiawUI {
         // even with the input-clear below — can double-send if both reads
         // land before the clear. A simple in-flight flag is the robust fix.
         if (this._sending) return;
+        // Composer is gated until the agent's first message — drop any send
+        // that races the lock (belt-and-suspenders; the field is also disabled).
+        if (!this._agentReady) return;
         const text = this.input.value.trim();
         if (!text) return;
         // iOS Safari can deliver a second send for one tap AFTER the first
@@ -329,6 +379,9 @@ export class MiawUI {
         this._dismissWelcome();
         if (m.text == null && m.raw) return;  // unsupported types: skip silently
         const inbound = m.direction !== 'outbound';
+        // The agent's first inbound message means the bot is live — open the
+        // composer (no-op if already open, e.g. on later messages/backfill).
+        if (inbound) this._releaseAgentGate();
 
         const row = document.createElement('div');
         row.className = `miaw-row ${inbound ? 'inbound' : 'outbound'}`;
@@ -369,6 +422,7 @@ export class MiawUI {
         this._clearTyping();
         this._clearBusy();
         this._dismissWelcome();
+        this._releaseAgentGate();   // a card is live agent output — open the composer
         // Optional lead-in text from the ExperienceType message.
         if (c.message) this._renderMessage({ direction: 'inbound', text: c.message, senderDisplayName: c.senderDisplayName, timestamp: c.timestamp });
         // Route each action-output value to the matching card renderer. We
