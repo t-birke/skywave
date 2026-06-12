@@ -33,9 +33,7 @@ export function VisitorPanel({ visitor, optionImages, onClose }: VisitorPanelPro
   return (
     <div
       style={{
-        position: 'absolute',
-        top: 16,
-        right: 16,
+        position: 'relative',
         width: 280,
         background: 'rgba(13,17,23,0.92)',
         border: '1px solid rgba(0,180,216,0.25)',
@@ -45,6 +43,7 @@ export function VisitorPanel({ visitor, optionImages, onClose }: VisitorPanelPro
         color: 'rgba(0,180,216,0.9)',
         boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
         backdropFilter: 'blur(6px)',
+        pointerEvents: 'auto',
       }}
     >
       {/* Close */}

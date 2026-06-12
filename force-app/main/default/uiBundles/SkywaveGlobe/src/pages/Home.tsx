@@ -4,7 +4,6 @@ import { toMarkers, toArcs } from '@/data/visitors';
 import { useDemoFeed, type FeedStatus } from '@/data/useDemoFeed';
 import { useReplay } from '@/data/useReplay';
 import { loadOptionImageMap, type OptionImageMap } from '@/data/surveyImages';
-import { VisitorPanel } from '@/components/VisitorPanel';
 
 const STATUS_COLOR: Record<FeedStatus, string> = {
   connecting: '#e0a000',
@@ -64,6 +63,9 @@ export default function Home() {
         arcs={arcs}
         selectedId={selectedId}
         onSelectMarker={id => setSelectedId(prev => (prev === id ? null : id))}
+        selectedVisitor={selectedVisitor}
+        optionImages={optionImages}
+        onClosePanel={() => setSelectedId(null)}
       />
 
       {/* HUD: status/stage + replay presets. */}
@@ -167,15 +169,6 @@ export default function Home() {
           </div>
         )}
       </div>
-
-      {/* Clicked-visitor detail panel. */}
-      {selectedVisitor && (
-        <VisitorPanel
-          visitor={selectedVisitor}
-          optionImages={optionImages}
-          onClose={() => setSelectedId(null)}
-        />
-      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useMemo, useRef, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Line, Sphere } from '@react-three/drei';
+import { OrbitControls, Line, Sphere, Html } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import { atmosphereVertexShader, atmosphereFragmentShader } from './shaders/atmosphere';
@@ -8,7 +8,10 @@ import { latLngToVector3, createEarthTexture } from './data/geo';
 import { GlobeMarker } from './GlobeMarker';
 import { GlobeArc } from './GlobeArc';
 import { GlobeAirports } from './GlobeAirports';
+import { VisitorPanel } from '@/components/VisitorPanel';
 import type { GlobeMarker as GlobeMarkerData, GlobeArcData } from './types';
+import type { Visitor } from '@/data/visitors';
+import type { OptionImageMap } from '@/data/surveyImages';
 
 const GLOBE_RADIUS = 1;
 const GRID_COLOR = '#1a3a5c';
@@ -204,6 +207,10 @@ interface HoloGlobeProps {
   arcs?: GlobeArcData[];
   selectedId?: string | null;
   onSelectMarker?: (id: string) => void;
+  /** Visitor + option-image map for the click-anchored detail panel. */
+  selectedVisitor?: Visitor | null;
+  optionImages?: OptionImageMap;
+  onClosePanel?: () => void;
 }
 
 export function HoloGlobe({
@@ -211,8 +218,17 @@ export function HoloGlobe({
   arcs = [],
   selectedId,
   onSelectMarker,
+  selectedVisitor,
+  optionImages = {},
+  onClosePanel,
 }: HoloGlobeProps) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
+
+  // World position of the selected marker, so the panel can anchor to it.
+  const selectedPos = useMemo(
+    () => markers.find(m => m.id === selectedId)?.position ?? null,
+    [markers, selectedId]
+  );
 
   return (
     <div className="h-full w-full">
@@ -243,6 +259,30 @@ export function HoloGlobe({
           {arcs.map(arc => (
             <GlobeArc key={arc.id} start={arc.start} end={arc.end} label={arc.label} />
           ))}
+
+          {/* Detail panel anchored to the selected avatar — tracks the globe
+              as the camera orbits (reprojected every frame by <Html>). */}
+          {selectedVisitor && selectedPos && (
+            <Html
+              position={selectedPos}
+              style={{ pointerEvents: 'none' }}
+              zIndexRange={[100, 0]}
+              // Offset the panel up-and-right of the avatar so it doesn't
+              // cover the marker it describes.
+              calculatePosition={(_el, camera, size) => {
+                const v = new THREE.Vector3(...selectedPos).project(camera);
+                const x = (v.x * 0.5 + 0.5) * size.width;
+                const y = (-v.y * 0.5 + 0.5) * size.height;
+                return [x + 24, y - 24];
+              }}
+            >
+              <VisitorPanel
+                visitor={selectedVisitor}
+                optionImages={optionImages}
+                onClose={onClosePanel ?? (() => {})}
+              />
+            </Html>
+          )}
         </GlobeScene>
 
         <CameraController
