@@ -16,12 +16,20 @@ import * as THREE from 'three';
 
 const SEGMENTS = 64;
 
+// The globe is a unit sphere, so 1 unit == Earth's radius. Express the arch
+// height in real km and convert, so it's tunable in human terms.
+const EARTH_RADIUS_KM = 6371;
+const APEX_PER_RADIAN_KM = 190; // arch grows with arc length…
+const MAX_APEX_KM = 320; // …but a long haul tops out here (~300 km)
+
 /**
- * Peak lift of the arch above the surface, scaled by arc length (great-circle
- * angle ω in radians) and capped so a half-globe route doesn't tower.
+ * Peak lift of the arch above the surface, in globe units. Scales with arc
+ * length (great-circle angle ω in radians) and caps near MAX_APEX_KM so a
+ * half-globe route stays a low, flat arch rather than towering thousands of km.
  */
 function peakAltitude(omega: number): number {
-  return Math.min(omega * 0.18, 0.35);
+  const km = Math.min(omega * APEX_PER_RADIAN_KM, MAX_APEX_KM);
+  return km / EARTH_RADIUS_KM;
 }
 
 /** Point at parameter t along the arc (t=0.5 → top-centre of the flight path). */
