@@ -122,11 +122,13 @@ export function GlobeMarker({
         <Html center style={{ pointerEvents: 'none' }} position={[0, 0, 0]}>
           <div
             style={{
-              width: selected ? '34px' : '26px',
-              height: selected ? '34px' : '26px',
+              width: selected ? '38px' : '30px',
+              height: selected ? '38px' : '30px',
               borderRadius: '50%',
-              border: `2px solid ${color}`,
-              boxShadow: `0 0 8px ${color}`,
+              border: `2.5px solid ${color}`,
+              // Layered glow: tight bright core + soft wide halo so the
+              // avatar reads as lit, not painted on the surface.
+              boxShadow: `0 0 6px ${color}, 0 0 16px ${color}99, 0 0 2px #ffffff`,
               overflow: 'hidden',
               background: '#0d1117',
               opacity: dimmed ? 0.35 : 1,
@@ -137,7 +139,14 @@ export function GlobeMarker({
               src={avatarUrl}
               alt=""
               referrerPolicy="no-referrer"
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                display: 'block',
+                // Lift the photo so faces pop against the dark globe.
+                filter: 'brightness(1.12) contrast(1.08) saturate(1.1)',
+              }}
             />
           </div>
         </Html>
