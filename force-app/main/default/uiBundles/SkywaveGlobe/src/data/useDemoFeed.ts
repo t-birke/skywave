@@ -13,13 +13,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { CometD } from 'cometd';
 import { ReplayExtension } from './cometdReplay';
-import type { Visitor, RouteLeg } from './visitors';
+import type { Visitor } from './visitors';
+import {
+  applyPlatformEvent,
+  snapshot,
+  SESSION_TTL_MS,
+  type VisitorMap,
+  type PlatformEventPayload,
+} from './visitorReducer';
 
 const EVENT_CHANNEL = '/event/Demo_Event__e';
 const STATE_CHANNEL = '/event/Demo_State_Change__e';
-// Session is considered stale without a fresh event for this long (matches
-// the LWC's SESSION_TTL_MS).
-const SESSION_TTL_MS = 30 * 60 * 1000;
 
 export type FeedStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
@@ -29,29 +33,13 @@ export interface DemoFeed {
   status: FeedStatus;
 }
 
-function parseInner(jsonStr: string | null | undefined): Record<string, unknown> {
-  if (!jsonStr) return {};
-  try {
-    return JSON.parse(jsonStr);
-  } catch {
-    return {};
-  }
-}
-
-function toNumber(v: unknown): number | null {
-  if (v === null || v === undefined) return null;
-  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-  const n = parseFloat(String(v));
-  return Number.isFinite(n) ? n : null;
-}
-
 export function useDemoFeed(activeDemoSessionId?: string | null): DemoFeed {
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [stage, setStage] = useState<string>('idle');
   const [status, setStatus] = useState<FeedStatus>('connecting');
 
   // Mutable visitor map keyed by sessionId; flushed to state on each event.
-  const bySession = useRef<Map<string, Visitor & { lastSeen: number }>>(new Map());
+  const bySession = useRef<VisitorMap>(new Map());
 
   useEffect(() => {
     const cometd = new CometD();
@@ -73,84 +61,24 @@ export function useDemoFeed(activeDemoSessionId?: string | null): DemoFeed {
 
     let unloaded = false;
 
-    const flush = () => {
+    const handleEvent = (payload: PlatformEventPayload) => {
       const now = Date.now();
-      const live = [...bySession.current.values()].filter(
-        v => now - v.lastSeen < SESSION_TTL_MS
-      );
-      setVisitors(live.map(({ lastSeen: _lastSeen, ...v }) => v));
-    };
-
-    const handleEvent = (payload: Record<string, unknown>) => {
-      const demoSessionId = payload.Demo_Session_Id__c as string | undefined;
-      // Scope to the active demo run if one is set.
-      if (
-        activeDemoSessionId &&
-        demoSessionId &&
-        demoSessionId !== activeDemoSessionId
-      ) {
-        return;
+      if (applyPlatformEvent(bySession.current, payload, now, activeDemoSessionId)) {
+        setVisitors(snapshot(bySession.current, now, SESSION_TTL_MS));
       }
-      const sessionId = payload.Session_Id__c as string | undefined;
-      if (!sessionId) return;
-
-      const now = Date.now();
-      let v = bySession.current.get(sessionId);
-      if (!v) {
-        v = { sessionId, lastSeen: now, surveyComplete: false };
-        bySession.current.set(sessionId, v);
-      }
-      v.lastSeen = now;
-
-      const inner = parseInner(payload.Payload_Json__c as string);
-
-      switch (payload.Type__c) {
-        case 'session_started': {
-          const lat = toNumber(inner.lat);
-          const lon = toNumber(inner.lon);
-          if (lat !== null) v.lat = lat;
-          if (lon !== null) v.lon = lon;
-          if (inner.city) v.city = inner.city as string;
-          break;
-        }
-        case 'survey_complete': {
-          v.surveyComplete = true;
-          const lat = toNumber(inner.lat);
-          const lon = toNumber(inner.lon);
-          if (lat !== null) v.lat = lat;
-          if (lon !== null) v.lon = lon;
-          if (inner.city) v.city = inner.city as string;
-          break;
-        }
-        case 'flight_booked':
-          v.route = {
-            legs: Array.isArray(inner.legs) ? (inner.legs as RouteLeg[]) : [],
-            isConnection: !!inner.isConnection,
-          };
-          break;
-        case 'seat_changed':
-          v.seat = (inner.seat as string) || null;
-          break;
-        case 'profile_created':
-          v.firstName = (inner.firstName as string) || null;
-          v.lastName = (inner.lastName as string) || null;
-          v.avatarUrl = (inner.avatarUrl as string) || null;
-          break;
-        default:
-          break;
-      }
-      flush();
     };
 
     cometd.handshake(hs => {
       if (hs.successful) {
         setStatus('connected');
         cometd.subscribe(EVENT_CHANNEL, msg => {
-          const data = msg.data as { payload?: Record<string, unknown> };
+          const data = msg.data as { payload?: PlatformEventPayload };
           if (data?.payload) handleEvent(data.payload);
         });
         cometd.subscribe(STATE_CHANNEL, msg => {
-          const data = msg.data as { payload?: Record<string, unknown> };
+          const data = msg.data as {
+            payload?: { Demo_Session_Id__c?: string; New_State__c?: string };
+          };
           const p = data?.payload;
           if (!p) return;
           if (

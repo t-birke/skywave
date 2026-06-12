@@ -99,6 +99,21 @@ export default defineConfig(({ command }) => {
                 });
               },
             },
+            // SOQL bridge for replay — forwards /sf-query?q=... to the org
+            // REST query API with the token injected. Stands in for the
+            // GraphQL SDK until the bundle deploys in-org.
+            '/sf-query': {
+              target: org.instanceUrl,
+              changeOrigin: true,
+              secure: true,
+              rewrite: (p: string) =>
+                p.replace(/^\/sf-query/, '/services/data/v60.0/query'),
+              configure: proxy => {
+                proxy.on('proxyReq', proxyReq => {
+                  proxyReq.setHeader('Authorization', `Bearer ${org.accessToken}`);
+                });
+              },
+            },
           },
         }
       : undefined,
