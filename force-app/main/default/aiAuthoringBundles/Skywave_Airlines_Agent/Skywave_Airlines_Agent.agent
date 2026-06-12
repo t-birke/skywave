@@ -68,6 +68,9 @@ variables:
     seat_target_booking_code: mutable string = ""
         label: "Seat Change: Target Booking Code"
         description: "Confirmation code of the booking being seat-changed. Gates the deterministic segment-count run."
+    seat_enabled: mutable boolean = False
+        label: "Seat Change Enabled"
+        description: "True once the active demo session reaches the agent_seat_pass stage. Gates the seat_selection route so the presenter can enable seat-change mid-conversation (no reload). Set by check_seat_enabled at the router."
     resolved_contact_id: mutable string = "003000000000000"
         description: "Resolved Contact Id for the current visitor (placeholder until resolve_session runs)."
     selected_fare_class: mutable string = ""
@@ -159,6 +162,15 @@ start_agent agent_router:
                     set @variables.seat_target_booking_code = @outputs.singleBookingCode
                     set @variables.bookings_refreshed_post_confirm = True
 
+            # Live seat-enable check. Runs only while seat is still disabled AND the
+            # visitor has a booking to change — so it's free during search/profile/
+            # payment (no booking yet) and stops the moment the presenter flips the
+            # demo to agent_seat_pass. Lets seat-change turn on mid-conversation with
+            # no reload: the next user turn re-reads the active Demo_Session__c stage.
+            if @variables.seat_enabled is False and @variables.active_booking_count > 0:
+                run @actions.check_seat_enabled
+                    set @variables.seat_enabled = @outputs.enabled
+
             if @variables.booking_step == "profile" or @variables.booking_step == "payment" or @variables.booking_step == "confirm":
                 transition to @subagent.flight_booking
 
@@ -169,7 +181,6 @@ start_agent agent_router:
               Route by intent:
               - Booking a NEW flight (search, choose, pay) OR vague travel intent ("surprise me", "somewhere warm", "I want to travel") -> use go_to_flight_booking
               - Viewing, canceling, or changing an EXISTING booking or flight -> use go_to_flight_management
-              - Seat selection or seat changes on an existing booking -> use go_to_seat_selection
               - Correcting or updating the traveler's OWN profile (first name, last name, email, phone, or avatar) -> use go_to_profile_management
               - Mileage balance, tier points, loyalty points, or frequent flyer miles (NOT a supported capability) -> use go_to_off_topic. Do NOT route these to go_to_profile_management.
               - Support cases, complaints, case status, opening/creating a case, or issues like lost baggage (NOT a supported capability) -> use go_to_off_topic. Do NOT route these to go_to_flight_management.
@@ -177,6 +188,12 @@ start_agent agent_router:
               - Ambiguous within an airline context (visitor wants something but isn't clear which booking/seat/etc.) -> use go_to_ambiguous_question
               - Genuinely off-topic and unrelated to travel/airlines (weather chitchat, news, jokes, code help, general knowledge) -> use go_to_off_topic
               Never attempt to help the customer yourself. Always route.
+
+            if @variables.seat_enabled is True:
+                | - Seat selection or seat changes on an existing booking -> use go_to_seat_selection
+
+            if @variables.seat_enabled is False:
+                | Seat selection / seat changes are NOT available right now. If the visitor asks to choose or change a seat, do NOT route to seat selection (that capability is currently unavailable). Use go_to_off_topic, which will briefly explain seat changes aren't available yet and offer what you CAN do.
 
         actions:
             go_to_flight_booking: @utils.transition to @subagent.flight_booking
@@ -196,6 +213,7 @@ start_agent agent_router:
 
             go_to_seat_selection: @utils.transition to @subagent.seat_selection
                 description: "Select or change the seat on one of the visitor's bookings, or explain there is no booking to change"
+                available when @variables.seat_enabled is True
 
             go_to_profile_management: @utils.transition to @subagent.profile_management
                 description: "Update the traveler's own profile (first name, last name, email, phone, or avatar) on their Contact — not tied to a booking"
@@ -345,6 +363,33 @@ start_agent agent_router:
                     is_used_by_planner: True
                 "success": boolean
                     description: "true if the action completed without error"
+                    label: "success"
+                    is_displayable: False
+                    is_used_by_planner: True
+
+        check_seat_enabled:
+            description: "Returns whether seat-change is enabled right now (active demo session at the agent_seat_pass stage). Read at the router so a presenter can enable seat-change mid-conversation."
+            label: "Check Seat Enabled"
+            require_user_confirmation: False
+            include_in_progress_indicator: False
+            target: "apex://Skywave_CheckSeatEnabled"
+
+            inputs:
+                "ignored": string
+                    description: "Unused; the active demo session is resolved server-side."
+                    label: "Ignored"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "enabled": boolean
+                    description: "True when seat-change is enabled (active demo session at agent_seat_pass)."
+                    label: "enabled"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "success": boolean
+                    description: "true if the check ran without error"
                     label: "success"
                     is_displayable: False
                     is_used_by_planner: True
@@ -949,8 +994,9 @@ subagent off_topic:
             | Your job is to redirect the conversation to relevant topics politely and succinctly.
               NEVER answer general knowledge questions. Only respond to general greetings and questions about your capabilities.
               Do not acknowledge the off-topic question. Redirect by asking how you can help with their flight bookings.
-              If the visitor asks about mileage, tier points, loyalty points, or frequent flyer miles: that is not something you can help with right now. Say so briefly — do NOT promise to look it up — and redirect to what you CAN do (book a flight, change a seat, or update their profile).
-              If the visitor wants to open a support case, file a complaint, check a case, or raise an issue like lost baggage: that is not something you can do here right now. Say so briefly — do NOT promise to create or look up a case — and offer what you CAN do (book a flight, change a seat, or update their profile), or to connect them with a human agent if they'd like.
+              If the visitor asks about mileage, tier points, loyalty points, or frequent flyer miles: that is not something you can help with right now. Say so briefly — do NOT promise to look it up — and redirect to what you CAN do (book a flight or update their profile).
+              If the visitor wants to open a support case, file a complaint, check a case, or raise an issue like lost baggage: that is not something you can do here right now. Say so briefly — do NOT promise to create or look up a case — and offer what you CAN do (book a flight or update their profile), or to connect them with a human agent if they'd like.
+              If the visitor asks to choose or change a seat: seat selection isn't available right now. Say so briefly — do NOT promise to do it or pull up a seat map — and offer what you CAN do (book a flight or update their profile).
 
 subagent ambiguous_question:
     label: "Ambiguous Question"
