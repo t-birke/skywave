@@ -268,9 +268,17 @@ export function HoloGlobe({
               style={{ pointerEvents: 'none' }}
               zIndexRange={[100, 0]}
               // Offset the panel up-and-right of the avatar so it doesn't
-              // cover the marker it describes.
+              // cover the marker it describes. When the anchor avatar rotates
+              // behind the globe, park the panel far off-screen so it doesn't
+              // float over the backside pointing at a hidden marker.
               calculatePosition={(_el, camera, size) => {
-                const v = new THREE.Vector3(...selectedPos).project(camera);
+                const p = new THREE.Vector3(...selectedPos);
+                const camDir = new THREE.Vector3()
+                  .subVectors(camera.position, p)
+                  .normalize();
+                const facing = p.clone().normalize().dot(camDir);
+                if (facing <= 0.08) return [-99999, -99999];
+                const v = p.project(camera);
                 const x = (v.x * 0.5 + 0.5) * size.width;
                 const y = (-v.y * 0.5 + 0.5) * size.height;
                 return [x + 24, y - 24];

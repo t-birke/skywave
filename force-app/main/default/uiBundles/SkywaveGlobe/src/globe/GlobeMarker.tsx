@@ -37,6 +37,11 @@ export function GlobeMarker({
   const ringRef = useRef<THREE.Mesh>(null);
   const pulseRef = useRef<THREE.Mesh>(null);
   const dotRef = useRef<THREE.Mesh>(null);
+  // Wrapper divs for the HTML overlays — CSS overlays can't depth-test against
+  // the WebGL globe, so we hide them ourselves when the marker is on the far
+  // side (occlusion).
+  const avatarWrapRef = useRef<HTMLDivElement>(null);
+  const labelWrapRef = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState(false);
   const { camera } = useThree();
 
@@ -62,6 +67,19 @@ export function GlobeMarker({
     }
     if (ringRef.current) {
       (ringRef.current.material as THREE.MeshBasicMaterial).opacity = 0.6 * finalOpacity;
+    }
+
+    // Occlude the HTML overlays (avatar + label) when the marker passes behind
+    // the globe's horizon. `facing <= 0` means it's on the far hemisphere; a
+    // small positive threshold hides it right at the limb so no sliver bleeds
+    // through the edge.
+    const occluded = facing <= 0.08;
+    if (avatarWrapRef.current) {
+      avatarWrapRef.current.style.opacity = occluded ? '0' : dimmed ? '0.35' : '1';
+      avatarWrapRef.current.style.visibility = occluded ? 'hidden' : 'visible';
+    }
+    if (labelWrapRef.current) {
+      labelWrapRef.current.style.visibility = occluded ? 'hidden' : 'visible';
     }
 
     if (status === 'alert' && ringRef.current) {
@@ -121,6 +139,7 @@ export function GlobeMarker({
       {avatarUrl && (
         <Html center style={{ pointerEvents: 'none' }} position={[0, 0, 0]}>
           <div
+            ref={avatarWrapRef}
             style={{
               width: selected ? '38px' : '30px',
               height: selected ? '38px' : '30px',
@@ -190,6 +209,7 @@ export function GlobeMarker({
           position={[0, avatarUrl ? -0.1 : -0.06, 0]}
         >
           <div
+            ref={labelWrapRef}
             style={{
               fontFamily: 'monospace',
               fontSize: '7px',
