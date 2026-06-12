@@ -1,75 +1,50 @@
-# Base React App
+# SkywaveGlobe — 3D globe demo monitor
 
-Base React App is a template application that demonstrates how to build a React UI Bundle on the Salesforce platform with Vite, TypeScript, Tailwind, shadcn/ui, and the Salesforce UI Bundle SDK. It provides a minimal shell (home, 404), routing, and GraphQL codegen support so feature apps can extend it via the patches pipeline.
+A spinning 3D Earth that plots live Skywave demo visitors as glowing avatars
+with great-circle flight arcs, plus an N-hour time-lapse replay. Built as a
+React **UIBundle** (Salesforce Multi-Framework) — the successor to the 2D
+`skywaveDemoMonitor`/`skywaveWorldMap` LWCs.
 
-This UI Bundle lives inside an SFDX project. The project root is the directory that contains `force-app/` and `sfdx-project.json`. Run the commands in the sections below from the paths indicated.
+> **Full docs:** see [`docs/GLOBE_MONITOR.md`](../../../../../docs/GLOBE_MONITOR.md)
+> (from repo root) for architecture, file map, the Monday in-org deploy plan,
+> and gotchas. This README is just the run/build/deploy commands.
 
-## Table of contents
-
-- [Run (development)](#run-development)
-- [Build](#build)
-- [Deploy](#deploy)
-- [Test](#test)
-
-## Run (development)
-
-From the UI Bundle directory (`force-app/main/default/uiBundles/base-react-app`):
+## Run locally (the fast loop)
 
 ```bash
-npm install
-npm run dev
+npm install          # first time
+npm run dev          # Vite → http://localhost:5173
 ```
 
-This starts the Vite dev server (e.g. http://localhost:5173). Use `npm run dev:design` to run in design mode.
+Requires the `si` org authed (`sf org display --target-org si`). The Vite dev
+server proxies `/cometd` (live data) and `/sf-query` (replay SOQL) to the org
+with a bearer token injected — no in-org deploy needed to iterate. Override the
+org with `SKYWAVE_ORG=<alias> npm run dev`.
+
+No live activity? Click **24H** in the HUD to replay the last 24h from records.
 
 ## Build
 
-From the UI Bundle directory:
-
 ```bash
-npm install
-npm run build
+npm run build        # → dist/ (the deploy payload; gitignored, rebuild before deploy)
 ```
 
-The production build is written to `dist/` inside the UI Bundle folder. Deploy using the steps in [Deploy](#deploy).
+## Deploy to org (GATED until the Multi-Framework release update)
 
-## Deploy
-
-From the **SFDX project root** (the directory that contains `force-app/`):
-
-1. Build the UI Bundle:
-
-   ```bash
-   cd force-app/main/default/uiBundles/base-react-app && npm install && npm run build && cd -
-   ```
-
-2. Deploy the UI Bundle only:
-
-   ```bash
-   sf project deploy start --source-dir force-app/main/default/ui-bundles --target-org <alias>
-   ```
-
-   Or deploy all metadata:
-
-   ```bash
-   sf project deploy start --source-dir force-app --target-org <alias>
-   ```
-
-   Replace `<alias>` with your target org alias.
-
-## Test
-
-From the UI Bundle directory:
+`UIBundle` metadata can't deploy until the Setup-UI feature gate is enabled
+(org preference `UIBundleSettings.webAppOptIn` is already set). Once enabled —
+from the **SFDX project root**:
 
 ```bash
-npm install
-npm run test
+cd force-app/main/default/uiBundles/SkywaveGlobe && npm install && npm run build && cd -
+sf project deploy start --source-dir force-app/main/default/uiBundles --target-org si
 ```
 
-This runs the unit test suite (Vitest). For end-to-end tests from the **base-react-app package root**:
+Then launch from the App Launcher ("SkywaveGlobe"). See the Monday checklist in
+`docs/GLOBE_MONITOR.md` §6 — including the in-org data-path swap (Vite proxies →
+CometD same-origin / GraphQL SDK).
 
-```bash
-npm run test:e2e
-```
+## Stack
 
-This installs dependencies, builds with E2E asset rewrites, and runs Playwright. Ensure Chromium is installed (`npx playwright install chromium` if needed).
+React 19 · Vite · TypeScript · Tailwind · three.js + @react-three/fiber +
+@react-three/drei · cometd (Streaming API) · @salesforce/sdk-data (in-org GraphQL).

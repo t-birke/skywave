@@ -62,6 +62,7 @@ the stage list and the rationale (it replaced a manual "check state" button).
 | ├ `triggers/` | 4 triggers (Demo_Session, Contact-update PE, phone-digits, VoiceCall resolve) |
 | ├ `lwc/` | Chat/voice cards (CLT renderers), demo monitor, survey author, contact card |
 | ├ `objects/` | Custom objects + the Platform Events + custom fields on Contact/VoiceCall |
+| ├ `uiBundles/SkywaveGlobe/` | **3D globe demo monitor** — React UIBundle (Salesforce Multi-Framework). Successor to the 2D `skywaveDemoMonitor`/`skywaveWorldMap` LWCs. See §3b'' and **`docs/GLOBE_MONITOR.md`**. Runs locally today (`npm run dev`); in-org deploy gated until the Multi-Framework release update. |
 | `heroku/skywave-app/` | Node app: static consumer site + WebSocket state relay |
 | └ `public/assets/website.css/.js` | Skywave Airlines marketing-site backdrop (nav, hero, search, deals, footer). Visible to every audience phone behind the demo modal. Extensible target for future booking/account features. |
 | └ `public/assets/site.css/.js` | The demo flow itself. Renders into a centered modal (`#modal-content`) overlaid on the website backdrop. Modal is hidden during agent stages so the chat icon takes over. Closable any time via X. |
@@ -334,6 +335,41 @@ lat/lon math (`x = lon + 180`, `y = 90 − lat`).
 
 The `Skywave_Agent_User` permset grants `Demo_Event__e` Create (= publish
 on a Platform Event) so the bot user's monitor publishes go through.
+
+### 3b''. Visitor activity → 3D globe monitor (React UIBundle)
+
+The **`SkywaveGlobe`** UIBundle (`force-app/main/default/uiBundles/SkywaveGlobe/`)
+is the successor to the 2D `skywaveDemoMonitor`/`skywaveWorldMap` LWCs above —
+a spinning 3D Earth that plots the same visitors as glowing avatars with
+great-circle flight arcs, plus an N-hour time-lapse **replay**. It's built with
+the new **Salesforce Multi-Framework / UIBundle** capability (React +
+react-three-fiber + Vite), not LWC.
+
+It consumes the **same** `Demo_Event__e` channel, but the transport differs by
+necessity:
+
+```
+  Demo_Event__e ──┬─ LIVE ──▶ CometD Streaming API (/cometd)
+                  │            (empApi is LWC-only; the UIBundle SDK has no
+                  │             streaming → use CometD directly from React)
+                  │
+                  └─ REPLAY ─▶ NOT the event buffer. HighVolume PEs aren't
+                               replayable over CometD, so replay reconstructs a
+                               Demo_Event-shaped timeline from PERSISTED RECORDS
+                               (Contact geo/avatar/survey-json + Booking→Segment
+                               →Flight) ordered by CreatedDate.
+```
+
+Both paths fold through one shared reducer (`visitorReducer.ts`) so live and
+replay look identical. **Local dev** runs the React app on a Vite server that
+proxies `/cometd` (live) and `/sf-query` (replay SOQL) to `si` with a bearer
+token injected — no in-org deploy needed to iterate.
+
+**Status:** runs locally now (`cd uiBundles/SkywaveGlobe && npm run dev`).
+In-org deploy is gated until the Multi-Framework feature opens (org preference
+`UIBundleSettings.webAppOptIn` is already set; the Setup-UI feature gate lands
+with the release update). Full architecture, file map, run steps, the Monday
+deploy checklist, and gotchas are in **`docs/GLOBE_MONITOR.md`**.
 
 ### 3c''. Past-booking gate
 
