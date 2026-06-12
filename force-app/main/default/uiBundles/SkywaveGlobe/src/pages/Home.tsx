@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { HoloGlobe } from '@/globe/HoloGlobe';
 import { toMarkers, toArcs } from '@/data/visitors';
 import { useDemoFeed, type FeedStatus } from '@/data/useDemoFeed';
 import { useReplay } from '@/data/useReplay';
+import { loadOptionImageMap, type OptionImageMap } from '@/data/surveyImages';
+import { VisitorPanel } from '@/components/VisitorPanel';
 
 const STATUS_COLOR: Record<FeedStatus, string> = {
   connecting: '#e0a000',
@@ -35,6 +37,17 @@ export default function Home() {
 
   const markers = useMemo(() => toMarkers(visitors), [visitors]);
   const arcs = useMemo(() => toArcs(visitors), [visitors]);
+
+  // Survey-option → image map, fetched once; used to resolve answer thumbs.
+  const [optionImages, setOptionImages] = useState<OptionImageMap>({});
+  useEffect(() => {
+    loadOptionImageMap().then(setOptionImages);
+  }, []);
+
+  const selectedVisitor = useMemo(
+    () => (selectedId ? visitors.find(v => v.sessionId === selectedId) ?? null : null),
+    [selectedId, visitors]
+  );
 
   const pick = (hours: number | null) => {
     setSelectedId(null);
@@ -154,6 +167,15 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* Clicked-visitor detail panel. */}
+      {selectedVisitor && (
+        <VisitorPanel
+          visitor={selectedVisitor}
+          optionImages={optionImages}
+          onClose={() => setSelectedId(null)}
+        />
+      )}
     </div>
   );
 }

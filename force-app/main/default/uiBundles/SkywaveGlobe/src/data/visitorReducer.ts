@@ -78,6 +78,25 @@ export function applyPlatformEvent(
       if (inner.city) v.city = inner.city as string;
       break;
     }
+    case 'survey_answer': {
+      const questionKey = inner.questionKey as string | undefined;
+      const answerKey = inner.answerKey as string | undefined;
+      if (questionKey && answerKey) {
+        const next = {
+          questionKey,
+          answerKey,
+          answerText: (inner.answerText as string) || answerKey,
+          imageUrl: null, // resolved at render time via the option-image map
+        };
+        // Dedupe by question — a re-answer replaces the earlier one.
+        const list = v.answers ?? [];
+        const idx = list.findIndex(a => a.questionKey === questionKey);
+        if (idx >= 0) list[idx] = next;
+        else list.push(next);
+        v.answers = list;
+      }
+      break;
+    }
     case 'flight_booked':
       v.route = {
         legs: Array.isArray(inner.legs) ? (inner.legs as RouteLeg[]) : [],

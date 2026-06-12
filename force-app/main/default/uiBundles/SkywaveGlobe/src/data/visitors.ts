@@ -16,6 +16,14 @@ export interface RouteLeg {
   to: string;
 }
 
+/** One survey answer the visitor gave, with its resolved thumbnail. */
+export interface SurveyAnswer {
+  questionKey: string;
+  answerKey: string;
+  answerText?: string | null;
+  imageUrl?: string | null;
+}
+
 export interface Visitor {
   sessionId: string;
   firstName?: string | null;
@@ -29,6 +37,8 @@ export interface Visitor {
   /** Set once a flight is booked. */
   route?: { legs: RouteLeg[]; isConnection: boolean } | null;
   surveyComplete?: boolean;
+  /** Survey answers given so far (deduped by questionKey). */
+  answers?: SurveyAnswer[];
   /** Exception flag (e.g. payment/seat failure) → renders as alert. */
   alert?: boolean;
 }
@@ -68,12 +78,22 @@ const SURFACE_LIFT = 1.01;
  */
 function routeEndpoints(
   legs: RouteLeg[]
-): { origin: [number, number]; dest: [number, number] } | null {
+): {
+  origin: [number, number];
+  dest: [number, number];
+  originCode: string;
+  destCode: string;
+} | null {
   if (!legs.length) return null;
   const origin = airport(legs[0].from);
   const dest = airport(legs[legs.length - 1].to);
   if (!origin || !dest) return null;
-  return { origin: [origin.lon, origin.lat], dest: [dest.lon, dest.lat] };
+  return {
+    origin: [origin.lon, origin.lat],
+    dest: [dest.lon, dest.lat],
+    originCode: origin.code,
+    destCode: dest.code,
+  };
 }
 
 export interface VisitorMarker extends GlobeMarker {
@@ -122,6 +142,7 @@ export function toArcs(visitors: Visitor[]): GlobeArcData[] {
       id: `${v.sessionId}:route`,
       start: latLngToArray(ep.origin[1], ep.origin[0], GLOBE_RADIUS * SURFACE_LIFT),
       end: latLngToArray(ep.dest[1], ep.dest[0], GLOBE_RADIUS * SURFACE_LIFT),
+      label: `${ep.originCode} → ${ep.destCode}`,
     });
   }
   return arcs;

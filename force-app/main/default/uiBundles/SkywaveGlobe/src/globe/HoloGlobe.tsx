@@ -7,6 +7,7 @@ import { atmosphereVertexShader, atmosphereFragmentShader } from './shaders/atmo
 import { latLngToVector3, createEarthTexture } from './data/geo';
 import { GlobeMarker } from './GlobeMarker';
 import { GlobeArc } from './GlobeArc';
+import { GlobeAirports } from './GlobeAirports';
 import type { GlobeMarker as GlobeMarkerData, GlobeArcData } from './types';
 
 const GLOBE_RADIUS = 1;
@@ -192,6 +193,7 @@ function GlobeScene({ children }: { children?: React.ReactNode }) {
       <GlobeGrid />
       <Atmosphere />
       <RadarSweep />
+      <GlobeAirports />
       {children}
     </group>
   );
@@ -239,7 +241,7 @@ export function HoloGlobe({
             />
           ))}
           {arcs.map(arc => (
-            <GlobeArc key={arc.id} start={arc.start} end={arc.end} />
+            <GlobeArc key={arc.id} start={arc.start} end={arc.end} label={arc.label} />
           ))}
         </GlobeScene>
 

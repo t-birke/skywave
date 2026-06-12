@@ -29,6 +29,7 @@ interface ContactRow {
   Geo_City__c: string | null;
   Session_Id__c: string | null;
   Demo_Session__c: string | null;
+  Skywave_Survey_Json__c: string | null;
   CreatedDate: string;
 }
 
@@ -83,10 +84,12 @@ export async function fetchReplayTimeline(
     ? `AND Booking__r.Contact__r.Demo_Session__c = '${activeDemoSessionId}'`
     : '';
 
-  // Contacts → session_started (geo) + profile_created (name/avatar).
+  // Contacts → session_started (geo) + profile_created (name/avatar) +
+  // survey_answer (from the persisted survey JSON).
   const contacts = await soql<ContactRow>(
     `SELECT Id, FirstName, LastName, ContactCardPicture__c, Geo_Latitude__c,
-            Geo_Longitude__c, Geo_City__c, Session_Id__c, Demo_Session__c, CreatedDate
+            Geo_Longitude__c, Geo_City__c, Session_Id__c, Demo_Session__c,
+            Skywave_Survey_Json__c, CreatedDate
      FROM Contact
      WHERE Demo_Session__c != null AND Session_Id__c != null
        AND CreatedDate >= ${since} ${demoFilter}
@@ -141,6 +144,33 @@ export async function fetchReplayTimeline(
           }),
         },
       });
+    }
+    // Survey answers — persisted as { questionKey: {questionText, answerText,
+    // answerKey} } on Skywave_Survey_Json__c. Emit one survey_answer each so
+    // the reducer folds them exactly like the live events.
+    if (c.Skywave_Survey_Json__c) {
+      let parsed: Record<string, { answerKey?: string; answerText?: string }>;
+      try {
+        parsed = JSON.parse(c.Skywave_Survey_Json__c);
+      } catch {
+        parsed = {};
+      }
+      let offset = 2;
+      for (const [questionKey, ans] of Object.entries(parsed)) {
+        if (!ans?.answerKey) continue;
+        entries.push({
+          t: t + offset++, // after geo/profile, preserving order
+          payload: {
+            ...base,
+            Type__c: 'survey_answer',
+            Payload_Json__c: JSON.stringify({
+              questionKey,
+              answerKey: ans.answerKey,
+              answerText: ans.answerText ?? undefined,
+            }),
+          },
+        });
+      }
     }
   }
 

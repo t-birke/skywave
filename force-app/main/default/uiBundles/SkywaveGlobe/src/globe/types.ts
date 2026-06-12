@@ -27,4 +27,6 @@ export interface GlobeArcData {
   id: string;
   start: [number, number, number];
   end: [number, number, number];
+  /** Optional route label rendered at the arc apex, e.g. "LAX → JFK". */
+  label?: string;
 }
