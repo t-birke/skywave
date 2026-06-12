@@ -114,6 +114,22 @@ export default defineConfig(({ command }) => {
                 });
               },
             },
+            // sObject write bridge — forwards /sf-data/<Object>/<Id> (PATCH)
+            // to the org REST sObjects API with the token injected. DEV/DEMO
+            // ONLY; used by the inconspicuous seat-capability toggle to flip
+            // Demo_Session__c.State__c (agent_seat_fail <-> agent_seat_pass).
+            '/sf-data': {
+              target: org.instanceUrl,
+              changeOrigin: true,
+              secure: true,
+              rewrite: (p: string) =>
+                p.replace(/^\/sf-data/, '/services/data/v60.0/sobjects'),
+              configure: proxy => {
+                proxy.on('proxyReq', proxyReq => {
+                  proxyReq.setHeader('Authorization', `Bearer ${org.accessToken}`);
+                });
+              },
+            },
           },
         }
       : undefined,

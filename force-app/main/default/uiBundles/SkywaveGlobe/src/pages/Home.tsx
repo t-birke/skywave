@@ -4,6 +4,7 @@ import { toMarkers, toArcs } from '@/data/visitors';
 import { useDemoFeed, type FeedStatus } from '@/data/useDemoFeed';
 import { useReplay } from '@/data/useReplay';
 import { loadOptionImageMap, type OptionImageMap } from '@/data/surveyImages';
+import { isSeatEnabled, setSeatEnabled } from '@/data/seatToggle';
 
 const STATUS_COLOR: Record<FeedStatus, string> = {
   connecting: '#e0a000',
@@ -42,6 +43,29 @@ export default function Home() {
   useEffect(() => {
     loadOptionImageMap().then(setOptionImages);
   }, []);
+
+  // Inconspicuous seat-capability switch (bottom-right corner dot). Reflects
+  // and flips Demo_Session__c.State__c agent_seat_fail <-> agent_seat_pass,
+  // which the agent reads per turn to gate the seat-change subagent live.
+  const [seatOn, setSeatOn] = useState<boolean>(false);
+  const [seatBusy, setSeatBusy] = useState<boolean>(false);
+  useEffect(() => {
+    isSeatEnabled()
+      .then(setSeatOn)
+      .catch(() => {});
+  }, []);
+  const toggleSeat = async () => {
+    if (seatBusy) return;
+    setSeatBusy(true);
+    try {
+      const next = await setSeatEnabled();
+      setSeatOn(next);
+    } catch {
+      // best-effort; leave the indicator as-is on failure
+    } finally {
+      setSeatBusy(false);
+    }
+  };
 
   const selectedVisitor = useMemo(
     () => (selectedId ? visitors.find(v => v.sessionId === selectedId) ?? null : null),
@@ -169,6 +193,30 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* Inconspicuous seat-capability switch — a dim corner dot. Invisible to
+          the audience; clickable by the operator to flip seat-change ON/OFF on
+          the active demo session (agent reads it live, no reload). Brightens
+          when enabled. */}
+      <div
+        onClick={toggleSeat}
+        title={`Seat change: ${seatOn ? 'ENABLED' : 'disabled'}${
+          seatBusy ? ' (…)' : ''
+        } — click to ${seatOn ? 'disable' : 'enable'}`}
+        style={{
+          position: 'absolute',
+          bottom: 10,
+          right: 10,
+          width: 10,
+          height: 10,
+          borderRadius: '50%',
+          cursor: 'pointer',
+          background: seatOn ? 'rgba(0,255,136,0.9)' : 'rgba(255,255,255,0.06)',
+          boxShadow: seatOn ? '0 0 10px rgba(0,255,136,0.8)' : 'none',
+          opacity: seatBusy ? 0.4 : 1,
+          transition: 'background 0.2s, box-shadow 0.2s, opacity 0.15s',
+        }}
+      />
     </div>
   );
 }
