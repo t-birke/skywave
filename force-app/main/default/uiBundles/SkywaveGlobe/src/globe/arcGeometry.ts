@@ -2,34 +2,29 @@
  * Shared geometry for the curved flight arcs.
  *
  * Single source of truth so the rendered line (GlobeArc) and the avatar that
- * rides it (visitors.ts) use the IDENTICAL bezier — change the curve here and
- * both move together.
+ * rides it (visitors.ts) use the IDENTICAL curve — change it here and both
+ * move together.
  *
- * The arc is a quadratic bezier from `start` to `end` with a control point
- * pushed radially outward. The bulge grows with distance but is CAPPED so a
- * long-haul (e.g. polar LAX→LHR) doesn't balloon off the top of the view.
+ * The arc is a GREAT CIRCLE (slerp between the two endpoint directions) lifted
+ * by a sine altitude arch: radius(t) = baseRadius + peak·sin(π·t). Because
+ * sin(π·t) ≥ 0 for t in [0,1], the arc radius is ALWAYS ≥ the surface — so the
+ * path can never dip below the globe (the bug a single-control-point bezier
+ * had, where the curve sagged toward the chord and cut through the sphere on
+ * long arcs).
  */
 import * as THREE from 'three';
 
-// Max radial bulge above the unit sphere for the control point. Short hops
-// stay near the surface; long hauls top out here instead of growing without
-// bound.
-const MAX_BULGE = 0.35;
+const SEGMENTS = 64;
 
-/** Control point of the arc's quadratic bezier (drei's `mid`). */
-export function arcControlPoint(
-  start: [number, number, number],
-  end: [number, number, number]
-): [number, number, number] {
-  const s = new THREE.Vector3(...start);
-  const e = new THREE.Vector3(...end);
-  const dist = s.distanceTo(e);
-  const bulge = Math.min(dist * 0.4, MAX_BULGE);
-  const ctrl = s.clone().add(e).multiplyScalar(0.5).normalize().multiplyScalar(1 + bulge);
-  return ctrl.toArray() as [number, number, number];
+/**
+ * Peak lift of the arch above the surface, scaled by arc length (great-circle
+ * angle ω in radians) and capped so a half-globe route doesn't tower.
+ */
+function peakAltitude(omega: number): number {
+  return Math.min(omega * 0.18, 0.35);
 }
 
-/** Point at parameter t along the arc (t=0.5 → centre of the flight path). */
+/** Point at parameter t along the arc (t=0.5 → top-centre of the flight path). */
 export function arcPointAt(
   start: [number, number, number],
   end: [number, number, number],
@@ -37,13 +32,33 @@ export function arcPointAt(
 ): [number, number, number] {
   const s = new THREE.Vector3(...start);
   const e = new THREE.Vector3(...end);
-  const c = new THREE.Vector3(...arcControlPoint(start, end));
-  // Quadratic bezier B(t) = (1-t)^2 s + 2(1-t)t c + t^2 e
-  const mt = 1 - t;
-  const p = s
-    .clone()
-    .multiplyScalar(mt * mt)
-    .add(c.multiplyScalar(2 * mt * t))
-    .add(e.clone().multiplyScalar(t * t));
-  return p.toArray() as [number, number, number];
+  const baseR = (s.length() + e.length()) / 2;
+  const sn = s.clone().normalize();
+  const en = e.clone().normalize();
+  const omega = Math.acos(THREE.MathUtils.clamp(sn.dot(en), -1, 1));
+
+  let dir: THREE.Vector3;
+  if (omega < 1e-4) {
+    dir = sn; // coincident endpoints — degenerate, no real arc
+  } else {
+    // Spherical linear interpolation along the great circle.
+    const sinOmega = Math.sin(omega);
+    const a = Math.sin((1 - t) * omega) / sinOmega;
+    const b = Math.sin(t * omega) / sinOmega;
+    dir = sn.clone().multiplyScalar(a).add(en.clone().multiplyScalar(b)).normalize();
+  }
+  const r = baseR + peakAltitude(omega) * Math.sin(Math.PI * t);
+  return dir.multiplyScalar(r).toArray() as [number, number, number];
+}
+
+/** Tessellated polyline of the arc, for rendering. */
+export function arcPoints(
+  start: [number, number, number],
+  end: [number, number, number]
+): [number, number, number][] {
+  const pts: [number, number, number][] = [];
+  for (let i = 0; i <= SEGMENTS; i++) {
+    pts.push(arcPointAt(start, end, i / SEGMENTS));
+  }
+  return pts;
 }

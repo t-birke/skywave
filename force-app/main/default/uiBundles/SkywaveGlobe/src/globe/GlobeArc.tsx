@@ -1,8 +1,8 @@
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { QuadraticBezierLine } from '@react-three/drei';
+import { Line } from '@react-three/drei';
 import * as THREE from 'three';
-import { arcControlPoint } from './arcGeometry';
+import { arcPoints } from './arcGeometry';
 
 interface GlobeArcProps {
   start: [number, number, number];
@@ -12,7 +12,8 @@ interface GlobeArcProps {
 export function GlobeArc({ start, end }: GlobeArcProps) {
   const lineRef = useRef<{ material: THREE.LineDashedMaterial }>(null);
 
-  const mid = useMemo(() => arcControlPoint(start, end), [start, end]);
+  // Great-circle polyline with a sine altitude arch — always above surface.
+  const points = useMemo(() => arcPoints(start, end), [start, end]);
 
   useFrame(({ clock }) => {
     if (lineRef.current?.material) {
@@ -24,10 +25,8 @@ export function GlobeArc({ start, end }: GlobeArcProps) {
   return (
     <>
       {/* Soft wide underglow — a solid, low-opacity halo beneath the dashes. */}
-      <QuadraticBezierLine
-        start={start}
-        end={end}
-        mid={mid}
+      <Line
+        points={points}
         color="#5fe0ff"
         lineWidth={5}
         transparent
@@ -36,11 +35,9 @@ export function GlobeArc({ start, end }: GlobeArcProps) {
         depthWrite={false}
       />
       {/* Crisp bright dashed flight path, animated. */}
-      <QuadraticBezierLine
+      <Line
         ref={lineRef as never}
-        start={start}
-        end={end}
-        mid={mid}
+        points={points}
         color="#7fefff"
         lineWidth={2}
         transparent
