@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
@@ -10,7 +11,45 @@ import codegen from 'vite-plugin-graphql-codegen';
 const schemaPath = resolve(__dirname, '../../../../../schema.graphql');
 const schemaExists = existsSync(schemaPath);
 
-export default defineConfig(({ mode }) => {
+/**
+ * DEV/DEMO ONLY — local CometD bridge.
+ *
+ * The UIBundle data SDK has no streaming, so for local preview we subscribe
+ * to Platform Events over the CometD Streaming API directly. The browser
+ * talks to localhost (same-origin); this proxy forwards /cometd to the org
+ * with a Bearer token injected and the BAYEUX_BROWSER cookie rewritten onto
+ * localhost. Resolved only for `vite` (serve), never for `vite build`, so the
+ * production bundle stays org-independent and deployable as-is.
+ *
+ * Token source: `sf org display`. Override the org with SKYWAVE_ORG.
+ */
+function resolveOrg(): { instanceUrl: string; accessToken: string } | null {
+  const alias = process.env.SKYWAVE_ORG || 'si';
+  try {
+    const out = execSync(`sf org display --target-org ${alias} --json`, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const r = JSON.parse(out).result;
+    if (r?.instanceUrl && r?.accessToken) {
+      return { instanceUrl: r.instanceUrl, accessToken: r.accessToken };
+    }
+  } catch {
+    // sf not available / org not authed — dev server still runs, just no live feed.
+  }
+  return null;
+}
+
+export default defineConfig(({ command }) => {
+  const org = command === 'serve' ? resolveOrg() : null;
+  if (command === 'serve') {
+    console.log(
+      org
+        ? `[skywave] CometD proxy → ${org.instanceUrl} (token ${org.accessToken.length} chars)`
+        : '[skywave] no org token resolved — globe runs without a live feed'
+    );
+  }
+
   return {
     base: './',
     plugins: [
@@ -31,6 +70,38 @@ export default defineConfig(({ mode }) => {
           ]
         : []),
     ] as import('vite').PluginOption[],
+
+    // DEV/DEMO ONLY — CometD bridge to the org (see resolveOrg above).
+    server: org
+      ? {
+          proxy: {
+            '/cometd': {
+              target: org.instanceUrl,
+              changeOrigin: true,
+              secure: true,
+              configure: proxy => {
+                // Inject the org bearer token on every forwarded CometD call.
+                proxy.on('proxyReq', proxyReq => {
+                  proxyReq.setHeader('Authorization', `Bearer ${org.accessToken}`);
+                });
+                // Rewrite Set-Cookie so BAYEUX_BROWSER sticks on localhost
+                // (strip Domain, force Path=/, drop Secure for http dev).
+                proxy.on('proxyRes', proxyRes => {
+                  const sc = proxyRes.headers['set-cookie'];
+                  if (sc) {
+                    proxyRes.headers['set-cookie'] = sc.map(c =>
+                      c
+                        .replace(/;\s*Domain=[^;]+/i, '')
+                        .replace(/;\s*Secure/i, '')
+                        .replace(/;\s*SameSite=[^;]+/i, '; SameSite=Lax')
+                    );
+                  }
+                });
+              },
+            },
+          },
+        }
+      : undefined,
 
     // Build configuration for MPA
     build: {

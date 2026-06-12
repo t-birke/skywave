@@ -1,51 +1,21 @@
 import { useMemo, useState } from 'react';
 import { HoloGlobe } from '@/globe/HoloGlobe';
-import { toMarkers, toArcs, type Visitor } from '@/data/visitors';
+import { toMarkers, toArcs } from '@/data/visitors';
+import { useDemoFeed, type FeedStatus } from '@/data/useDemoFeed';
 
-// Placeholder visitors — replaced by the live Skywave feed in a later step.
-// Avatar images use a deterministic public source just for local preview.
-const av = (seed: string) => `https://i.pravatar.cc/80?u=${seed}`;
-
-const DEMO_VISITORS: Visitor[] = [
-  {
-    sessionId: 'sess-amelia',
-    firstName: 'Amelia',
-    lastName: 'Cruz',
-    avatarUrl: av('amelia'),
-    seat: '14A',
-    route: { legs: [{ from: 'LAX', to: 'JFK' }, { from: 'JFK', to: 'NBO' }], isConnection: true },
-  },
-  {
-    sessionId: 'sess-ben',
-    firstName: 'Ben',
-    lastName: 'Okafor',
-    avatarUrl: av('ben'),
-    seat: '2C',
-    route: { legs: [{ from: 'LHR', to: 'JFK' }], isConnection: false },
-  },
-  {
-    sessionId: 'sess-chen',
-    firstName: 'Chen',
-    avatarUrl: av('chen'),
-    city: 'Singapore',
-    lat: 1.3521,
-    lon: 103.8198,
-  },
-  {
-    sessionId: 'sess-dara',
-    firstName: 'Dara',
-    avatarUrl: av('dara'),
-    city: 'São Paulo',
-    lat: -23.55,
-    lon: -46.63,
-    alert: true,
-  },
-];
+const STATUS_COLOR: Record<FeedStatus, string> = {
+  connecting: '#e0a000',
+  connected: '#00ff88',
+  disconnected: '#888888',
+  error: '#ff4444',
+};
 
 export default function Home() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const markers = useMemo(() => toMarkers(DEMO_VISITORS), []);
-  const arcs = useMemo(() => toArcs(DEMO_VISITORS), []);
+  const { visitors, stage, status } = useDemoFeed();
+
+  const markers = useMemo(() => toMarkers(visitors), [visitors]);
+  const arcs = useMemo(() => toArcs(visitors), [visitors]);
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#0a0e1a' }}>
@@ -55,6 +25,39 @@ export default function Home() {
         selectedId={selectedId}
         onSelectMarker={id => setSelectedId(prev => (prev === id ? null : id))}
       />
+
+      {/* Feed status + current stage (demo HUD). */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 16,
+          left: 16,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          fontFamily: 'monospace',
+          fontSize: 12,
+          letterSpacing: '0.08em',
+          color: 'rgba(0,180,216,0.85)',
+          textTransform: 'uppercase',
+          pointerEvents: 'none',
+        }}
+      >
+        <span
+          style={{
+            width: 9,
+            height: 9,
+            borderRadius: '50%',
+            background: STATUS_COLOR[status],
+            boxShadow: `0 0 8px ${STATUS_COLOR[status]}`,
+          }}
+        />
+        <span>{status}</span>
+        <span style={{ color: 'rgba(0,180,216,0.4)' }}>·</span>
+        <span>stage: {stage}</span>
+        <span style={{ color: 'rgba(0,180,216,0.4)' }}>·</span>
+        <span>{visitors.length} visitor{visitors.length === 1 ? '' : 's'}</span>
+      </div>
     </div>
   );
 }
