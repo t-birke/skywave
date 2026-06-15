@@ -4,7 +4,7 @@ import { toMarkers, toArcs } from '@/data/visitors';
 import { useDemoFeed, type FeedStatus } from '@/data/useDemoFeed';
 import { useReplay } from '@/data/useReplay';
 import { loadOptionImageMap, type OptionImageMap } from '@/data/surveyImages';
-import { isSeatEnabled, setSeatEnabled } from '@/data/seatToggle';
+import { fetchActiveSession, setSeatEnabled } from '@/data/seatToggle';
 
 const STATUS_COLOR: Record<FeedStatus, string> = {
   connecting: '#e0a000',
@@ -13,14 +13,17 @@ const STATUS_COLOR: Record<FeedStatus, string> = {
   error: '#ff4444',
 };
 
-// Replay presets, in hours. `null` = LIVE.
+// Replay presets, in hours. `null` = LIVE. Windows reach back far enough to
+// catch persisted demo data between live runs (newest records can be days old).
 const PRESETS: { label: string; hours: number | null }[] = [
   { label: 'LIVE', hours: null },
-  { label: '1H', hours: 1 },
-  { label: '3H', hours: 3 },
   { label: '6H', hours: 6 },
   { label: '24H', hours: 24 },
+  { label: '7D', hours: 24 * 7 },
+  { label: '30D', hours: 24 * 30 },
 ];
+
+const SEAT_ON = 'agent_seat_pass';
 
 export default function Home() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -49,11 +52,26 @@ export default function Home() {
   // which the agent reads per turn to gate the seat-change subagent live.
   const [seatOn, setSeatOn] = useState<boolean>(false);
   const [seatBusy, setSeatBusy] = useState<boolean>(false);
+
+  // Stage seeded from Demo_Session__c.State__c on load. Live CometD events
+  // (useDemoFeed) override this once they flow; in-org (no /cometd proxy yet)
+  // the live stage stays 'idle', so the seeded value is the visible status —
+  // mirroring how the old skywaveDemoMonitor LWC read the active session.
+  const [seededStage, setSeededStage] = useState<string>('idle');
+
+  // One active-session read seeds both the seat indicator and the stage.
   useEffect(() => {
-    isSeatEnabled()
-      .then(setSeatOn)
+    fetchActiveSession()
+      .then(s => {
+        if (!s) return;
+        setSeatOn(s.state === SEAT_ON);
+        if (s.state) setSeededStage(s.state);
+      })
       .catch(() => {});
   }, []);
+
+  // Prefer a live stage once CometD delivers one; otherwise show the seed.
+  const displayStage = live.stage !== 'idle' ? live.stage : seededStage;
   const toggleSeat = async () => {
     if (seatBusy) return;
     setSeatBusy(true);
@@ -128,7 +146,7 @@ export default function Home() {
             <>
               <span>{live.status}</span>
               <span style={{ color: 'rgba(0,180,216,0.4)' }}>·</span>
-              <span>stage: {live.stage}</span>
+              <span>stage: {displayStage}</span>
             </>
           )}
           <span style={{ color: 'rgba(0,180,216,0.4)' }}>·</span>

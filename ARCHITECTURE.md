@@ -370,10 +370,15 @@ plugin doesn't proxy streaming).
 
 **Status:** **deployed + active in the `sitest` Multi-Framework sandbox**
 (2026-06-15); reads/writes verified in-org via GraphQL. Also runs locally
-(`SKYWAVE_ORG=sitest npm run dev`). Remaining: App Launcher access (a deployed
-UIBundle gets no AppMenuItem on its own) and in-org live CometD. `si` (the demo
-org) gets it when its Multi-Framework gate opens. Full architecture, file map,
-run steps, status, and gotchas are in **`docs/GLOBE_MONITOR.md`**.
+(`SKYWAVE_ORG=sitest npm run dev`). The displayed stage is **seeded from
+`Demo_Session__c.State__c` on load** (so the HUD status is correct in-org even
+without live CometD); replay presets are **6H/24H/7D/30D** (wide enough to reach
+records that may be days old between live runs). Remaining: App Launcher access
+(a deployed UIBundle gets no AppMenuItem on its own) and in-org live CometD —
+until that lands, in-org the live feed shows no visitors, so use a replay
+preset. `si` (the demo org) gets it when its Multi-Framework gate opens. Full
+architecture, file map, run steps, status, and gotchas are in
+**`docs/GLOBE_MONITOR.md`**.
 
 ### 3c''. Past-booking gate
 

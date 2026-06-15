@@ -22,13 +22,13 @@ interface ActiveSessionNode {
   State__c: { value: string | null } | null;
 }
 
-interface ActiveSession {
+export interface ActiveSession {
   id: string;
   state: string | null;
 }
 
 /** Resolve the active Demo_Session__c (Active__c=true, newest Started__c). */
-async function fetchActiveSession(): Promise<ActiveSession | null> {
+export async function fetchActiveSession(): Promise<ActiveSession | null> {
   const nodes = await queryEdges<ActiveSessionNode>(
     `query {
       uiapi { query {

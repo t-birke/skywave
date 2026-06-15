@@ -46,9 +46,12 @@ Then open http://localhost:5173. The globe spins; if a demo session is live (or
 you publish events / use Replay), visitors appear. Override the org with
 `SKYWAVE_ORG=<alias> npm run dev`.
 
-**Seeing nothing?** That's expected with no live activity. Click **24H** in the
-top-left HUD to replay the last 24h from records (deterministic — always shows
-data if any exists). Or publish a synthetic visitor — see §5.
+**Seeing nothing?** That's expected with no live activity. Click a replay preset
+(**6H / 24H / 7D / 30D**) in the top-left HUD to replay that window from records
+(deterministic — always shows data if any exists). Pick a window wide enough to
+reach your data: between live runs the newest demo records can be **days old**,
+so 24H may come back empty while 7D/30D fill the globe. Or publish a synthetic
+visitor — see §5.
 
 ---
 
@@ -123,7 +126,7 @@ All paths under `force-app/main/default/uiBundles/SkywaveGlobe/src/`.
 ### UI (`pages/`, `components/`)
 | File | Role |
 |---|---|
-| `pages/Home.tsx` | Top-level: chooses LIVE vs REPLAY, renders `<HoloGlobe>`, the HUD (status dot, stage, visitor count, **LIVE/1H/3H/6H/24H** preset buttons, replay progress bar), loads the option-image map. |
+| `pages/Home.tsx` | Top-level: chooses LIVE vs REPLAY, renders `<HoloGlobe>`, the HUD (status dot, stage, visitor count, **LIVE/6H/24H/7D/30D** preset buttons, replay progress bar), loads the option-image map. **Seeds the displayed stage from `Demo_Session__c.State__c`** (one `fetchActiveSession` read, shared with the seat toggle) so the status shows in-org even before/without live CometD; a live `Demo_State_Change__e` event overrides it. |
 | `components/VisitorPanel.tsx` | The click-detail panel: avatar, name, route/seat, survey-answer thumbnails. Rendered inside the scene (anchored to the avatar) by `HoloGlobe`, so it tracks globe rotation. |
 
 ### Config
@@ -217,6 +220,11 @@ verification prefer **REPLAY** (click 24H), which reads persisted records.
    `/cometd` inherit the runtime session? If it 401s, fall back to extending the
    Heroku relay with a `/ws/monitor` channel (subscribes to `Demo_Event__e`).
    (Replay + seat toggle already work in-org — they're on the SDK path.)
+   **Until this lands, in-org the HUD shows no live visitors and the live stage
+   stays `idle`** — so use a REPLAY preset to populate the globe, and note the
+   **stage is now seeded from `Demo_Session__c.State__c` on load** (so the
+   upper-left status reflects the real demo stage even without CometD; a live
+   `Demo_State_Change__e` overrides it once streaming works).
 3. **`si` (the demo org)** doesn't have Multi-Framework yet. When its gate opens:
    Setup → Quick Find "Salesforce Multi-Framework" → Enable Domain (⚠️
    irreversible; `si` is demo-critical) → disable My Domain "Require first-party
