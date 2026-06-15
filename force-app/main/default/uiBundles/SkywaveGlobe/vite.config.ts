@@ -14,10 +14,13 @@ const schemaExists = existsSync(schemaPath);
 /**
  * DEV/DEMO ONLY — local CometD bridge.
  *
- * The UIBundle data SDK has no streaming, so for local preview we subscribe
- * to Platform Events over the CometD Streaming API directly. The browser
- * talks to localhost (same-origin); this proxy forwards /cometd to the org
- * with a Bearer token injected and the BAYEUX_BROWSER cookie rewritten onto
+ * REST reads/writes now go through UI API GraphQL + the Data SDK, proxied by
+ * the official salesforce({orgAlias}) plugin (/services/data). The ONE thing
+ * that plugin doesn't proxy is the CometD Streaming API, which the live feed
+ * needs (the UIBundle SDK has no streaming). So this resolveOrg + the /cometd
+ * proxy below remain to bridge Platform Events for local preview: the browser
+ * talks to localhost (same-origin), and this forwards /cometd to the org with
+ * a Bearer token injected and the BAYEUX_BROWSER cookie rewritten onto
  * localhost. Resolved only for `vite` (serve), never for `vite build`, so the
  * production bundle stays org-independent and deployable as-is.
  *
@@ -72,7 +75,10 @@ export default defineConfig(({ command }) => {
     plugins: [
       tailwindcss(),
       react(),
-      salesforce(),
+      // orgAlias makes the plugin's /services/data/.../graphql proxy resolve
+      // the right org's auth (refresh-aware) so createDataSDK().graphql() works
+      // in dev. Defaults to `si`; override with SKYWAVE_ORG.
+      salesforce({ orgAlias: process.env.SKYWAVE_ORG || 'si' }),
       // Only add codegen when schema exists (e.g. after `npm run graphql:schema`).
       // In CI or when schema is not checked in, skip codegen so build succeeds.
       ...(schemaExists
@@ -116,37 +122,12 @@ export default defineConfig(({ command }) => {
                 });
               },
             },
-            // SOQL bridge for replay — forwards /sf-query?q=... to the org
-            // REST query API with the token injected. Stands in for the
-            // GraphQL SDK until the bundle deploys in-org.
-            '/sf-query': {
-              target: org.instanceUrl,
-              changeOrigin: true,
-              secure: true,
-              rewrite: (p: string) =>
-                p.replace(/^\/sf-query/, '/services/data/v60.0/query'),
-              configure: proxy => {
-                proxy.on('proxyReq', proxyReq => {
-                  proxyReq.setHeader('Authorization', `Bearer ${org.accessToken}`);
-                });
-              },
-            },
-            // sObject write bridge — forwards /sf-data/<Object>/<Id> (PATCH)
-            // to the org REST sObjects API with the token injected. DEV/DEMO
-            // ONLY; used by the inconspicuous seat-capability toggle to flip
-            // Demo_Session__c.State__c (agent_seat_fail <-> agent_seat_pass).
-            '/sf-data': {
-              target: org.instanceUrl,
-              changeOrigin: true,
-              secure: true,
-              rewrite: (p: string) =>
-                p.replace(/^\/sf-data/, '/services/data/v60.0/sobjects'),
-              configure: proxy => {
-                proxy.on('proxyReq', proxyReq => {
-                  proxyReq.setHeader('Authorization', `Bearer ${org.accessToken}`);
-                });
-              },
-            },
+            // NOTE: REST reads/writes (replay, surveyImages, seatToggle) used
+            // to go through custom /sf-query + /sf-data proxies here. They now
+            // use UI API GraphQL + the Data SDK (@salesforce/sdk-data), served
+            // by the official salesforce({orgAlias}) plugin's /services/data
+            // proxy — so only the CometD live-stream bridge remains custom
+            // (the official plugin doesn't proxy /cometd).
           },
         }
       : undefined,

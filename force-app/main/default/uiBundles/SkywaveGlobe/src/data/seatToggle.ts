@@ -8,42 +8,47 @@
  * message — no reload, no agent version switch. This helper drives that
  * flip from the globe HUD.
  *
- * DEV/DEMO transport: same-origin /sf-query (read) and /sf-data (PATCH),
- * which the Vite dev server proxies to the org with a Bearer token
- * injected (see vite.config.ts). No empApi, no Heroku relay.
+ * Transport: UI API GraphQL read + UI API record PATCH write via the Data SDK
+ * (see ./graphql). Works natively in-org and through the official dev proxy.
  */
+import { queryEdges, v, updateRecord } from './graphql';
 
 const SEAT_ON = 'agent_seat_pass';
 const SEAT_OFF = 'agent_seat_fail';
 
-interface QueryResponse<T> {
-  records: T[];
+interface ActiveSessionNode {
+  // Id is UI API leaf type ID! — selected bare, no { value } subselection.
+  Id: string | null;
+  State__c: { value: string | null } | null;
 }
 
-interface ActiveSessionRow {
-  Id: string;
-  State__c: string | null;
+interface ActiveSession {
+  id: string;
+  state: string | null;
 }
 
 /** Resolve the active Demo_Session__c (Active__c=true, newest Started__c). */
-async function fetchActiveSession(): Promise<ActiveSessionRow | null> {
-  const soql =
-    "SELECT Id, State__c FROM Demo_Session__c WHERE Active__c = true " +
-    'ORDER BY Started__c DESC NULLS LAST LIMIT 1';
-  const res = await fetch(`/sf-query?q=${encodeURIComponent(soql)}`, {
-    headers: { Accept: 'application/json' },
-  });
-  if (!res.ok) {
-    throw new Error(`active-session query failed: ${res.status}`);
-  }
-  const data = (await res.json()) as QueryResponse<ActiveSessionRow>;
-  return data.records?.[0] ?? null;
+async function fetchActiveSession(): Promise<ActiveSession | null> {
+  const nodes = await queryEdges<ActiveSessionNode>(
+    `query {
+      uiapi { query {
+        Demo_Session__c(first: 1, where: { Active__c: { eq: true } },
+                        orderBy: { Started__c: { order: DESC, nulls: LAST } }) {
+          edges { node { Id State__c { value } } }
+        }
+      } }
+    }`,
+    'Demo_Session__c'
+  );
+  const n = nodes[0];
+  if (!n || !n.Id) return null;
+  return { id: n.Id, state: v(n.State__c) };
 }
 
 /** Whether the active session currently has seat-change enabled. */
 export async function isSeatEnabled(): Promise<boolean> {
   const row = await fetchActiveSession();
-  return row?.State__c === SEAT_ON;
+  return row?.state === SEAT_ON;
 }
 
 /**
@@ -56,18 +61,8 @@ export async function setSeatEnabled(enabled?: boolean): Promise<boolean> {
   if (!row) {
     throw new Error('no active Demo_Session__c to toggle');
   }
-  const currentlyOn = row.State__c === SEAT_ON;
+  const currentlyOn = row.state === SEAT_ON;
   const next = enabled === undefined ? !currentlyOn : enabled;
-  const newState = next ? SEAT_ON : SEAT_OFF;
-
-  const res = await fetch(`/sf-data/Demo_Session__c/${row.Id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ State__c: newState }),
-  });
-  // Salesforce returns 204 No Content on a successful sObject PATCH.
-  if (res.status !== 204 && !res.ok) {
-    throw new Error(`seat toggle failed: ${res.status} ${await res.text().catch(() => '')}`);
-  }
+  await updateRecord(row.id, { State__c: next ? SEAT_ON : SEAT_OFF });
   return next;
 }

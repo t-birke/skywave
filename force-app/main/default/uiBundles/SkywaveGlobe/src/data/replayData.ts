@@ -9,18 +9,19 @@
  * CreatedDate, ordered ascending, then fed through the SAME visitorReducer
  * the live feed uses — so a replay looks identical to having watched it live.
  *
- * DEV transport: the Vite /sf-query proxy forwards SOQL to the org REST query
- * API with the token injected. Swaps to the GraphQL SDK once deployed in-org.
+ * Transport: UI API GraphQL via @salesforce/sdk-data (see ./graphql). Works
+ * natively in-org and through the official dev proxy — no custom SOQL proxy.
  */
 import type { PlatformEventPayload } from './visitorReducer';
+import { queryEdges, v, sinceIso } from './graphql';
 
 export interface TimelineEntry {
   t: number; // ms epoch (CreatedDate)
   payload: PlatformEventPayload;
 }
 
+// Flat rows (UI API envelopes already unwrapped via v()).
 interface ContactRow {
-  Id: string;
   FirstName: string | null;
   LastName: string | null;
   ContactCardPicture__c: string | null;
@@ -34,37 +35,45 @@ interface ContactRow {
 }
 
 interface SegmentRow {
-  Segment_Order__c: number;
+  Segment_Order__c: number | null;
   Seat_Number__c: string | null;
-  Flight__r: { Origin__c: string | null; Destination__c: string | null } | null;
-  Booking__r: {
-    CreatedDate: string;
-    Contact__r: { Session_Id__c: string | null; Demo_Session__c: string | null } | null;
+  Origin__c: string | null;
+  Destination__c: string | null;
+  BookingCreatedDate: string | null;
+  Session_Id__c: string | null;
+  Demo_Session__c: string | null;
+}
+
+const GQL_LIMIT = 2000;
+
+/** UI API node shape for the Contact query (verbose `{ value }` envelopes). */
+interface ContactNode {
+  FirstName: { value: string | null } | null;
+  LastName: { value: string | null } | null;
+  ContactCardPicture__c: { value: string | null } | null;
+  Geo_Latitude__c: { value: number | null } | null;
+  Geo_Longitude__c: { value: number | null } | null;
+  Geo_City__c: { value: string | null } | null;
+  Session_Id__c: { value: string | null } | null;
+  Demo_Session__c: { value: string | null } | null;
+  Skywave_Survey_Json__c: { value: string | null } | null;
+  CreatedDate: { value: string | null } | null;
+}
+
+interface SegmentNode {
+  Segment_Order__c: { value: number | null } | null;
+  Seat_Number__c: { value: string | null } | null;
+  Flight__r: {
+    Origin__c: { value: string | null } | null;
+    Destination__c: { value: string | null } | null;
   } | null;
-}
-
-interface QueryResponse<T> {
-  totalSize: number;
-  done: boolean;
-  records: T[];
-}
-
-const SOQL_LIMIT = 2000;
-
-async function soql<T>(query: string): Promise<T[]> {
-  const res = await fetch(`/sf-query?q=${encodeURIComponent(query)}`, {
-    headers: { Accept: 'application/json' },
-  });
-  if (!res.ok) {
-    throw new Error(`SOQL query failed: ${res.status} ${await res.text().catch(() => '')}`);
-  }
-  const data = (await res.json()) as QueryResponse<T>;
-  return data.records ?? [];
-}
-
-/** ISO string the SOQL layer expects for a datetime literal (no quotes). */
-function sinceLiteral(hoursAgo: number, nowMs: number): string {
-  return new Date(nowMs - hoursAgo * 3600_000).toISOString();
+  Booking__r: {
+    CreatedDate: { value: string | null } | null;
+    Contact__r: {
+      Session_Id__c: { value: string | null } | null;
+      Demo_Session__c: { value: string | null } | null;
+    } | null;
+  } | null;
 }
 
 /**
@@ -76,37 +85,80 @@ export async function fetchReplayTimeline(
   nowMs: number,
   activeDemoSessionId?: string | null
 ): Promise<TimelineEntry[]> {
-  const since = sinceLiteral(hours, nowMs);
-  const demoFilter = activeDemoSessionId
-    ? `AND Demo_Session__c = '${activeDemoSessionId}'`
-    : '';
-  const bookingDemoFilter = activeDemoSessionId
-    ? `AND Booking__r.Contact__r.Demo_Session__c = '${activeDemoSessionId}'`
-    : '';
+  const since = sinceIso(hours, nowMs);
 
   // Contacts → session_started (geo) + profile_created (name/avatar) +
   // survey_answer (from the persisted survey JSON).
-  const contacts = await soql<ContactRow>(
-    `SELECT Id, FirstName, LastName, ContactCardPicture__c, Geo_Latitude__c,
-            Geo_Longitude__c, Geo_City__c, Session_Id__c, Demo_Session__c,
-            Skywave_Survey_Json__c, CreatedDate
-     FROM Contact
-     WHERE Demo_Session__c != null AND Session_Id__c != null
-       AND CreatedDate >= ${since} ${demoFilter}
-     ORDER BY CreatedDate ASC LIMIT ${SOQL_LIMIT}`
+  const contactWhere = [
+    `{ Demo_Session__c: { ne: null } }`,
+    `{ Session_Id__c: { ne: null } }`,
+    `{ CreatedDate: { gte: { value: "${since}" } } }`,
+    ...(activeDemoSessionId
+      ? [`{ Demo_Session__c: { eq: "${activeDemoSessionId}" } }`]
+      : []),
+  ].join(', ');
+
+  const contactNodes = await queryEdges<ContactNode>(
+    `query {
+      uiapi { query {
+        Contact(first: ${GQL_LIMIT}, where: { and: [${contactWhere}] },
+                orderBy: { CreatedDate: { order: ASC } }) {
+          edges { node {
+            FirstName { value } LastName { value } ContactCardPicture__c { value }
+            Geo_Latitude__c { value } Geo_Longitude__c { value } Geo_City__c { value }
+            Session_Id__c { value } Demo_Session__c { value }
+            Skywave_Survey_Json__c { value } CreatedDate { value }
+          } }
+        }
+      } }
+    }`,
+    'Contact'
   );
+  const contacts: ContactRow[] = contactNodes.map(n => ({
+    FirstName: v(n.FirstName),
+    LastName: v(n.LastName),
+    ContactCardPicture__c: v(n.ContactCardPicture__c),
+    Geo_Latitude__c: v(n.Geo_Latitude__c),
+    Geo_Longitude__c: v(n.Geo_Longitude__c),
+    Geo_City__c: v(n.Geo_City__c),
+    Session_Id__c: v(n.Session_Id__c),
+    Demo_Session__c: v(n.Demo_Session__c),
+    Skywave_Survey_Json__c: v(n.Skywave_Survey_Json__c),
+    CreatedDate: v(n.CreatedDate) ?? '',
+  }));
 
   // Booking segments → flight_booked (origin→…→dest legs) + seat.
-  const segments = await soql<SegmentRow>(
-    `SELECT Segment_Order__c, Seat_Number__c,
-            Flight__r.Origin__c, Flight__r.Destination__c,
-            Booking__r.CreatedDate,
-            Booking__r.Contact__r.Session_Id__c, Booking__r.Contact__r.Demo_Session__c
-     FROM Booking_Segment__c
-     WHERE Booking__r.Contact__r.Demo_Session__c != null
-       AND Booking__r.CreatedDate >= ${since} ${bookingDemoFilter}
-     ORDER BY Booking__r.CreatedDate ASC, Segment_Order__c ASC LIMIT ${SOQL_LIMIT}`
+  const segWhere = activeDemoSessionId
+    ? `{ Booking__r: { Contact__r: { Demo_Session__c: { eq: "${activeDemoSessionId}" } } } }`
+    : `{ Booking__r: { Contact__r: { Demo_Session__c: { ne: null } } } }`;
+
+  const segmentNodes = await queryEdges<SegmentNode>(
+    `query {
+      uiapi { query {
+        Booking_Segment__c(first: ${GQL_LIMIT}, where: ${segWhere},
+                           orderBy: { Segment_Order__c: { order: ASC } }) {
+          edges { node {
+            Segment_Order__c { value } Seat_Number__c { value }
+            Flight__r { Origin__c { value } Destination__c { value } }
+            Booking__r {
+              CreatedDate { value }
+              Contact__r { Session_Id__c { value } Demo_Session__c { value } }
+            }
+          } }
+        }
+      } }
+    }`,
+    'Booking_Segment__c'
   );
+  const segments: SegmentRow[] = segmentNodes.map(n => ({
+    Segment_Order__c: v(n.Segment_Order__c),
+    Seat_Number__c: v(n.Seat_Number__c),
+    Origin__c: v(n.Flight__r?.Origin__c),
+    Destination__c: v(n.Flight__r?.Destination__c),
+    BookingCreatedDate: v(n.Booking__r?.CreatedDate),
+    Session_Id__c: v(n.Booking__r?.Contact__r?.Session_Id__c),
+    Demo_Session__c: v(n.Booking__r?.Contact__r?.Demo_Session__c),
+  }));
 
   const entries: TimelineEntry[] = [];
 
@@ -176,10 +228,10 @@ export async function fetchReplayTimeline(
 
   // Group segments by booking (session + createdDate) into one flight_booked.
   const bookingKey = (s: SegmentRow) =>
-    `${s.Booking__r?.Contact__r?.Session_Id__c ?? ''}|${s.Booking__r?.CreatedDate ?? ''}`;
+    `${s.Session_Id__c ?? ''}|${s.BookingCreatedDate ?? ''}`;
   const byBooking = new Map<string, SegmentRow[]>();
   for (const s of segments) {
-    if (!s.Booking__r?.Contact__r?.Session_Id__c || !s.Flight__r) continue;
+    if (!s.Session_Id__c || !s.Origin__c || !s.Destination__c) continue;
     const k = bookingKey(s);
     (byBooking.get(k) ?? byBooking.set(k, []).get(k)!).push(s);
   }
@@ -187,16 +239,16 @@ export async function fetchReplayTimeline(
   for (const segs of byBooking.values()) {
     segs.sort((a, b) => (a.Segment_Order__c ?? 0) - (b.Segment_Order__c ?? 0));
     const first = segs[0];
-    const sessionId = first.Booking__r!.Contact__r!.Session_Id__c!;
-    const t = Date.parse(first.Booking__r!.CreatedDate);
+    const sessionId = first.Session_Id__c!;
+    const t = first.BookingCreatedDate ? Date.parse(first.BookingCreatedDate) : 0;
     const legs = segs
-      .filter(s => s.Flight__r?.Origin__c && s.Flight__r?.Destination__c)
-      .map(s => ({ from: s.Flight__r!.Origin__c!, to: s.Flight__r!.Destination__c! }));
+      .filter(s => s.Origin__c && s.Destination__c)
+      .map(s => ({ from: s.Origin__c!, to: s.Destination__c! }));
     if (!legs.length) continue;
 
     const base = {
       Session_Id__c: sessionId,
-      Demo_Session_Id__c: first.Booking__r!.Contact__r!.Demo_Session__c ?? undefined,
+      Demo_Session_Id__c: first.Demo_Session__c ?? undefined,
     };
     entries.push({
       t,
