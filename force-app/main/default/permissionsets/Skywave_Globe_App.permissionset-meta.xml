@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Skywave Globe App</label>
+    <description>Grants App Launcher visibility for the Skywave Globe React UIBundle app. Keep separate from Skywave_Demo_Admin (which is also assigned to the Automated Process user, blocking app-visibility grants).</description>
+    <hasActivationRequired>false</hasActivationRequired>
+    <applicationVisibilities>
+        <application>Skywave_Globe</application>
+        <visible>true</visible>
+    </applicationVisibilities>
+</PermissionSet>
