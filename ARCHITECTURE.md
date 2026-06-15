@@ -62,7 +62,7 @@ the stage list and the rationale (it replaced a manual "check state" button).
 | ├ `triggers/` | 4 triggers (Demo_Session, Contact-update PE, phone-digits, VoiceCall resolve) |
 | ├ `lwc/` | Chat/voice cards (CLT renderers), demo monitor, survey author, contact card |
 | ├ `objects/` | Custom objects + the Platform Events + custom fields on Contact/VoiceCall |
-| ├ `uiBundles/SkywaveGlobe/` | **3D globe demo monitor** — React UIBundle (Salesforce Multi-Framework). Successor to the 2D `skywaveDemoMonitor`/`skywaveWorldMap` LWCs. See §3b'' and **`docs/GLOBE_MONITOR.md`**. Runs locally today (`npm run dev`); in-org deploy gated until the Multi-Framework release update. |
+| ├ `uiBundles/SkywaveGlobe/` | **3D globe demo monitor** — React UIBundle (Salesforce Multi-Framework). Successor to the 2D `skywaveDemoMonitor`/`skywaveWorldMap` LWCs. See §3b'' and **`docs/GLOBE_MONITOR.md`**. Deployed to the `sitest` sandbox; data via UI API GraphQL + Data SDK. Runs locally via `npm run dev`. |
 | `heroku/skywave-app/` | Node app: static consumer site + WebSocket state relay |
 | └ `public/assets/website.css/.js` | Skywave Airlines marketing-site backdrop (nav, hero, search, deals, footer). Visible to every audience phone behind the demo modal. Extensible target for future booking/account features. |
 | └ `public/assets/site.css/.js` | The demo flow itself. Renders into a centered modal (`#modal-content`) overlaid on the website backdrop. Modal is hidden during agent stages so the chat icon takes over. Closable any time via X. |
@@ -361,15 +361,19 @@ necessity:
 ```
 
 Both paths fold through one shared reducer (`visitorReducer.ts`) so live and
-replay look identical. **Local dev** runs the React app on a Vite server that
-proxies `/cometd` (live) and `/sf-query` (replay SOQL) to `si` with a bearer
-token injected — no in-org deploy needed to iterate.
+replay look identical. **Reads/writes** (replay, survey images, seat toggle)
+use **UI API GraphQL + the `@salesforce/sdk-data` SDK** — the supported path
+that works in-org natively and, in local dev, through the
+`@salesforce/vite-plugin-ui-bundle` `salesforce({orgAlias})` proxy. Only the
+**live CometD** stream keeps a thin custom Vite `/cometd` proxy (the official
+plugin doesn't proxy streaming).
 
-**Status:** runs locally now (`cd uiBundles/SkywaveGlobe && npm run dev`).
-In-org deploy is gated until the Multi-Framework feature opens (org preference
-`UIBundleSettings.webAppOptIn` is already set; the Setup-UI feature gate lands
-with the release update). Full architecture, file map, run steps, the Monday
-deploy checklist, and gotchas are in **`docs/GLOBE_MONITOR.md`**.
+**Status:** **deployed + active in the `sitest` Multi-Framework sandbox**
+(2026-06-15); reads/writes verified in-org via GraphQL. Also runs locally
+(`SKYWAVE_ORG=sitest npm run dev`). Remaining: App Launcher access (a deployed
+UIBundle gets no AppMenuItem on its own) and in-org live CometD. `si` (the demo
+org) gets it when its Multi-Framework gate opens. Full architecture, file map,
+run steps, status, and gotchas are in **`docs/GLOBE_MONITOR.md`**.
 
 ### 3c''. Past-booking gate
 
