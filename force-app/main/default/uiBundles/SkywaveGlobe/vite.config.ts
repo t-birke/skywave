@@ -21,18 +21,35 @@ const schemaExists = existsSync(schemaPath);
  * localhost. Resolved only for `vite` (serve), never for `vite build`, so the
  * production bundle stays org-independent and deployable as-is.
  *
- * Token source: `sf org display`. Override the org with SKYWAVE_ORG.
+ * Token source: `sf org auth show-access-token` — NOT `sf org display`, which
+ * redacts the token to the literal string "[REDACTED] Use 'sf org auth
+ * show-access-token' to view" (a newer CLI security default). Reading the
+ * token from `sf org display` yields that placeholder, so every API call 401s.
+ * `instanceUrl` still comes from `sf org display` (not redacted).
+ * Override the org with SKYWAVE_ORG.
  */
 function resolveOrg(): { instanceUrl: string; accessToken: string } | null {
   const alias = process.env.SKYWAVE_ORG || 'si';
   try {
-    const out = execSync(`sf org display --target-org ${alias} --json`, {
+    const disp = execSync(`sf org display --target-org ${alias} --json`, {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     });
-    const r = JSON.parse(out).result;
-    if (r?.instanceUrl && r?.accessToken) {
-      return { instanceUrl: r.instanceUrl, accessToken: r.accessToken };
+    const instanceUrl = JSON.parse(disp).result?.instanceUrl;
+
+    // The token is redacted in `sf org display`; fetch the real one here.
+    // `--json` returns it under result.accessToken (the human form prints a
+    // confirmation banner, so we parse from the first '{').
+    const tokOut = execSync(
+      `sf org auth show-access-token --target-org ${alias} --json`,
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+    );
+    const parsed = JSON.parse(tokOut.slice(tokOut.indexOf('{')));
+    const accessToken =
+      typeof parsed.result === 'string' ? parsed.result : parsed.result?.accessToken;
+
+    if (instanceUrl && accessToken) {
+      return { instanceUrl, accessToken };
     }
   } catch {
     // sf not available / org not authed — dev server still runs, just no live feed.
