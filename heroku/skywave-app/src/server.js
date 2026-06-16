@@ -8,7 +8,8 @@ import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { startPubSubSubscriber } from './pubsub-client.js';
-import { register, fanOut, activeCount, startHeartbeat } from './ws-fanout.js';
+import { startMonitorSubscriber } from './pubsub-monitor.js';
+import { register, registerMonitor, fanOut, fanOutMonitor, activeCount, monitorCount, startHeartbeat } from './ws-fanout.js';
 import { forwardToApex } from './sf-api.js';
 import { buildWebsiteRouter } from './website-routes.js';
 import { buildPreflightRouter } from './preflight.js';
@@ -99,6 +100,19 @@ const server = createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url, 'http://placeholder');
+
+    // Globe monitor channel — a single broadcast endpoint, isolated from the
+    // per-session phone sockets. Checked FIRST so "monitor" isn't mistaken for
+    // a sessionId by the regex below.
+    if (url.pathname === '/ws/monitor') {
+        wss.handleUpgrade(req, socket, head, (ws) => {
+            registerMonitor(ws);
+            ws.send(JSON.stringify({ type: 'hello', channel: 'monitor' }));
+            console.log(`monitor ws connected active=${monitorCount()}`);
+        });
+        return;
+    }
+
     // SDK anonymousIds are short hex (e.g. 1db57f8b6d54a786); UUIDs are dashed
     // hex; both fit. Allow alphanumerics + dashes + underscores, 8–64 chars.
     const match = url.pathname.match(/^\/ws\/([A-Za-z0-9_-]{8,64})$/);
@@ -142,8 +156,22 @@ startPubSubSubscriber((ev) => {
         demoSessionId: ev.demoSessionId,
         replayId: ev.replayId
     }, ev.targetSessionId);
+    // The globe HUD also shows the demo stage — mirror broadcast stage changes
+    // to monitors (no targeted client_action; the globe only cares about stage).
+    if (ev.newState && !ev.targetSessionId) {
+        fanOutMonitor({ type: 'stage_changed', newState: ev.newState, demoSessionId: ev.demoSessionId });
+    }
 }).catch((err) => {
     console.error('Pub/Sub subscribe failed at startup:', err);
+});
+
+// Globe monitor subscriber — the Demo_Event__e visitor firehose → /ws/monitor.
+// Fully isolated from the consumer path above (separate Pub/Sub instance,
+// separate socket registry). Phones never receive these events.
+startMonitorSubscriber((payload) => {
+    fanOutMonitor({ type: 'demo_event', payload });
+}).catch((err) => {
+    console.error('Pub/Sub monitor subscribe failed at startup:', err);
 });
 
 // Heroku's router kills idle WebSockets after 55s (H15). Send a ping
