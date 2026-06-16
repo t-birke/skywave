@@ -1,6 +1,6 @@
 ---
 name: skywave-install
-description: "Conductor for installing the Skywave Interactive Agentforce demo into a Salesforce Demo Org (SDO) end-to-end — core demo (agent + MIAW chat + Experience Cloud sites + data), optional Data Cloud observability dashboards, the optional Heroku preflight/consumer-site relay, the optional 3D globe demo-monitor UIBundle, and the optional Interaction-SDK + Data Cloud customer-tracking pipeline (Web Connector, mappings, identity resolution, real-time data graph). TRIGGER when: the user has cloned the is_interactive_skywave repo and wants to stand the demo up; says 'install Skywave', 'set up the demo', 'run the installer', 'get the demo working on my SDO'; is resuming an install after the Data Cloud provisioning wait; or hits a gate (ESD publish, data-kit instantiation, stream refresh, Heroku config, globe app-domain, tracking data-graph) and needs guidance. DO NOT TRIGGER when: the user is editing the demo's agent/Apex/LWC source (that's normal dev work), debugging a specific runtime failure in an already-installed demo, or asking about a different project."
+description: "Conductor for installing the Skywave Interactive Agentforce demo into a Salesforce Demo Org (SDO) end-to-end — core demo (agent + MIAW chat + Experience Cloud sites + data), optional Data Cloud observability dashboards, the optional Heroku preflight/consumer-site relay, the optional 3D globe demo-monitor UIBundle, the optional Interaction-SDK + Data Cloud customer-tracking pipeline (Web Connector, mappings, identity resolution, real-time data graph), and the optional voice agent (Chapter 9 — phone number, NativeVoice channel, PSTN toggles). TRIGGER when: the user has cloned the is_interactive_skywave repo and wants to stand the demo up; says 'install Skywave', 'set up the demo', 'run the installer', 'get the demo working on my SDO'; is resuming an install after the Data Cloud provisioning wait; or hits a gate (ESD publish, data-kit instantiation, stream refresh, Heroku config, globe app-domain, tracking data-graph) and needs guidance. DO NOT TRIGGER when: the user is editing the demo's agent/Apex/LWC source (that's normal dev work), debugging a specific runtime failure in an already-installed demo, or asking about a different project."
 license: MIT
 metadata:
   version: "0.1.0"
@@ -34,7 +34,8 @@ Open `install.sh` and skim the section banners. It has four tiers and a few mode
 ./install.sh --with-heroku         # + Tier 3: preflight relay + consumer-site backend
 ./install.sh --with-globe          # + Tier 4: 3D globe demo-monitor UIBundle (needs Tier 3's relay)
 ./install.sh --with-tracking       # + Tier 5: Interaction-SDK + Data Cloud customer tracking (needs DC)
-./install.sh --all                 # all five
+./install.sh --with-voice          # + Tier 6: voice agent (Chapter 9) — UI-gated, conducted here
+./install.sh --all                 # all six
 ./install.sh --resume              # skip already-completed sections (use after any gate)
 ./install.sh --check-stdm          # poll: is Data Cloud STDM ready yet? (exit 0/1)
 ./install.sh --check-prereqs       # green/red tool check for the selected tier
@@ -178,6 +179,24 @@ deviceId every downstream step keys on) 100% via the Core `/ssot/` API
   the manual `heroku config:set` command.
 - Slowness note: `/data-streams?limit=200` is ~46s on a populated DC org; the
   runner caches it, so a full Tier-5 pass is ~1–2 min, not stuck.
+
+### G9 — Voice agent (Tier 6, §6.1–6.4) — UI-gated
+Voice (Chapter 9) is mostly UI-only — no public API for the number/channel or the
+PSTN toggles. Tier 6 scripts the agent publish + permsets; you conduct the gates,
+ideally by handing off to the **`voice-agent-demo` skill** (it has the full SDO
+recipe + failure modes). The ORDER is load-bearing:
+1. §6.1 assigns the 3 NativeCCaaS permsets — then the user **must log out and back
+   in** (softphone provisions at session start; the channel UI won't appear otherwise).
+2. §6.3: claim a phone number + create a **NativeVoice channel** in Setup →
+   Communication Channels (NOT Agentforce Voice Setup — that makes an incompatible
+   channel). **Claim the number AFTER §6.1 + re-login**, or the channel-create fails
+   with a generic error and the number is permanently stuck (claim a fresh one).
+3. §6.4: enable BOTH PSTN toggles (Agentforce Voice Setup → PSTN tab: "Connect
+   Related Voice Calls" + "Record Voice Calls") — off by default, no API; without
+   them the rep sees an empty transcript. Then point routing at
+   `Skywave_Voice_Agent` (Omni-Flow) + the `skywave_routing` queue.
+Verify by calling the number: the agent answers and can transfer to a human (the
+transcript carries over only if the PSTN toggles are on).
 
 ## When something breaks
 

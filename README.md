@@ -49,7 +49,8 @@ git config core.hooksPath .githooks   # ARCHITECTURE.md drift reminder on commit
 ./install.sh --with-heroku         # + preflight relay + consumer-site backend
 ./install.sh --with-globe          # + 3D globe demo-monitor UIBundle (needs the relay; app domain enabled in Setup)
 ./install.sh --with-tracking       # + Interaction-SDK + Data Cloud customer tracking (needs Data Cloud)
-./install.sh --all                 # all five
+./install.sh --with-voice          # + voice agent (Chapter 9; UI-gated — phone number, channel, PSTN toggles)
+./install.sh --all                 # all six
 ./install.sh --resume              # continue after any gate (idempotent — always safe)
 ```
 
@@ -88,6 +89,15 @@ one, re-run with `--resume`:
   graph is built by Tier 5; on a fresh org the skill POSTs it on API v66 and
   polls `status=ready`. Needs the standard CRM connector's Contact→Individual
   mappings present so identity resolution can fuse web visitors to CRM Contacts.
+- **Voice number + channel + PSTN toggles** (voice) — Tier 6 publishes the voice
+  agent + assigns the Contact Center permsets, but claiming the phone number,
+  creating the NativeVoice channel, and the two Agentforce Voice PSTN toggles are
+  UI-only (no API). Do them AFTER the permsets + a re-login (see the skill).
+
+There is also one **manual data step** the installer leaves to you: set
+`Skywave_Demo_Seed__c = true` on exactly one Contact (the demo Contact) so the
+no-website chat path has a fallback —
+`sf data update record -s Contact -i <id> -v "Skywave_Demo_Seed__c=true"`.
 
 See `.claude/skills/skywave-install/SKILL.md` for the full gate playbook.
 

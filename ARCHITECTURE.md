@@ -74,7 +74,7 @@ the stage list and the rationale (it replaced a manual "check state" button).
 | `vendor/sdo-agentforce-observability/` | **Vendored QBrix-6 metadata** — the 12 `SDO_Analytics_*`/`SDO_AFO_Bot__c` objects, Apex/LWC, Lightning app, and the Data Cloud layer (data kit, stream templates, DMO field maps) that back the observability dashboards. Copied in so recipients don't install the internal QBrix. Separate package dir in `sfdx-project.json`; provenance + deliberate changes in its `ATTRIBUTION.md`. (§3f) |
 | `.claude/skills/skywave-install/` | **Conductor skill** for `install.sh` — the only `.claude/` content that ships (see `.gitignore`). Drives the install section-by-section and handles the gates. |
 | `docs/` | Data Cloud mapping, web-connector schema, demo walkthrough |
-| `install.sh` | **Canonical tiered installer** (SDO target). Tier 1 core / `--with-observability` (2) / `--with-heroku` (3) / `--with-globe` (4) / `--with-tracking` (5) / `--all`; idempotent + `--resume`-able. Source of truth for every setup command; the skill conducts it. Supersedes the scratch-org `orgInit.sh`. |
+| `install.sh` | **Canonical tiered installer** (SDO target). Tier 1 core / `--with-observability` (2) / `--with-heroku` (3) / `--with-globe` (4) / `--with-tracking` (5) / `--with-voice` (6, Chapter 9) / `--all`; idempotent + `--resume`-able. Source of truth for every setup command; the skill conducts it. Supersedes the scratch-org `orgInit.sh`. |
 | `config/`, `orgInit.sh`, `sfdx-project.json` | `orgInit.sh` = legacy scratch-org bootstrap (kept for reference); `install.sh` is the current SDO path |
 | `secrets/`, `.secrets/`, `.env` | Credentials — all gitignored (see SECRETS.md) |
 
@@ -827,9 +827,8 @@ must be redone. Treat this as the operational checklist.
 | Thing | Where | When you must touch it |
 |-------|-------|------------------------|
 | **ESD republish** | Setup UI / `scripts/publishEmbeddedServiceDeployment.mjs` | **After every agent publish/activate**, or chat CLT cards silently degrade to plain text. Demo-critical. (memory) |
-| `AGENT_USER` env var | shell, inline before `sf` agent commands | deploy AND publish fail without it (`sfdx-project.json` replaceWithEnv). (memory) |
-| Queue routing config | org data | General Voice queue repointed to `skywave_routing` (LeastActive) or transfers drop. Not in metadata. (memory) |
-| Agentforce Voice PSTN toggles 6 + 7 | Setup → Agentforce Voice Setup | "Connect Related Voice Calls" + "Record Voice Calls" — empty transcript without them. |
+| `AGENT_USER` env var | shell, inline before `sf` agent commands | deploy AND publish fail without it (`sfdx-project.json` `replaceWithEnv` — fires for all 3 `.agent` bundles: chat, baseline, voice; their `default_agent_user` is the `skywaveserviceagent@example.com` placeholder that gets substituted). `install.sh` exports it. (memory) |
+| Voice number + channel + PSTN toggles | Setup → Communication Channels + Agentforce Voice Setup | **Tier 6 (`--with-voice`) conducts these** — claim number + NativeVoice channel (after the NativeCCaaS permsets + re-login Tier 6 §6.1), and the 2 PSTN toggles ("Connect Related Voice Calls" + "Record Voice Calls" — empty transcript without them). UI-only, no API. Routing → `skywave_routing` queue (in metadata). |
 | Heroku Config Vars | `skywave-app` dyno | `IPINFO_TOKEN`, `SF_ESW_*`, JWT key, etc. `install.sh` Tier 3 sets the derivable ones; secrets are manual. See `.env.example` + SECRETS.md. |
 | Heroku relay origin | `Heroku_Origin_Url__c` CMD + remote site (`replaceWithEnv`); globe via `VITE_RELAY_WS_URL` | Single source of truth read via `Skywave_HerokuConfig`. `install.sh` §3.2b fills it from `heroku apps:info` post-provision. Globe must be rebuilt with the build flag. |
 | `Skywave_Demo_Admin` FLS | permset (in git); regen via `scripts/regen-demo-admin-fls.py` | Every new custom field/object must get full FLS on this permset or the presenter hits phantom INVALID_FIELD. Add it to the script's `OUR_OBJECTS`/`STD_FIELDS`, run the script, deploy the permset. (default rule, memory) |
