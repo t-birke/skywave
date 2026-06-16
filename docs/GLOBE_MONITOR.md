@@ -227,9 +227,15 @@ verification prefer **REPLAY** (click 24H), which reads persisted records.
   ISOLATED from the consumer phones) and fans the `Demo_Event__e` firehose out
   over an isolated `/ws/monitor` WebSocket. `useDemoFeed` opens
   `wss://<relay>/ws/monitor` (overridable via `VITE_RELAY_WS_URL`) and folds each
-  event through the same reducer. Caveat: a `.salesforce.app` bundle's CSP
-  `connect-src` could block the outbound `wss://` — the `[globe-feed]` console
-  logs surface that immediately.
+  event through the same reducer.
+- **CSP: the `wss://` relay origin needs its OWN CspTrustedSite.** The bundle
+  domain enforces `connect-src`. An existing `skywave_heroku` trusted site
+  already allowed `https://skywave-app-…herokuapp.com`, but **CSP treats `wss://`
+  as a distinct scheme from `https://`** — the WebSocket was refused
+  (`Connecting to 'wss://…' violates… connect-src`) until we added a separate
+  `wss://` entry: `cspTrustedSites/Skywave_Globe_Relay_Wss` (endpoint
+  `wss://skywave-app-…herokuapp.com`, `isApplicableToConnectSrc=true`). Deployed
+  to `si` 2026-06-16.
 - **Token fix:** read the dev token from `sf org auth show-access-token`
   (`result.accessToken`), never `sf org display` (redacts it → 401s). Only
   matters for the local-dev `/cometd` proxy now.
