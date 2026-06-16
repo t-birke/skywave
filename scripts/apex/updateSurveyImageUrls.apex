@@ -1,13 +1,17 @@
 // Repoint every Survey_Answer_Option__c.Image_Url__c at the Skywave-served
-// images on Heroku. Replaces the legacy Unsplash CDN URLs with our
-// nano-banana generated set, served from
-// https://skywave-app-bb0e8666933b.herokuapp.com/assets/survey/<q>-<o>.jpg.
+// images on Heroku (nano-banana generated set), served from
+// <origin>/assets/survey/<q>-<o>.jpg.
+//
+// %%SKYWAVE_HEROKU_ORIGIN%% is substituted by install.sh from the resolved dyno
+// origin — every install's Heroku hash differs, so it is NEVER hardcoded. To run
+// by hand, replace the placeholder with your dyno origin first.
 //
 // Idempotent — re-runnable any time we regenerate the images. Keys on
 // (Question_Key__c, Option_Key__c) so adding/removing options in either
 // place is safe.
 
-final String BASE = 'https://skywave-app-bb0e8666933b.herokuapp.com/assets/survey/';
+final String ORIGIN = '%%SKYWAVE_HEROKU_ORIGIN%%';
+final String BASE = ORIGIN.removeEnd('/') + '/assets/survey/';
 
 List<Survey_Answer_Option__c> opts = [
     SELECT Id, Option_Key__c, Image_Url__c,

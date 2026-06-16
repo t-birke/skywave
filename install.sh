@@ -262,6 +262,19 @@ resolve_heroku_origin() {
     state_set SKYWAVE_HEROKU_ORIGIN "$origin"
 }
 
+# Seed the survey Q&A content. Substitutes %%SKYWAVE_HEROKU_ORIGIN%% in the apex
+# with the resolved origin (so option image URLs follow the dyno — every install's
+# Heroku hash differs) and runs it. Idempotent (upsert on the keys). If the origin
+# is still the pre-provision placeholder, the apex leaves image URLs blank and
+# Tier 3 §3.2b sets them once the real dyno exists.
+seed_survey_content() {
+    local tmp; tmp="$(mktemp -t skywave-survey.XXXXXX).apex"
+    sed "s#%%SKYWAVE_HEROKU_ORIGIN%%#${SKYWAVE_HEROKU_ORIGIN}#g" \
+        scripts/apex/seedSurveyContent.apex > "$tmp"
+    sf apex run --target-org "$ORG_ALIAS" --file "$tmp" >/dev/null
+    rm -f "$tmp"
+}
+
 # Best-effort Data Cloud presence probe. DataStream is a DC-only sObject that's
 # queryable once Data Cloud is provisioned (verified on an SDO: DataConnector is
 # NOT queryable even when DC is active, but DataStream is — so use DataStream).
@@ -422,7 +435,13 @@ PYEOF
         sf apex run --target-org "$ORG_ALIAS" --file scripts/apex/seedSkywaveBookingData.apex >/dev/null
         sf apex run --target-org "$ORG_ALIAS" --file scripts/apex/seedSkywaveSeatMaps.apex   >/dev/null
         sf apex run --target-org "$ORG_ALIAS" --file scripts/apex/seedSkywaveRouteNetwork.apex >/dev/null
-        ok "booking + seatmap + route data seeded"; done_mark 1.12
+        # Survey Q&A (Chapter 1 content). The %%SKYWAVE_HEROKU_ORIGIN%% placeholder
+        # in the apex is substituted here from the resolved origin so option image
+        # URLs follow the dyno (every install's Heroku hash differs). Tier 3 §3.2b
+        # re-runs the image-URL refresh once the REAL dyno is provisioned.
+        resolve_heroku_origin
+        seed_survey_content
+        ok "booking + seatmap + route + survey content seeded"; done_mark 1.12
     fi
 
     # ── 1.13 Publish ESD (Playwright headless click) ───── [GATE if it fails] ─
@@ -824,6 +843,14 @@ tier3_heroku() {
             --ignore-conflicts --json >/dev/null \
             && ok "CMD + remote site point at ${SKYWAVE_HEROKU_ORIGIN}" \
             || warn "redeploy of CMD/remote-site failed — set Heroku_Origin_Url__c manually to ${SKYWAVE_HEROKU_ORIGIN}"
+        # Survey option images are served by THIS dyno — repoint them now the real
+        # origin is known (Tier 1 §1.12 may have used the pre-provision placeholder).
+        local _imgapex; _imgapex="$(mktemp -t skywave-img.XXXXXX).apex"
+        sed "s#%%SKYWAVE_HEROKU_ORIGIN%%#${SKYWAVE_HEROKU_ORIGIN}#g" scripts/apex/updateSurveyImageUrls.apex > "$_imgapex"
+        sf apex run --target-org "$ORG_ALIAS" --file "$_imgapex" >/dev/null 2>&1 \
+            && ok "survey image URLs repointed at ${SKYWAVE_HEROKU_ORIGIN}" \
+            || warn "survey image-URL refresh skipped/failed (run scripts/apex/updateSurveyImageUrls.apex)"
+        rm -f "$_imgapex"
         info "globe UIBundle: rebuild with VITE_RELAY_WS_URL=\"${SKYWAVE_HEROKU_ORIGIN/https:/wss:}/ws/monitor\" (see its README)"
         done_mark 3.2b
     fi
