@@ -11,7 +11,7 @@ config:
     agent_label: "Skywave Voice Agent"
     description: "Phone voice agent for Skywave Airlines: identifies the caller, reads their bookings, and changes their seat by voice."
     agent_type: "AgentforceServiceAgent"
-    default_agent_user: "einsteinagent@00dg8000006i9hjeas.ext"
+    default_agent_user: "skywaveserviceagent@example.com"
     additional_parameter__enable_graph_runtime: True
 
 variables:

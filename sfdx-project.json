@@ -16,6 +16,16 @@
             "replaceWithEnv": "AGENT_USER"
         },
         {
+            "filename": "force-app/main/default/aiAuthoringBundles/Skywave_Airlines_Agent_Baseline/Skywave_Airlines_Agent_Baseline.agent",
+            "stringToReplace": "skywaveserviceagent@example.com",
+            "replaceWithEnv": "AGENT_USER"
+        },
+        {
+            "filename": "force-app/main/default/aiAuthoringBundles/Skywave_Voice_Agent/Skywave_Voice_Agent.agent",
+            "stringToReplace": "skywaveserviceagent@example.com",
+            "replaceWithEnv": "AGENT_USER"
+        },
+        {
             "filename": "force-app/main/default/flows/Skywave_Route_to_Agent.flow-meta.xml",
             "stringToReplace": "%%SF_SKYWAVE_FLOW_AGENT_ID%%",
             "replaceWithEnv": "SF_SKYWAVE_FLOW_AGENT_ID"

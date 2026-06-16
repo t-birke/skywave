@@ -16,7 +16,8 @@
 #   ./install.sh --with-heroku         Tiers 1 + 3 (preflight relay + consumer-site backend)
 #   ./install.sh --with-globe          Tiers 1 + 4 (3D globe demo monitor UIBundle; needs Tier 3's relay)
 #   ./install.sh --with-tracking       Tiers 1 + 5 (Interaction-SDK + Data Cloud customer tracking; needs DC)
-#   ./install.sh --all                 Tiers 1 + 2 + 3 + 4 + 5
+#   ./install.sh --with-voice          Tiers 1 + 6 (voice agent — Chapter 9; UI-gated, conducted by the skill)
+#   ./install.sh --all                 Tiers 1 + 2 + 3 + 4 + 5 + 6
 #   ./install.sh --resume              Re-run; skips completed sections (see STATE FILE)
 #   ./install.sh --check-stdm          Poll-only: is Data Cloud STDM ready yet? (exit 0/1)
 #   ./install.sh --check-prereqs       Report required CLIs for the selected tier; exit
@@ -58,14 +59,15 @@ STATE_DIR="${REPO_ROOT}/.deploy-tmp"
 STATE_FILE="${STATE_DIR}/install-state.env"
 
 # ─── Flags ──────────────────────────────────────────────────────────────────
-WITH_OBS=0; WITH_HEROKU=0; WITH_GLOBE=0; WITH_TRACKING=0; RESUME=0; MODE="install"
+WITH_OBS=0; WITH_HEROKU=0; WITH_GLOBE=0; WITH_TRACKING=0; WITH_VOICE=0; RESUME=0; MODE="install"
 for arg in "$@"; do
     case "$arg" in
         --with-observability) WITH_OBS=1 ;;
         --with-heroku)        WITH_HEROKU=1 ;;
         --with-globe)         WITH_GLOBE=1 ;;
         --with-tracking)      WITH_TRACKING=1 ;;
-        --all)                WITH_OBS=1; WITH_HEROKU=1; WITH_GLOBE=1; WITH_TRACKING=1 ;;
+        --with-voice)         WITH_VOICE=1 ;;
+        --all)                WITH_OBS=1; WITH_HEROKU=1; WITH_GLOBE=1; WITH_TRACKING=1; WITH_VOICE=1 ;;
         --resume)             RESUME=1 ;;
         --check-stdm)         MODE="check-stdm" ;;
         --check-prereqs)      MODE="check-prereqs" ;;
@@ -113,7 +115,7 @@ section()    { local id="$1"; if [ "$RESUME" = "1" ] && is_done "$id"; then info
 #  PREREQ CHECKS  (§0.0)
 # ════════════════════════════════════════════════════════════════════════════
 check_prereqs() {
-    say "0.0 Prerequisite check (tier: core$([ $WITH_OBS = 1 ] && echo +observability)$([ $WITH_HEROKU = 1 ] && echo +heroku)$([ $WITH_GLOBE = 1 ] && echo +globe)$([ $WITH_TRACKING = 1 ] && echo +tracking))"
+    say "0.0 Prerequisite check (tier: core$([ $WITH_OBS = 1 ] && echo +observability)$([ $WITH_HEROKU = 1 ] && echo +heroku)$([ $WITH_GLOBE = 1 ] && echo +globe)$([ $WITH_TRACKING = 1 ] && echo +tracking)$([ $WITH_VOICE = 1 ] && echo +voice))"
     local missing=0
     need() { # need <cmd> <why> <hint>
         if command -v "$1" >/dev/null 2>&1; then ok "$1 — $2"
@@ -155,6 +157,12 @@ check_prereqs() {
         info "+ the standard CRM connector's Contact→Individual/Email mappings (so IR's email"
         info "match fuses web↔CRM). Auth reuses the SF_CLIENT_ID/secrets/jwt.key app (Api"
         info "scope suffices). The DG step is gated on a fresh org (validate + report)."
+    fi
+    if [ "$WITH_VOICE" = "1" ]; then
+        info "voice tier (Chapter 9): publishes/activates Skywave_Voice_Agent + assigns the"
+        info "NativeCCaaS permsets (scripted), but the phone number + NativeVoice channel and"
+        info "the 2 PSTN toggles are UI-ONLY (no public API — confirmed). The skill conducts"
+        info "those gates via the voice-agent-demo skill. Needs a re-login after permsets."
     fi
     info "NOTE: 'gh' + a corporate token are only needed by the maintainer to (re)vendor"
     info "QBrix-6 — end users who clone this repo do NOT need them."
@@ -794,6 +802,87 @@ for line in sys.stdin:
 }
 
 # ════════════════════════════════════════════════════════════════════════════
+#  TIER 6 — VOICE AGENT (Chapter 9)
+# ════════════════════════════════════════════════════════════════════════════
+# Voice is heavily UI-gated: the phone number + NativeVoice channel (Communication
+# Channels UI) and the two Agentforce Voice PSTN toggles have NO public API
+# (confirmed — see the voice-agent-demo skill). So this tier scripts what it can
+# (publish/activate the voice agent + the bot-user Apex permset + the NativeCCaaS
+# permsets + the telephony toggle) and marks the rest as gates the skill conducts.
+# The voice metadata (Skywave_Voice_Agent bundle, Skywave_VoiceCallResolver +
+# trigger, skywave_routing queue/routing-config, VoiceCall flexipage) already
+# deploys with the Tier-1 blanket force-app deploy.
+VOICE_AGENT_API_NAME="Skywave_Voice_Agent"
+tier6_voice() {
+    state_load; export AGENT_USER
+    say "TIER 6 — voice agent (Chapter 9)"
+
+    # ── 6.1 NativeCCaaS permsets + telephony toggle (scripted) ───────────────
+    if section 6.1; then
+        say "6.1 Contact Center permsets + telephony"
+        for ps in ContactCenterAdminNativeCCaaS ContactCenterAgentNativeCCaaS ContactCenterSupervisorNativeCCaaS; do
+            sf org assign permset --target-org "$ORG_ALIAS" --name "$ps" 2>/dev/null && ok "assigned $ps" || warn "could not assign $ps (may not exist / already assigned)"
+        done
+        sf org assign permsetgroup --target-org "$ORG_ALIAS" --name SDO_Service_CCaaS 2>/dev/null && ok "assigned SDO_Service_CCaaS PSG" || true
+        warn "[GATE] Log OUT and back IN to the org now — softphone provisioning happens at session start; the channel UI options won't appear until you do."
+        done_mark 6.1
+    fi
+
+    # ── 6.2 Publish + activate the voice agent (+ BotUser patch, like §1.6) ──
+    if section 6.2; then
+        say "6.2 Publish + activate ${VOICE_AGENT_API_NAME}"
+        [ -n "${AGENT_USER:-}" ] || { state_load; export AGENT_USER; }
+        # The bot user needs the agent's Apex permset BEFORE publish or the planner
+        # ships empty action wiring (memory: bot-user-apex-permissions).
+        sf org assign permset --target-org "$ORG_ALIAS" --name Skywave_Agent_User --on-behalf-of "$AGENT_USER" 2>/dev/null || true
+        sf agent publish authoring-bundle --target-org "$ORG_ALIAS" --api-name "$VOICE_AGENT_API_NAME" --skip-retrieve --json >/dev/null
+        # Same BotUserId-null workaround as the chat agent (§1.6): patch <botUser>.
+        local patchdir botfile
+        patchdir="$(mktemp -d)"
+        sf project retrieve start --target-org "$ORG_ALIAS" --metadata "Bot:${VOICE_AGENT_API_NAME}" --target-metadata-dir "$patchdir" --unzip --json >/dev/null 2>&1 || true
+        botfile="$patchdir/unpackaged/unpackaged/bots/${VOICE_AGENT_API_NAME}.bot"
+        if [ -f "$botfile" ]; then
+            BOTFILE="$botfile" AGENT_USER="$AGENT_USER" python3 - <<'PYEOF'
+import os, re
+p = os.environ['BOTFILE']; s = open(p).read()
+if '<botUser>' not in s:
+    s = re.sub(r'(<Bot [^>]*>)\s*\n', r'\1\n    <botUser>%s</botUser>\n' % os.environ['AGENT_USER'], s, count=1)
+    open(p, 'w').write(s)
+PYEOF
+            sf project deploy start --target-org "$ORG_ALIAS" --metadata-dir "$patchdir/unpackaged/unpackaged" --ignore-conflicts --json >/dev/null 2>&1 || true
+        fi
+        rm -rf "$patchdir"
+        sf agent activate --target-org "$ORG_ALIAS" --api-name "$VOICE_AGENT_API_NAME" --json >/dev/null
+        ok "voice agent published + activated"
+        done_mark 6.2
+    fi
+
+    # ── 6.3 Phone number + NativeVoice channel (UI GATE) ─────────────────────
+    if section 6.3; then
+        say "6.3 Phone number + voice channel"
+        warn "[GATE] Claim a phone number + create a NativeVoice channel in Setup →"
+        info "Communication Channels (UI-only — no API). CRITICAL: do this AFTER §6.1's"
+        info "permsets + re-login, or the channel create fails and the number is stuck."
+        info "The skill conducts this via the voice-agent-demo skill (Stage 3); set the"
+        info "channel's Call Routing to a voice queue, then mark §6.3 done + --resume."
+        return 0
+    fi
+
+    # ── 6.4 PSTN toggles + routing to the agent (UI GATE) ────────────────────
+    if section 6.4; then
+        say "6.4 PSTN toggles + agent routing"
+        warn "[GATE] Setup → Agentforce Voice Setup → PSTN tab: enable BOTH 'Connect"
+        info "Related Voice Calls' + 'Record Voice Calls' (off by default, no API — without"
+        info "them the rep sees an empty transcript). Then point the channel's routing at"
+        info "${VOICE_AGENT_API_NAME} (Omni-Flow) + the skywave_routing queue (LeastActive,"
+        info "already deployed). Caller-id→Contact resolution runs via Skywave_VoiceCallResolve."
+        return 0
+    fi
+    say "Tier 6 complete — voice agent"
+    info "Call the claimed number; ${VOICE_AGENT_API_NAME} answers and can transfer to a human."
+}
+
+# ════════════════════════════════════════════════════════════════════════════
 #  TIER 3 — HEROKU RELAY
 # ════════════════════════════════════════════════════════════════════════════
 tier3_heroku() {
@@ -1035,6 +1124,9 @@ case "$MODE" in
             [ "$WITH_HEROKU" = "1" ] || warn "globe baked with the current relay origin; if the dyno isn't provisioned yet, re-run --with-heroku --with-globe --resume after Tier 3."
             tier4_globe
         fi
+        # Voice (Chapter 9): scripted agent publish + permsets, UI gates for the
+        # number/channel/PSTN toggles (conducted by the skill).
+        [ "$WITH_VOICE" = "1" ] && tier6_voice
         say "Done."
         info "State: ${STATE_FILE} (re-run with --resume to continue any skipped/gated steps)"
         ;;

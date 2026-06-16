@@ -13,7 +13,7 @@ config:
     agent_label: "Skywave Airlines Agent"
     description: "A support agent for Skywave Airlines that assists customers with their flight bookings and related inquiries."
     agent_type: "AgentforceServiceAgent"
-    default_agent_user: "einsteinagent@00dg8000006i9hjeas.ext"
+    default_agent_user: "skywaveserviceagent@example.com"
     additional_parameter__enable_graph_runtime: True
 
 variables:
