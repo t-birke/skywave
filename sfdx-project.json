@@ -3,6 +3,10 @@
         {
             "path": "force-app",
             "default": true
+        },
+        {
+            "path": "vendor/sdo-agentforce-observability",
+            "default": false
         }
     ],
     "replacements": [

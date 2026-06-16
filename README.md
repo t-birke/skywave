@@ -11,75 +11,80 @@ a public LWR Experience Cloud site with an embedded Agentforce Messaging
 > the demo vision; [`docs/STYLE_GUIDE.md`](docs/STYLE_GUIDE.md) the visual
 > language for new UI; [`SECRETS.md`](SECRETS.md) covers credentials.
 
-## Prerequisites
+## Installing the demo
 
-- [Salesforce CLI (`sf`)](https://developer.salesforce.com/tools/salesforcecli) installed
-- Authenticated into a DevHub org (`sf org login web --set-default-dev-hub`)
-- [`jq`](https://jqlang.github.io/jq/) on your PATH (`brew install jq` on macOS)
-- `python3` on your PATH (ships with macOS)
-- Node.js 18+ (for Playwright — skip if you prefer to click Publish manually)
+The demo installs into a **Salesforce Demo Org (SDO)** — not a scratch org —
+because the observability tier needs Data Cloud, which SDOs ship with. One
+canonical, idempotent, resumable script (`install.sh`) does everything; a
+companion Claude skill (`.claude/skills/skywave-install`) conducts it and
+handles the few interactive gates. If you have Claude Code, just open this repo
+and say **"install Skywave"** — the skill takes over.
 
-Install Playwright + Chromium so `orgInit.sh` can click Publish headlessly
-(otherwise the script will prompt you to click it):
+### Prerequisites
+
+- [Salesforce CLI (`sf`)](https://developer.salesforce.com/tools/salesforcecli) — v2, not `sfdx`
+- An **SDO with Data Cloud**, authenticated and aliased `si`:
+  `sf org login web --alias si --set-default`
+- [`jq`](https://jqlang.github.io/jq/) and `python3` on your PATH (`brew install jq`; python3 ships with macOS)
+- Node.js 18+/20, then `npm install && npx playwright install chromium`
+  (Playwright drives the two headless-browser gates: ESD Publish + Data Cloud
+  stream refresh)
+- For the Heroku tier only: the `heroku` CLI, logged in (`heroku login`)
 
 ```sh
 npm install
 npx playwright install chromium
-chmod +x orgInit.sh scripts/createEmbeddedServiceConfig.sh
+git config core.hooksPath .githooks   # ARCHITECTURE.md drift reminder on commit
+./install.sh --check-prereqs          # green/red check for the selected tier
 ```
 
-Enable the repo git hooks (once per clone) so commits get the
-ARCHITECTURE.md drift reminder:
+> You do **not** need the internal observability QBrix or a corporate GitHub
+> token — that metadata is vendored into `vendor/sdo-agentforce-observability/`.
+
+### Getting started
 
 ```sh
-git config core.hooksPath .githooks
+./install.sh                       # Tier 1: core demo (agent, MIAW chat, sites, data)
+./install.sh --with-observability  # + Data Cloud session-tracing dashboards (adds a ~2–3h wait)
+./install.sh --with-heroku         # + live-feed / globe / preflight relay
+./install.sh --all                 # all three
+./install.sh --resume              # continue after any gate (idempotent — always safe)
 ```
 
-## Getting Started
+**Tier 1 (core)** recreates nothing destructively — it find-or-creates the agent
+user, the `skywave website` LWR site, deploys all metadata (vendored ESW
+bootstrap site, MessagingChannel, Apex/LWC/objects/flows/agent bundle, CSP/CORS),
+publishes + activates the agent (patching `BotUserId`), creates the
+`Skywave_MIAW_Deployment` Embedded Service config via the Tooling API
+(`clientVersion=WebV2`, no "Switch to v2" click), seeds idempotent booking /
+seatmap / route data, publishes the ESD (Playwright), bakes the ESW config into
+the homepage LWC, and enables guest access. When it finishes it prints the
+customer-site URL — hard-refresh (Cmd+Shift+R) to clear the LWR bundle cache; the
+chat widget appears bottom-right and routes to `Skywave_Airlines_Agent`.
 
-Run one script. With Playwright installed it runs end-to-end with zero
-clicks; without it, the script pauses once for a Setup "Publish" click:
+### The interactive gates
 
-```sh
-./orgInit.sh
-```
+A handful of steps need a human or a Claude-only tool; `install.sh` pauses at
+each with a clear message, and the skill knows how to clear them. After clearing
+one, re-run with `--resume`:
 
-What it does automatically:
+- **SDO auth** — provision/authenticate the org if absent.
+- **ESD Publish** — Salesforce exposes no public API for the deployment's
+  "Publish" button ([PLATFORM_FEEDBACK.md #10](PLATFORM_FEEDBACK.md)), so it's
+  clicked headlessly via `scripts/publishEmbeddedServiceDeployment.mjs`; falls
+  back to a Setup deep-link.
+- **STDM provisioning wait** (observability) — ~2–3h async; the script exits and
+  you resume with `--check-stdm` / `--resume`.
+- **Data-kit instantiation** (observability) — the skill runs it via the data360
+  MCP, with a Setup → Data Kits UI fallback.
+- **Stream Full Refresh** (observability) — `scripts/refreshDataStreams.mjs`, with
+  a Dev Console Apex fallback.
+- **Heroku keys** — the Connected App cert + MIAW JWK upload are manual Setup steps.
 
-- Recreates the `skywave-scratch` scratch org
-- Creates the customer-facing `skywave website` LWR site (`sf community create`)
-- Deploys all metadata in one pass — including the vendored ESW bootstrap
-  site (DigitalExperienceBundle + CustomSite + Network), the
-  `Skywave_Channel` MessagingChannel, Apex, LWC, objects, flows, agent
-  bundle, CSP/CORS entries, and the guest profile
-- Creates the agent user, publishes + activates the Agentforce agent,
-  patches the Bot to set `BotUserId` (workaround for an `sf agent publish`
-  bug that leaves it null)
-- Activates `Skywave_Channel` via Apex (`IsActive` is read-only via the
-  Metadata API); routing to the agent goes through `Skywave_Route_to_Agent`
-  routing flow
-- Publishes the ESW bootstrap site
-- Creates the `Skywave_MIAW_Deployment` Embedded Service Deployment via the
-  Tooling API with `clientVersion=WebV2` (no "Switch to Enhanced v2" click)
-- Publishes the customer LWR site, flips the Network to `Live`, loads
-  sample data
+See `.claude/skills/skywave-install/SKILL.md` for the full gate playbook.
 
-### The Publish step
-
-Salesforce doesn't expose a public API for the "Publish" button on an
-Embedded Service Deployment (confirmed internally — see
-[PLATFORM_FEEDBACK.md #10](PLATFORM_FEEDBACK.md)). The script works
-around this by driving a headless Chromium via Playwright to click
-the button for you. See `scripts/publishEmbeddedServiceDeployment.mjs`.
-
-If Playwright isn't installed, the script falls back to prompting you
-to click Publish in Setup, then press Enter to continue.
-
-### Open the site
-
-After the script completes, hit the LWR site URL it prints. Hard-refresh
-(Cmd+Shift+R) to clear the LWR bundle cache. The messaging widget should
-appear bottom-right and connect to the agent.
+> The legacy scratch-org installer `orgInit.sh` is kept for reference only; the
+> SDO path above (`install.sh`) supersedes it.
 
 ## Data Cloud
 

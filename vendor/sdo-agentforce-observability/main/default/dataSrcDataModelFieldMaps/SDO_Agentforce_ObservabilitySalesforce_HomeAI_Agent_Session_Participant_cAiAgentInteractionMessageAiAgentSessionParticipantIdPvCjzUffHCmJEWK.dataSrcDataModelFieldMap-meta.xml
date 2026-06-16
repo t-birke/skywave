@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DataSrcDataModelFieldMap xmlns="http://soap.sforce.com/2006/04/metadata">
+    <filterApplied>false</filterApplied>
+    <filterOperationType>Equal</filterOperationType>
+    <masterLabel>SDO_Agentforce_ObservabilitySalesforce_HomeAI_Agent_Session_Participant_cAiAgentInteractionMessageAiAgentSessionParticipantIdPvCjzUffHCmJEWK</masterLabel>
+    <sourceField>SDO_Analytics_AIAgentInteractionMes_Home1.AI_Agent_Session_Participant_c__c</sourceField>
+    <targetField>AiAgentInteractionMessageDmo.AiAgentInteractionMessageDmo.AiAgentSessionParticipantId</targetField>
+    <templateVersion>1</templateVersion>
+    <versionNumber>1.0</versionNumber>
+</DataSrcDataModelFieldMap>

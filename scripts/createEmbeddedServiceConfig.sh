@@ -11,7 +11,12 @@ DEPLOYMENT_NAME="${DEPLOYMENT_NAME:-Skywave_MIAW_Deployment}"
 CHANNEL_NAME="${CHANNEL_NAME:-Skywave_Channel}"
 SITE_NAME="${SITE_NAME:-ESA_Deployment1}"
 
-ORG_INFO=$(sf org display --json)
+# Honor an explicit target org if the caller exports ORG_ALIAS (install.sh
+# does); otherwise fall back to the CLI's default org (legacy behavior).
+ORG_TARGET_ARG=()
+[ -n "${ORG_ALIAS:-}" ] && ORG_TARGET_ARG=(--target-org "$ORG_ALIAS")
+
+ORG_INFO=$(sf org display "${ORG_TARGET_ARG[@]}" --json)
 ACCESS_TOKEN=$(echo "$ORG_INFO" | jq -r '.result.accessToken')
 INSTANCE_URL=$(echo "$ORG_INFO" | jq -r '.result.instanceUrl')
 

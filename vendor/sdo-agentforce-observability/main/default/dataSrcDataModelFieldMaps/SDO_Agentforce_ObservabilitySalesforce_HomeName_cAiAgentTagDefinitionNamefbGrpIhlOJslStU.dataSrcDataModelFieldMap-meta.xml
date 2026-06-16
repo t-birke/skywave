@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DataSrcDataModelFieldMap xmlns="http://soap.sforce.com/2006/04/metadata">
+    <filterApplied>false</filterApplied>
+    <filterOperationType>Equal</filterOperationType>
+    <masterLabel>SDO_Agentforce_ObservabilitySalesforce_HomeName_cAiAgentTagDefinitionNamefbGrpIhlOJslStU</masterLabel>
+    <sourceField>SDO_Analytics_AIAgentTagDefinition_Home1.Name_c__c</sourceField>
+    <targetField>AiAgentTagDefinitionDmo.AiAgentTagDefinitionDmo.NameInterfaceField</targetField>
+    <templateVersion>1</templateVersion>
+    <versionNumber>1.0</versionNumber>
+</DataSrcDataModelFieldMap>

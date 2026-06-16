@@ -1,0 +1,28 @@
+<template>
+    <lightning-card title="Synthetic Session Search" icon-name="standard:search">
+        <div class="slds-var-p-around_medium">
+
+            <lightning-input type="text" label="Session UUID" placeholder="Enter session UUID or External ID"
+                value={searchUuid} onchange={handleUuidChange} class="slds-var-m-bottom_small">
+            </lightning-input>
+
+            <template lwc:if={errorMessage}>
+                <div class="slds-notify slds-notify_alert slds-alert_error slds-var-m-bottom_small" role="alert">
+                    <span class="slds-assistive-text">Error</span>
+                    <lightning-icon icon-name="utility:error" size="x-small" variant="error"
+                        class="slds-var-m-right_x-small"></lightning-icon>
+                    <h2>{errorMessage}</h2>
+                </div>
+            </template>
+
+            <lightning-button label="Go to" variant="brand" onclick={handleGoToSession} disabled={isSearching}
+                icon-name="utility:forward">
+            </lightning-button>
+
+            <template lwc:if={isSearching}>
+                <lightning-spinner alternative-text="Searching..." size="small"
+                    class="slds-var-m-top_small"></lightning-spinner>
+            </template>
+        </div>
+    </lightning-card>
+</template>

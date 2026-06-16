@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CompactLayout xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Custom_Compact_Layout</fullName>
+    <fields>Name</fields>
+    <fields>AI_Agent_Api_Name__c</fields>
+    <fields>AI_Agent_Session__c</fields>
+    <fields>AI_Agent_Session_Participant_Role__c</fields>
+    <fields>AI_Agent_Template_Api_Name__c</fields>
+    <fields>AI_Agent_Type__c</fields>
+    <fields>AI_Agent_Version_Api_Name__c</fields>
+    <fields>End_Timestamp__c</fields>
+    <fields>Individual__c</fields>
+    <label>Custom Compact Layout</label>
+</CompactLayout>

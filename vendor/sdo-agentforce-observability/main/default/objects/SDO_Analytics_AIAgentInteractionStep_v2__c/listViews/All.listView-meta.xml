@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>All</fullName>
+    <columns>NAME</columns>
+    <columns>AI_Agent_Interaction__c</columns>
+    <columns>Ai_Agent_Interaction_Step_Type__c</columns>
+    <columns>Attribute__c</columns>
+    <columns>Error_Message__c</columns>
+    <columns>Gen_AI_Gateway_Request__c</columns>
+    <columns>Gen_AI_Gateway_Response__c</columns>
+    <columns>Generation__c</columns>
+    <columns>Input_Value__c</columns>
+    <columns>Name__c</columns>
+    <filterScope>Everything</filterScope>
+    <label>All Records</label>
+</ListView>

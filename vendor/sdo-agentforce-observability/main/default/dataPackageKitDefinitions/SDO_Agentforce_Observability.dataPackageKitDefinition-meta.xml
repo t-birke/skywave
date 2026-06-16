@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DataPackageKitDefinition xmlns="http://soap.sforce.com/2006/04/metadata">
+    <dataKitSource>EXTERNAL</dataKitSource>
+    <dataKitType>NONE</dataKitType>
+    <dataSpaceDefinitionDevName>default</dataSpaceDefinitionDevName>
+    <deploymentOrder>{&quot;isAutoSequence&quot;:true,&quot;sequence&quot;:[{&quot;devName&quot;:&quot;SDO_AFO_STDM&quot;,&quot;type&quot;:&quot;DataStream&quot;},{&quot;devName&quot;:&quot;SDO_AFO_Optimization&quot;,&quot;type&quot;:&quot;DataStream&quot;},{&quot;devName&quot;:&quot;SDO_AFO_Extra&quot;,&quot;type&quot;:&quot;DataStream&quot;}]}</deploymentOrder>
+    <developerName>SDO_Agentforce_Observability</developerName>
+    <isDeployed>false</isDeployed>
+    <isEnabled>false</isEnabled>
+    <masterLabel>SDO Agentforce Observability</masterLabel>
+    <useDeterministicNaming>false</useDeterministicNaming>
+    <versionNumber>11.0</versionNumber>
+</DataPackageKitDefinition>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DataSrcDataModelFieldMap xmlns="http://soap.sforce.com/2006/04/metadata">
+    <filterApplied>false</filterApplied>
+    <filterOperationType>Equal</filterOperationType>
+    <masterLabel>SDO_Agentforce_ObservabilitySalesforce_HomeResponse_Summary_Text_cAiAgentMomentResponseSummaryTextuwuctCWiJHoOsHs</masterLabel>
+    <sourceField>SDO_Analytics_AIAgentMoment_v2_c_Home1.Response_Summary_Text_c__c</sourceField>
+    <targetField>AiAgentMomentDmo.AiAgentMomentDmo.ResponseSummaryText</targetField>
+    <templateVersion>1</templateVersion>
+    <versionNumber>1.0</versionNumber>
+</DataSrcDataModelFieldMap>

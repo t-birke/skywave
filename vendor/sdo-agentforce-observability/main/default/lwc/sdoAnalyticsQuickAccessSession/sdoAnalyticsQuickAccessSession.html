@@ -1,0 +1,19 @@
+<template>
+    <lightning-card icon-name="utility:shortcuts">
+        <div slot="title">
+            Quick Access
+        </div>
+        <div slot="actions">
+            <lightning-button label="Open in Observability" variant="brand" onclick={handleNavigateToAnalytics}
+                disabled={isDisabled}>
+            </lightning-button>
+        </div>
+        <div class="slds-var-p-around_small">
+            <div class="slds-text-body_small slds-text-color_weak">
+                <lightning-icon icon-name="utility:info" size="xx-small"
+                    class="slds-var-m-right_xx-small"></lightning-icon>
+                Changes will be reflected only after the related data stream is refreshed
+            </div>
+        </div>
+    </lightning-card>
+</template>

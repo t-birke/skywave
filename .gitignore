@@ -12,8 +12,14 @@
 .vscode/
 .cursor/
 .idea/
-.claude/
 .agents/
+
+# Claude: ignore everything EXCEPT the shipped installer skill. The skill makes
+# a fresh clone self-contained (Claude auto-discovers it). settings.local.json
+# is a local permission allowlist — not secret, but local noise — keep ignored.
+.claude/*
+!.claude/skills/
+.claude/settings.local.json
 
 # OS
 .DS_Store
@@ -57,8 +63,8 @@ secrets/
 # Stashed observability seed data (demo data export)
 .stash/
 
-# Observability dataset export — build artifact, not source
-skywave-observability-dataset/
+# Observability dataset — SHIP the dir (it's the portable fallback data-load
+# path for the observability tier). Keep ignoring the regenerable 637KB zip.
 skywave-observability-dataset.zip
 
 # ECv2 reference raw assets are Salesforce "Company Confidential" minified

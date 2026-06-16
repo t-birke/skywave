@@ -1,0 +1,26 @@
+<template>
+    <lightning-card icon-name="utility:shortcuts">
+        <div slot="title">
+            Quick Access
+        </div>
+        <div slot="actions">
+            <lightning-button label={buttonLabel} variant="neutral" onclick={handleNavigateToDataStream}
+                disabled={isDisabled}>
+            </lightning-button>
+            <template if:true={isLoading}>
+                <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+            </template>
+        </div>
+        <template if:true={hasError}>
+            <div class="slds-var-p-around_small">
+                <div class="slds-var-m-top_small">
+                    <div class="slds-text-color_error slds-text-body_small">
+                        <lightning-icon icon-name="utility:error" size="xx-small" variant="error"
+                            class="slds-var-m-right_xx-small"></lightning-icon>
+                        {errorMessage}
+                    </div>
+                </div>
+            </div>
+        </template>
+    </lightning-card>
+</template>

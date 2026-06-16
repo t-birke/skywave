@@ -1,0 +1,3 @@
+"Created_Days__c","Created_Time__c","Data_Type__c","Demo_Identifier__c","Description__c","Developer_Name__c","External_ID__c","Name__c","Source_Type__c"
+"0.0","18:39:29","Text","SKYWAVE_PHASE_4_5","Optimization Request Category tag","AIE_Request_Category_Skywave_Airlines_Agent","4cadbae4-bb77-493b-aafd-b3a8d182ce34","Optimization Request Category","Generated"
+"0.0","18:39:29","Integer","SKYWAVE_PHASE_4_5","Relevance Score tag","Quality_Score","f2375b53-e483-45b8-af49-4eca235fe864","Relevance Score","Predefined"

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FlexiPage xmlns="http://soap.sforce.com/2006/04/metadata">
+    <flexiPageRegions>
+        <itemInstances>
+            <componentInstance>
+                <componentInstanceProperties>
+                    <name>decorate</name>
+                    <value>true</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>richTextValue</name>
+                    <value>&lt;p&gt;Demo tools to streamline your builds and customizations &lt;span style=&quot;color: rgb(68, 68, 68);&quot;&gt;for Agentforce Observability Brix&lt;/span&gt;. Check out &lt;span style=&quot;color: rgb(68, 68, 68);&quot;&gt;Solutions Workspace for the full&lt;/span&gt; guide&lt;/p&gt;</value>
+                </componentInstanceProperties>
+                <componentName>flexipage:richText</componentName>
+                <identifier>flexipage_richText</identifier>
+            </componentInstance>
+        </itemInstances>
+        <name>region1</name>
+        <type>Region</type>
+    </flexiPageRegions>
+    <flexiPageRegions>
+        <itemInstances>
+            <componentInstance>
+                <componentInstanceProperties>
+                    <name>buttonLabel</name>
+                    <value>Session Data Stream</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>streamName</name>
+                    <value>SDO_Analytics_AIAgentSession_v2__c_Home</value>
+                </componentInstanceProperties>
+                <componentName>sdoAnalyticsDataStreamNavigator</componentName>
+                <identifier>c_sdoAnalyticsDataStreamNavigator</identifier>
+            </componentInstance>
+        </itemInstances>
+        <name>region2</name>
+        <type>Region</type>
+    </flexiPageRegions>
+    <flexiPageRegions>
+        <itemInstances>
+            <componentInstance>
+                <componentName>sdoAnalyticsSyntheticSessionSearch</componentName>
+                <identifier>c_sdoAnalyticsSyntheticSessionSearch</identifier>
+            </componentInstance>
+        </itemInstances>
+        <name>region3</name>
+        <type>Region</type>
+    </flexiPageRegions>
+    <masterLabel>Demo Config</masterLabel>
+    <template>
+        <name>flexipage:appHomeTemplateHeaderTwoColumnsLeftSidebar</name>
+    </template>
+    <type>AppPage</type>
+</FlexiPage>

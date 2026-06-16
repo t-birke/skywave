@@ -1,0 +1,165 @@
+<template>
+    <lightning-card icon-name="doctype:audio">
+        <div slot="title">
+            Session Audio File
+        </div>
+        <div slot="actions">
+            <lightning-helptext
+                content="The audio file comes from VoiceCall.CallRecording.MediaContentId">
+            </lightning-helptext>
+        </div>
+        <div class="slds-var-p-around_medium">
+
+            <!-- Voice Call Lookup -->
+            <lightning-record-edit-form record-id={recordId} object-api-name="SDO_Analytics_AIAgentSession_v2__c"
+                onsuccess={handleSuccess}>
+                <lightning-input-field field-name="Related_Voice_Call__c" variant="label-stacked"
+                    onchange={handleLookupChange}>
+                </lightning-input-field>
+            </lightning-record-edit-form>
+
+            <!-- Loading State -->
+            <template lwc:if={isLoading}>
+                <div class="slds-var-m-top_large">
+                    <lightning-spinner alternative-text="Loading recording..." size="small"></lightning-spinner>
+                </div>
+            </template>
+
+            <!-- Error State -->
+            <template lwc:if={hasError}>
+                <div class="slds-notify slds-notify_alert slds-alert_warning slds-var-m-top_large slds-var-m-bottom_medium"
+                    role="alert">
+                    <span class="slds-assistive-text">Warning</span>
+                    <lightning-icon icon-name="utility:warning" size="x-small"
+                        class="slds-var-m-right_x-small"></lightning-icon>
+                    <h2>{errorMessage}</h2>
+                </div>
+
+                <!-- Upload/Change Recording Option -->
+                <template lwc:if={showUploadOption}>
+                    <div class="slds-var-m-bottom_medium">
+                        <lightning-button label={uploadLabel} icon-name="utility:upload" onclick={toggleUploadSection}
+                            variant="neutral" class="slds-var-m-bottom_small">
+                        </lightning-button>
+
+                        <template lwc:if={showUploadSection}>
+                            <div class="slds-box slds-var-m-top_small">
+                                <lightning-radio-group name="uploadMode" label="Choose an option" options={uploadModeOptions}
+                                    value={uploadMode} onchange={handleUploadModeChange} type="radio">
+                                </lightning-radio-group>
+
+                                <div class="slds-var-m-top_medium">
+                                    <template lwc:if={isNewFileMode}>
+                                        <lightning-file-upload label="Upload Audio File" name="fileUploader"
+                                            accept={acceptedFormats} record-id={voiceCallId}
+                                            onuploadfinished={handleUploadFinished} disabled={isUploading}>
+                                        </lightning-file-upload>
+                                    </template>
+
+                                    <template lwc:if={isExistingFileMode}>
+                                        <template lwc:if={hasAvailableFiles}>
+                                            <lightning-combobox name="existingFiles" label="Select an existing audio file"
+                                                value={selectedFileId} placeholder="Choose a file" options={availableFiles}
+                                                onchange={handleFileSelection} disabled={isUploading}>
+                                            </lightning-combobox>
+                                            <lightning-button label="Select File" variant="brand"
+                                                onclick={handleSelectExistingFile} disabled={isUploading}
+                                                class="slds-var-m-top_small">
+                                            </lightning-button>
+                                        </template>
+                                        <template lwc:else>
+                                            <div class="slds-text-color_weak">No audio files available in the org</div>
+                                        </template>
+                                    </template>
+                                </div>
+
+                                <template lwc:if={isUploading}>
+                                    <lightning-spinner alternative-text="Updating recording..."
+                                        size="small"></lightning-spinner>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+            </template>
+
+            <!-- Audio Player -->
+            <template lwc:if={hasRecording}>
+                <div class="slds-var-m-top_large">
+                    <div class="slds-var-m-bottom_small">
+                        <lightning-icon icon-name="utility:file" size="small"
+                            class="slds-var-m-right_x-small"></lightning-icon>
+                        <strong>File Name:</strong> {recordingTitle}
+                    </div>
+
+                    <!-- Upload/Change Recording Option -->
+                    <template lwc:if={showUploadOption}>
+                        <div class="slds-var-m-top_small slds-var-m-bottom_medium">
+                            <lightning-button label={uploadLabel} icon-name="utility:upload"
+                                onclick={toggleUploadSection} variant="neutral" class="slds-var-m-bottom_small">
+                            </lightning-button>
+
+                            <template lwc:if={showUploadSection}>
+                                <div class="slds-box slds-var-m-top_small">
+                                    <lightning-radio-group name="uploadMode" label="Choose an option"
+                                        options={uploadModeOptions} value={uploadMode} onchange={handleUploadModeChange}
+                                        type="radio">
+                                    </lightning-radio-group>
+
+                                    <div class="slds-var-m-top_medium">
+                                        <template lwc:if={isNewFileMode}>
+                                            <lightning-file-upload label="Upload Audio File" name="fileUploader"
+                                                accept={acceptedFormats} record-id={voiceCallId}
+                                                onuploadfinished={handleUploadFinished} disabled={isUploading}>
+                                            </lightning-file-upload>
+                                        </template>
+
+                                        <template lwc:if={isExistingFileMode}>
+                                            <template lwc:if={hasAvailableFiles}>
+                                                <lightning-combobox name="existingFiles"
+                                                    label="Select an existing audio file" value={selectedFileId}
+                                                    placeholder="Choose a file" options={availableFiles}
+                                                    onchange={handleFileSelection} disabled={isUploading}>
+                                                </lightning-combobox>
+                                                <lightning-button label="Select File" variant="brand"
+                                                    onclick={handleSelectExistingFile} disabled={isUploading}
+                                                    class="slds-var-m-top_small">
+                                                </lightning-button>
+                                            </template>
+                                            <template lwc:else>
+                                                <div class="slds-text-color_weak">No audio files available in the org
+                                                </div>
+                                            </template>
+                                        </template>
+                                    </div>
+
+                                    <template lwc:if={isUploading}>
+                                        <lightning-spinner alternative-text="Updating recording..."
+                                            size="small"></lightning-spinner>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <audio controls class="audio-player">
+                        <source src={audioUrl} type={audioType}>
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+            </template>
+
+            <!-- No Recording State -->
+            <template lwc:if={showNoRecording}>
+                <div class="slds-text-align_center slds-var-p-around_large slds-var-m-top_large">
+                    <lightning-icon icon-name="utility:record_audio" size="large"
+                        class="slds-var-m-bottom_small"></lightning-icon>
+                    <p class="slds-text-body_regular slds-text-color_weak">
+                        No voice call recording available for this session
+                    </p>
+                </div>
+            </template>
+
+        </div>
+    </lightning-card>
+</template>

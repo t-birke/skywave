@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DataStreamTemplate xmlns="http://soap.sforce.com/2006/04/metadata">
+    <dataSourceBundleDefinition>SDO_AFO_Optimization</dataSourceBundleDefinition>
+    <dataSourceObject>SDO_Analytics_AIAgentTagDefinitionA_Home1</dataSourceObject>
+    <fullRefreshIntervalDays>NONE</fullRefreshIntervalDays>
+    <masterLabel>SDO_Analytics_AIAgentTagDefinitionA_Home</masterLabel>
+    <objectCategory>Salesforce_SFDCReferenceModel_0_93.Related</objectCategory>
+    <refreshFrequency>NONE</refreshFrequency>
+    <refreshMode>UPSERT</refreshMode>
+    <sourceObjectName>SDO_Analytics_AIAgentTagDefinitionA_Home</sourceObjectName>
+    <streamType>INGEST</streamType>
+    <templateVersion>1</templateVersion>
+</DataStreamTemplate>
