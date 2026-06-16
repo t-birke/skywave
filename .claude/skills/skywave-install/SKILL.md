@@ -116,8 +116,28 @@ auth → calls the run endpoint). If it fails, the fallback is the Developer Con
 `Skywave_DataStreamRunner.refreshBotStreams();`. Then `--resume`.
 
 ### G6 — Heroku relay config + push  (§3.1, §3.3, §3.4)
-`install.sh` creates/attaches the app, sets the config vars it can derive
-(ESW values, org id, etc.), and pushes. Two manual pieces remain:
+
+**If the Heroku CLI isn't installed/authed — get a corporate Heroku account first
+(Salesforce internal).** `install.sh`'s prereq check warns when `heroku` is
+missing or not logged in. Salesforce employees provision an account like this:
+
+1. **Request the entitlement.** In Security Hub / IIQ, search for and request
+   the **`HerokuSSO_Users`** entitlement. Your manager approves it; provisioning
+   takes ~1 hour after approval. If it doesn't appear in IIQ, ask in
+   **#heroku-support-global** or check the internal Basecamp guide.
+2. **Log in via SSO.** Go to **id.heroku.com/login** → "Log in via SSO" (bottom)
+   → SSO team name **`sfdc-sso`** (or **`sfdc-aloha`**).
+3. **Install the CLI:** `brew install heroku/brew/heroku`, verify with
+   `heroku --version`.
+4. **Authenticate:** `heroku login` (opens a browser for SSO).
+
+Stuck? **#heroku-support-global** (Heroku support), **#heroku-access-help**
+(access), or the internal Basecamp guide. Once `heroku login` works, re-run
+`./install.sh --with-heroku --resume`.
+
+Once the CLI is authed, `install.sh` creates/attaches the app, sets the config
+vars it can derive (ESW values, org id, etc.), and pushes. Two manual pieces
+remain:
 - **Keys:** confirm the public cert (`secrets/jwt.crt`) is embedded in the
   `Skywave_Heroku_Relay` Connected App, and the **MIAW public JWK is uploaded to
   the Salesforce Keyset** in Setup (authenticated chat fails silently without it).

@@ -129,7 +129,11 @@ check_prereqs() {
         need openssl "JWT keypair gen" "ships with macOS"
         if command -v heroku >/dev/null 2>&1 && heroku auth:whoami >/dev/null 2>&1; then
             ok "heroku authenticated ($(heroku auth:whoami 2>/dev/null))"
-        else warn "heroku not logged in — run: heroku login"; fi
+        else
+            warn "heroku not installed/authed — run: heroku login"
+            info "Salesforce internal: need a corporate Heroku account first (IIQ"
+            info "HerokuSSO_Users entitlement + SSO login). See SKILL.md gate G6."
+        fi
     fi
     if [ "$WITH_OBS" = "1" ]; then
         info "observability tier: the data-kit instantiation step (G4) is run by the"
