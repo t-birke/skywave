@@ -368,17 +368,19 @@ that works in-org natively and, in local dev, through the
 **live CometD** stream keeps a thin custom Vite `/cometd` proxy (the official
 plugin doesn't proxy streaming).
 
-**Status:** **deployed + active in the `sitest` Multi-Framework sandbox**
-(2026-06-15); reads/writes verified in-org via GraphQL. Also runs locally
-(`SKYWAVE_ORG=sitest npm run dev`). The displayed stage is **seeded from
-`Demo_Session__c.State__c` on load** (so the HUD status is correct in-org even
-without live CometD); replay presets are **6H/24H/7D/30D** (wide enough to reach
-records that may be days old between live runs). Remaining: App Launcher access
-(a deployed UIBundle gets no AppMenuItem on its own) and in-org live CometD —
-until that lands, in-org the live feed shows no visitors, so use a replay
-preset. `si` (the demo org) gets it when its Multi-Framework gate opens. Full
-architecture, file map, run steps, status, and gotchas are in
-**`docs/GLOBE_MONITOR.md`**.
+**Status:** **deployed + active in BOTH `sitest` (sandbox, 2026-06-15) and `si`
+(production demo org, 2026-06-16)**; reads/writes verified in-org via GraphQL.
+Launched via a **CustomApplication** (`<uiBundle>c__SkywaveGlobe</uiBundle>`,
+API 67.0+) + the **`Skywave_Globe_App` permset** — which must be **assigned to
+the running user** (org-side; doesn't ride the deploy) or the app stays hidden.
+The bundle is **org-portable**: `dist/` uses only origin-relative paths, so the
+same build deploys to any org. The displayed stage is **seeded from
+`Demo_Session__c.State__c` on load**; replay presets are **6H/24H/7D/30D**.
+**Live CometD inherits the in-org session** — `/cometd/` is same-origin on the
+`*.salesforce.app` bundle domain (proven: opaque-token handshake `successful`).
+Remaining: confirm My Domain "Require first-party cookies" is OFF on `si`, and
+watch one live `Demo_Event__e` land end-to-end. Full architecture, file map,
+run steps, status, and gotchas are in **`docs/GLOBE_MONITOR.md`**.
 
 ### 3c''. Past-booking gate
 

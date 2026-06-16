@@ -198,37 +198,49 @@ verification prefer **REPLAY** (click 24H), which reads persisted records.
 
 ## 6. In-org status & remaining work
 
-**DONE — deployed to `sitest` (Multi-Framework sandbox, 2026-06-15):**
-- `sf project deploy start --source-dir force-app/main/default/uiBundles --target-org sitest`
-  succeeded; UIBundle "Skywave Globe" is active. (`dist/` is the deploy payload —
-  gitignored but NOT forceignored, so `npm run build` before each deploy.)
-- **Data path migrated to UI API GraphQL + Data SDK** — works in-org natively,
-  no custom REST proxy. Verified end-to-end against `sitest`.
-- **Token fix:** read the dev token from `sf org auth show-access-token`, never
-  `sf org display` (which redacts it → 401s). Only matters for the `/cometd`
-  proxy now.
+**DONE — deployed to BOTH orgs:**
+- **`sitest`** (Multi-Framework sandbox, 2026-06-15) and **`si`** (production
+  demo org, 2026-06-16, deploy `0Afg8000006L2pmCAC`, 93/93 components).
+  The bundle is **org-portable** — `dist/` uses only origin-relative paths
+  (`${window.location.origin}/cometd/…`, `/services/data/…`); nothing points at
+  a specific org. (`dist/` is the deploy payload — gitignored but NOT
+  forceignored, so `npm run build` before each deploy.)
+- **Launch wiring solved.** A deployed UIBundle gets no `AppMenuItem` on its
+  own. Fix = a **CustomApplication** with `<uiBundle>c__SkywaveGlobe</uiBundle>`
+  (NOT a CustomTab — it rejects `<uiBundle>`; needs `sourceApiVersion` 67.0+) +
+  a dedicated **`Skywave_Globe_App` permset** for App Launcher visibility.
+  **The permset must be assigned to the running user** (`sf org assign permset
+  --name Skywave_Globe_App`) — assignment is org-side, it does NOT ride the
+  deploy. Until assigned, `AppMenuItem.IsAccessible=false` and the app is hidden.
+- **Data path: UI API GraphQL + Data SDK** — works in-org natively, no custom
+  REST proxy. Verified end-to-end against both orgs.
+- **Live CometD inherits the in-org session — PROVEN.** A Bayeux handshake to
+  the org's `/cometd/60.0/` with the opaque OAuth token (112 chars, has `!`;
+  NOT a JWT — JWTs get `401::Authentication invalid`) returns `successful:true`
+  + a `clientId`. In the deployed bundle `/cometd/…` is on the `*.salesforce.app`
+  domain's built-in Lightning Connect allowlist, so `${window.location.origin}/
+  cometd/60.0/` is **same-origin** and rides first-party cookies — no token, no
+  proxy. (A cross-origin handshake would be CORS-blocked — the org emits no
+  `Access-Control-Allow-Origin` for `.salesforce.app`/`.lightning.force.com`,
+  and `CorsWhitelistOrigin` doesn't cover Streaming — so same-origin is the
+  ONLY path, and it's the one the runtime gives us.)
+- **Token fix:** read the dev token from `sf org auth show-access-token`
+  (`result.accessToken`), never `sf org display` (redacts it → 401s). Only
+  matters for the local-dev `/cometd` proxy now.
 
-**STILL TO DO:**
-1. **App Launcher access.** A deployed UIBundle gets **no `AppMenuItem`** on its
-   own — it's not launchable from the org UI yet (App Launcher shows nothing;
-   `/lightning/app/SkywaveGlobe` 404s → falls back to default app). Needs a
-   CustomTab/CustomApplication pointing at the bundle, or the right bundle URL.
-   **Resolve this before any in-org demo.**
-2. **Live (CometD) in the deployed bundle.** Reads/writes work in-org via the
-   SDK, but live streaming used the local Vite `/cometd` proxy, which doesn't
-   exist in the deployed app. Open: does a raw `cometd` handshake to same-origin
-   `/cometd` inherit the runtime session? If it 401s, fall back to extending the
-   Heroku relay with a `/ws/monitor` channel (subscribes to `Demo_Event__e`).
-   (Replay + seat toggle already work in-org — they're on the SDK path.)
-   **Until this lands, in-org the HUD shows no live visitors and the live stage
-   stays `idle`** — so use a REPLAY preset to populate the globe, and note the
-   **stage is now seeded from `Demo_Session__c.State__c` on load** (so the
-   upper-left status reflects the real demo stage even without CometD; a live
-   `Demo_State_Change__e` overrides it once streaming works).
-3. **`si` (the demo org)** doesn't have Multi-Framework yet. When its gate opens:
-   Setup → Quick Find "Salesforce Multi-Framework" → Enable Domain (⚠️
-   irreversible; `si` is demo-critical) → disable My Domain "Require first-party
-   cookies" → build + deploy as above.
+**STILL TO DO / VERIFY:**
+1. **My Domain "Require first-party cookies" must be OFF on `si`.** This gates
+   same-origin cookie inheritance for CometD; it's not SOQL-queryable, so
+   confirm in Setup → My Domain → Routing/Policies. If ON, the live handshake
+   will fail in-browser despite the token test passing.
+2. **Watch one live event land in the deployed app.** Handshake auth + delivery
+   are proven separately; the end-to-end (publish `Demo_Event__e` from an end-
+   user device → marker appears in the `si` globe) hasn't been watched yet.
+   Gotcha: `EventBus.publish` can report success while the `SaveResult` failed
+   (missing required `Demo_Session_Id__c`) — verify the SaveResult.
+   Until verified, REPLAY presets populate the globe and the stage is seeded
+   from `Demo_Session__c.State__c` on load (live `Demo_State_Change__e`
+   overrides it).
 
 ---
 
