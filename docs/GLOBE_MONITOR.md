@@ -214,16 +214,22 @@ verification prefer **REPLAY** (click 24H), which reads persisted records.
   deploy. Until assigned, `AppMenuItem.IsAccessible=false` and the app is hidden.
 - **Data path: UI API GraphQL + Data SDK** — works in-org natively, no custom
   REST proxy. Verified end-to-end against both orgs.
-- **Live CometD inherits the in-org session — PROVEN.** A Bayeux handshake to
-  the org's `/cometd/60.0/` with the opaque OAuth token (112 chars, has `!`;
-  NOT a JWT — JWTs get `401::Authentication invalid`) returns `successful:true`
-  + a `clientId`. In the deployed bundle `/cometd/…` is on the `*.salesforce.app`
-  domain's built-in Lightning Connect allowlist, so `${window.location.origin}/
-  cometd/60.0/` is **same-origin** and rides first-party cookies — no token, no
-  proxy. (A cross-origin handshake would be CORS-blocked — the org emits no
-  `Access-Control-Allow-Origin` for `.salesforce.app`/`.lightning.force.com`,
-  and `CorsWhitelistOrigin` doesn't cover Streaming — so same-origin is the
-  ONLY path, and it's the one the runtime gives us.)
+- **Live feed: Pub/Sub → Heroku relay → `/ws/monitor` WebSocket.** Browser-direct
+  streaming is a DEAD END (proven against `si`, 2026-06-16): an in-org CometD
+  handshake to `…--c.my.salesforce.app/cometd/60.0/` returns `failureReason:
+  401::Request requires authentication` → `403::Handshake denied`, because the
+  session `sid` cookie is scoped to `*.my.salesforce.com` and the bundle runs on
+  `*.salesforce.app` (different registrable domain — the browser never sends it,
+  and the bundle gateway injects auth only for the UI-API/GraphQL allowlist, not
+  `/cometd`). Pub/Sub-direct is also impossible: `Subscribe` is bidirectional
+  streaming, which gRPC-Web can't do from a browser. So Pub/Sub runs SERVER-side
+  in the Heroku relay (`heroku/skywave-app/src/pubsub-monitor.js`, a subscriber
+  ISOLATED from the consumer phones) and fans the `Demo_Event__e` firehose out
+  over an isolated `/ws/monitor` WebSocket. `useDemoFeed` opens
+  `wss://<relay>/ws/monitor` (overridable via `VITE_RELAY_WS_URL`) and folds each
+  event through the same reducer. Caveat: a `.salesforce.app` bundle's CSP
+  `connect-src` could block the outbound `wss://` — the `[globe-feed]` console
+  logs surface that immediately.
 - **Token fix:** read the dev token from `sf org auth show-access-token`
   (`result.accessToken`), never `sf org display` (redacts it → 401s). Only
   matters for the local-dev `/cometd` proxy now.

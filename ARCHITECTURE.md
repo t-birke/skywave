@@ -289,9 +289,18 @@ left null and `Target_Session_Id__c` set to the visitor's deviceId).
 visitor's WS only, and the client refreshes nav identity in place
 without a reload. Today's only consumer is `profile_created` (published
 by `Skywave_SaveProfile.publishProfileCreatedEvent` after a chat-side
-profile lands). We reuse this PE rather than have the relay subscribe
-to `Demo_Event__e` directly — that channel is the demo-monitor firehose
-and 99% of its traffic is irrelevant to the visitor's phone.
+profile lands). For the *phone* path we reuse this PE rather than route
+the `Demo_Event__e` firehose to phones — 99% of that traffic is
+irrelevant to the visitor's device.
+
+**Isolated third purpose: the globe monitor feed.** The relay ALSO runs a
+*separate* Pub/Sub subscriber on `Demo_Event__e` (`pubsub-monitor.js`, its
+own gRPC instance) and broadcasts each event to `/ws/monitor` sockets only
+(`ws-fanout.js` keeps a `monitors` Set distinct from the per-session phone
+`sockets` Map). The 3D globe UIBundle opens that WS because it can't stream
+the PEs browser-side (see §3b''). Phones never subscribe to or receive
+`Demo_Event__e`; the firehose flows Pub/Sub → `monitors` → `/ws/monitor`
+exclusively.
 
 ### 3b'. Visitor activity → demo monitor (web, real time)
 
@@ -349,15 +358,22 @@ It consumes the **same** `Demo_Event__e` channel, but the transport differs by
 necessity:
 
 ```
-  Demo_Event__e ──┬─ LIVE ──▶ CometD Streaming API (/cometd)
-                  │            (empApi is LWC-only; the UIBundle SDK has no
-                  │             streaming → use CometD directly from React)
+  Demo_Event__e ──┬─ LIVE ──▶ Heroku relay (Pub/Sub gRPC, server-side) ──▶
+                  │            /ws/monitor WebSocket ──▶ globe.
+                  │            NOT browser-direct: the bundle runs on
+                  │            *.salesforce.app, a different domain than the
+                  │            *.my.salesforce.com session cookie → in-org
+                  │            CometD 403s; and Pub/Sub Subscribe is bidi, which
+                  │            gRPC-Web can't do from a browser. So Pub/Sub runs
+                  │            server-side in the relay (isolated from the
+                  │            consumer phones) and fans out over WebSocket.
                   │
                   └─ REPLAY ─▶ NOT the event buffer. HighVolume PEs aren't
                                replayable over CometD, so replay reconstructs a
                                Demo_Event-shaped timeline from PERSISTED RECORDS
                                (Contact geo/avatar/survey-json + Booking→Segment
-                               →Flight) ordered by CreatedDate.
+                               →Flight) ordered by CreatedDate, via same-origin
+                               UI API GraphQL.
 ```
 
 Both paths fold through one shared reducer (`visitorReducer.ts`) so live and

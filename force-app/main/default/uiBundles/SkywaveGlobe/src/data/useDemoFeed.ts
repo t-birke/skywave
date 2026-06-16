@@ -1,18 +1,25 @@
 /**
- * Live demo feed over the CometD Streaming API.
+ * Live demo feed over the Heroku relay WebSocket.
  *
- * Subscribes to the two Skywave Platform Event channels and reduces them
- * into the Visitor[] + current-stage state the globe renders. Ports the
- * accumulation logic from skywaveDemoMonitor.js's handleDemoEvent, minus the
- * survey-thumbnail resolution (the globe shows avatars, not survey strips).
+ * Why not CometD/Pub/Sub directly? The deployed bundle runs on
+ * `*.salesforce.app`, a different registrable domain from `*.my.salesforce.com`
+ * where the session cookie lives — so an in-org CometD handshake to
+ * `/cometd/` returns `403::Handshake denied` (the browser never sends `sid`,
+ * and the bundle gateway injects auth only for the UI-API/GraphQL allowlist,
+ * not `/cometd`). Pub/Sub is no escape either: its `Subscribe` RPC is
+ * bidirectional-streaming, which gRPC-Web cannot do from a browser.
  *
- * DEV/DEMO transport: the browser talks to same-origin /cometd, which the
- * Vite dev server proxies to the org with a Bearer token injected (see
- * vite.config.ts). No empApi, no Heroku relay, no org metadata deploy.
+ * So Pub/Sub runs SERVER-side in the Heroku relay, which subscribes to the
+ * Demo_Event__e firehose and fans it out on an isolated `/ws/monitor`
+ * broadcast channel (separate from the consumer phones). The globe just opens
+ * that WebSocket and folds each event through the SAME visitorReducer.
+ *
+ * Relay messages:
+ *   { type: 'hello', channel: 'monitor' }
+ *   { type: 'demo_event', payload: { Type__c, Session_Id__c, Payload_Json__c, Demo_Session_Id__c } }
+ *   { type: 'stage_changed', newState }
  */
 import { useEffect, useRef, useState } from 'react';
-import { CometD } from 'cometd';
-import { ReplayExtension } from './cometdReplay';
 import type { Visitor } from './visitors';
 import {
   applyPlatformEvent,
@@ -22,9 +29,6 @@ import {
   type PlatformEventPayload,
 } from './visitorReducer';
 
-const EVENT_CHANNEL = '/event/Demo_Event__e';
-const STATE_CHANNEL = '/event/Demo_State_Change__e';
-
 export type FeedStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
 export interface DemoFeed {
@@ -33,12 +37,31 @@ export interface DemoFeed {
   status: FeedStatus;
 }
 
+// Relay WebSocket URL. The bundle runs on a different origin than the relay, so
+// this is an ABSOLUTE wss:// URL, not origin-relative. Overridable at build via
+// VITE_RELAY_WS_URL; defaults to the known prod relay /ws/monitor channel.
+const RELAY_WS_URL =
+  (import.meta.env?.VITE_RELAY_WS_URL as string | undefined) ??
+  'wss://skywave-app-bb0e8666933b.herokuapp.com/ws/monitor';
+
+// Reconnect backoff (mirrors the consumer site): start 1s, double to 30s cap.
+const RECONNECT_MIN_MS = 1000;
+const RECONNECT_MAX_MS = 30000;
+
 // Lifecycle logging — filter the console by `[globe-feed]` to see only this.
-// Flip VERBOSE to false to quiet the per-event/heartbeat noise once it works.
+// Flip VERBOSE to false to quiet the per-event noise once it works.
 const LOG = '[globe-feed]';
 const VERBOSE = true;
 const log = (...a: unknown[]) => console.log(LOG, ...a);
 const warn = (...a: unknown[]) => console.warn(LOG, ...a);
+
+interface MonitorMessage {
+  type?: string;
+  channel?: string;
+  payload?: PlatformEventPayload;
+  newState?: string;
+  demoSessionId?: string;
+}
 
 export function useDemoFeed(activeDemoSessionId?: string | null): DemoFeed {
   const [visitors, setVisitors] = useState<Visitor[]>([]);
@@ -49,105 +72,122 @@ export function useDemoFeed(activeDemoSessionId?: string | null): DemoFeed {
   const bySession = useRef<VisitorMap>(new Map());
 
   useEffect(() => {
-    const cometdUrl = `${window.location.origin}/cometd/60.0/`;
-    log('effect mount — origin:', window.location.origin, '| activeSession:', activeDemoSessionId ?? '(none)');
-    log('CometD URL:', cometdUrl);
-
-    const cometd = new CometD();
-    const replay = new ReplayExtension();
-    replay.setReplay({ [EVENT_CHANNEL]: -1, [STATE_CHANNEL]: -1 });
-    cometd.registerExtension('sfdc-replay', replay);
-
-    cometd.configure({
-      // Same-origin in-org; in local dev the Vite proxy forwards to the org.
-      url: cometdUrl,
-      appendMessageTypeToURL: false,
-      // 'debug' surfaces the raw Bayeux traffic (handshake/connect/subscribe
-      // requests + responses) in the console — invaluable when nothing fires.
-      logLevel: 'debug',
-    });
-    // Salesforce CometD is long-polling only — and the Vite proxy doesn't
-    // tunnel WebSockets to the org. Drop the websocket transport so the
-    // client doesn't pick `ws://localhost/...` and hang before handshake.
-    cometd.unregisterTransport('websocket');
-    log('transports after unregister(websocket):', cometd.getTransportTypes());
+    log('effect mount — relay URL:', RELAY_WS_URL, '| activeSession:', activeDemoSessionId ?? '(none)');
 
     let unloaded = false;
+    let ws: WebSocket | null = null;
+    let reconnectDelay = RECONNECT_MIN_MS;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
     const handleEvent = (payload: PlatformEventPayload) => {
+      // Scope to the active demo session if one is set (the reducer also
+      // filters, but logging the drop here is clearer).
+      if (
+        activeDemoSessionId &&
+        payload.Demo_Session_Id__c &&
+        payload.Demo_Session_Id__c !== activeDemoSessionId
+      ) {
+        if (VERBOSE) log('event ignored — different demoSession:', payload.Demo_Session_Id__c);
+        return;
+      }
       const now = Date.now();
       const changed = applyPlatformEvent(bySession.current, payload, now, activeDemoSessionId);
       if (VERBOSE) {
         log('event applied:', payload.Type__c, '| session:', payload.Session_Id__c,
-          '| demoSession:', payload.Demo_Session_Id__c ?? '(none)',
           '| changed:', changed, '| visitorMap size:', bySession.current.size);
       }
-      if (changed) {
-        setVisitors(snapshot(bySession.current, now, SESSION_TTL_MS));
-      }
+      if (changed) setVisitors(snapshot(bySession.current, now, SESSION_TTL_MS));
     };
 
-    // ---- Meta-channel listeners (register BEFORE handshake) ----------------
-    // The catch-all: ANY failed Bayeux message (handshake/connect/subscribe)
-    // lands here. If nothing else logs, this is usually where the truth is.
-    cometd.addListener('/meta/unsuccessful', m => {
-      warn('/meta/unsuccessful:', m);
-    });
-    cometd.addListener('/meta/handshake', m => {
-      log('/meta/handshake:', m.successful ? 'OK' : 'FAILED', m);
-    });
-    cometd.addListener('/meta/subscribe', m => {
-      log('/meta/subscribe:', m.subscription, m.successful ? 'OK' : 'FAILED', m);
-    });
-    cometd.addListener('/meta/connect', m => {
-      if (VERBOSE) log('/meta/connect:', m.successful ? 'OK' : 'FAILED');
-      if (!unloaded) setStatus(m.successful ? 'connected' : 'disconnected');
-    });
-
-    log('calling handshake()…');
-    cometd.handshake(hs => {
-      log('handshake callback — successful:', hs.successful, '| clientId:', hs.clientId ?? '(none)');
-      if (hs.successful) {
-        setStatus('connected');
-        log('subscribing to', EVENT_CHANNEL, 'and', STATE_CHANNEL);
-        cometd.subscribe(EVENT_CHANNEL, msg => {
-          if (VERBOSE) log('raw msg on', EVENT_CHANNEL, msg.data);
-          const data = msg.data as { payload?: PlatformEventPayload };
-          if (data?.payload) handleEvent(data.payload);
-          else warn('event message had no .payload:', msg.data);
-        });
-        cometd.subscribe(STATE_CHANNEL, msg => {
-          if (VERBOSE) log('raw msg on', STATE_CHANNEL, msg.data);
-          const data = msg.data as {
-            payload?: { Demo_Session_Id__c?: string; New_State__c?: string };
-          };
-          const p = data?.payload;
-          if (!p) return;
-          if (
-            activeDemoSessionId &&
-            p.Demo_Session_Id__c &&
-            p.Demo_Session_Id__c !== activeDemoSessionId
-          ) {
-            log('state change ignored — different demoSession:', p.Demo_Session_Id__c);
-            return;
-          }
-          if (p.New_State__c) {
-            log('stage →', p.New_State__c);
-            setStage(p.New_State__c as string);
-          }
-        });
-      } else if (!unloaded) {
-        // Handshake denied — surface the failureReason the org returns in ext.
-        warn('handshake DENIED:', JSON.stringify(hs));
+    const connect = () => {
+      if (unloaded) return;
+      log('opening WebSocket…');
+      setStatus('connecting');
+      try {
+        ws = new WebSocket(RELAY_WS_URL);
+      } catch (err) {
+        // A CSP connect-src violation throws synchronously here — surface it.
+        warn('WebSocket constructor threw (CSP block?):', err);
         setStatus('error');
+        scheduleReconnect();
+        return;
       }
-    });
+
+      ws.addEventListener('open', () => {
+        log('WebSocket OPEN');
+        reconnectDelay = RECONNECT_MIN_MS; // reset backoff on success
+        if (!unloaded) setStatus('connected');
+      });
+
+      ws.addEventListener('message', m => {
+        let msg: MonitorMessage;
+        try {
+          msg = JSON.parse(m.data as string);
+        } catch {
+          warn('non-JSON message:', m.data);
+          return;
+        }
+        if (VERBOSE) log('msg:', msg.type, msg);
+        switch (msg.type) {
+          case 'hello':
+            log('relay hello — channel:', msg.channel);
+            break;
+          case 'demo_event':
+            if (msg.payload) handleEvent(msg.payload);
+            else warn('demo_event without payload:', msg);
+            break;
+          case 'stage_changed':
+            if (
+              activeDemoSessionId &&
+              msg.demoSessionId &&
+              msg.demoSessionId !== activeDemoSessionId
+            ) {
+              break;
+            }
+            if (msg.newState) {
+              log('stage →', msg.newState);
+              setStage(msg.newState);
+            }
+            break;
+          default:
+            if (VERBOSE) warn('unknown message type:', msg.type);
+        }
+      });
+
+      ws.addEventListener('error', e => {
+        // The browser hides CSP/handshake detail here for security; the close
+        // event's code is usually more informative. Log both.
+        warn('WebSocket error event:', e);
+      });
+
+      ws.addEventListener('close', e => {
+        log('WebSocket CLOSE — code:', e.code, '| reason:', e.reason || '(none)', '| wasClean:', e.wasClean);
+        if (!unloaded) {
+          setStatus('disconnected');
+          scheduleReconnect();
+        }
+      });
+    };
+
+    const scheduleReconnect = () => {
+      if (unloaded || reconnectTimer) return;
+      const delay = reconnectDelay;
+      reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS);
+      log(`reconnecting in ${delay}ms`);
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, delay);
+    };
+
+    connect();
 
     return () => {
-      log('effect cleanup — disconnecting');
+      log('effect cleanup — closing WebSocket');
       unloaded = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       try {
-        cometd.disconnect();
+        ws?.close();
       } catch {
         // ignore teardown races
       }
