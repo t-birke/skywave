@@ -60,6 +60,7 @@ class Pipeline:
         self.base = f"/services/data/{API}/ssot"
         self.conn = None
         self.beacon_uuid = None
+        self._streams_cache = None   # /data-streams?limit=200 is ~46s on si — fetch ONCE
 
     def get(self, path):
         return self.c.req("GET", f"{self.base}{path}")
@@ -69,6 +70,14 @@ class Pipeline:
 
     def put(self, path, body):
         return self.c.req("PUT", f"{self.base}{path}", body)
+
+    def _all_streams(self, refresh=False):
+        """Cached /data-streams?limit=200 (it's ~46s per call on si). Refresh only
+        after creating streams."""
+        if self._streams_cache is None or refresh:
+            _, d = self.get("/data-streams?limit=200")
+            self._streams_cache = (d or {}).get("dataStreams", []) if isinstance(d, dict) else []
+        return self._streams_cache
 
     # 1 — connector -----------------------------------------------------------
     def step_connector(self):
@@ -149,9 +158,8 @@ class Pipeline:
     PROFILE = ["contactPointEmail", "identity", "partyIdentification"]
 
     def _existing_streams(self):
-        _, d = self.get("/data-streams?limit=200")
         out = []
-        for s in (d or {}).get("dataStreams", []):
+        for s in self._all_streams():
             ci = s.get("connectorInfo") or {}
             if ci.get("connectorType") == "StreamingApp":
                 cd = ci.get("connectorDetails") or {}
@@ -177,6 +185,8 @@ class Pipeline:
                 skipped.append(ev); continue
             st, r = self._create_stream(conn_name, f"skywave_app_{ev}", "Profile", [ev])
             (created if st in (200, 201) else skipped).append(f"{ev}({st})")
+        if created:
+            self._all_streams(refresh=True)   # invalidate cache so mappings resolve new DLOs
         emit("streams", status="ok", created=created, skipped=skipped)
         return True
 
@@ -256,8 +266,7 @@ class Pipeline:
     # 7 — mappings ------------------------------------------------------------
     def _resolve_source_dlo(self, token):
         """Map a logical source token to the live DLO dev name (hash re-minted per org)."""
-        _, d = self.get("/data-streams?limit=200")
-        streams = (d or {}).get("dataStreams", [])
+        streams = self._all_streams()
         def dll(s): return (s.get("dataLakeObjectInfo") or {}).get("name") or ""
         if token == "__web_engagement__":
             for s in streams:
@@ -271,13 +280,32 @@ class Pipeline:
                     return nm
         return None
 
+    def _existing_map_sources(self, dmo):
+        """Source DLO stems already mapped into this DMO (so we skip re-POSTing —
+        re-POSTing an existing map is slow and can hang server-side)."""
+        _, d = self.get(f"/data-model-object-mappings?dataspace={DATASPACE}&dmoDeveloperName={dmo}")
+        maps = (d or {}).get("objectSourceTargetMaps", []) if isinstance(d, dict) else []
+        out = set()
+        for m in maps:
+            # developerName is "<sourceDLO>_map_<target>_<ts>" — take the source stem
+            dev = m.get("developerName", "")
+            if "_map_" in dev:
+                out.add(dev.split("_map_")[0])
+        return out
+
     def step_mappings(self):
         spec = pj("mappings.json")["mappings"]
         results = []
         for m in spec:
             src = self._resolve_source_dlo(m["sourceToken"])
             if not src:
-                results.append(f"{m['targetDmo']}: SRC_NOT_FOUND({m['sourceToken']})"); continue
+                results.append(f"{m['targetDmo']}:SRC_NOT_FOUND({m['sourceToken']})"); continue
+            # skip-if-exists: is this source DLO already mapped into the target DMO?
+            # The mapping dev-name stem drops the DLO's __dll suffix, so compare
+            # on the stem (src is "<dlo>__dll", existing stems are "<dlo>").
+            src_stem = src[:-5] if src.endswith("__dll") else src
+            if src_stem in self._existing_map_sources(m["targetDmo"]):
+                results.append(f"{m['targetDmo']}:exists"); continue
             body = {"objectSourceTargetMaps": [{
                 "sourceEntityDeveloperName": src,
                 "targetEntityDeveloperName": m["targetDmo"],

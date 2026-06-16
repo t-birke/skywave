@@ -15,7 +15,8 @@
 #   ./install.sh --with-observability  Tiers 1 + 2 (Data Cloud session-tracing dashboards)
 #   ./install.sh --with-heroku         Tiers 1 + 3 (preflight relay + consumer-site backend)
 #   ./install.sh --with-globe          Tiers 1 + 4 (3D globe demo monitor UIBundle; needs Tier 3's relay)
-#   ./install.sh --all                 Tiers 1 + 2 + 3 + 4
+#   ./install.sh --with-tracking       Tiers 1 + 5 (Interaction-SDK + Data Cloud customer tracking; needs DC)
+#   ./install.sh --all                 Tiers 1 + 2 + 3 + 4 + 5
 #   ./install.sh --resume              Re-run; skips completed sections (see STATE FILE)
 #   ./install.sh --check-stdm          Poll-only: is Data Cloud STDM ready yet? (exit 0/1)
 #   ./install.sh --check-prereqs       Report required CLIs for the selected tier; exit
@@ -57,13 +58,14 @@ STATE_DIR="${REPO_ROOT}/.deploy-tmp"
 STATE_FILE="${STATE_DIR}/install-state.env"
 
 # ─── Flags ──────────────────────────────────────────────────────────────────
-WITH_OBS=0; WITH_HEROKU=0; WITH_GLOBE=0; RESUME=0; MODE="install"
+WITH_OBS=0; WITH_HEROKU=0; WITH_GLOBE=0; WITH_TRACKING=0; RESUME=0; MODE="install"
 for arg in "$@"; do
     case "$arg" in
         --with-observability) WITH_OBS=1 ;;
         --with-heroku)        WITH_HEROKU=1 ;;
         --with-globe)         WITH_GLOBE=1 ;;
-        --all)                WITH_OBS=1; WITH_HEROKU=1; WITH_GLOBE=1 ;;
+        --with-tracking)      WITH_TRACKING=1 ;;
+        --all)                WITH_OBS=1; WITH_HEROKU=1; WITH_GLOBE=1; WITH_TRACKING=1 ;;
         --resume)             RESUME=1 ;;
         --check-stdm)         MODE="check-stdm" ;;
         --check-prereqs)      MODE="check-prereqs" ;;
@@ -111,7 +113,7 @@ section()    { local id="$1"; if [ "$RESUME" = "1" ] && is_done "$id"; then info
 #  PREREQ CHECKS  (§0.0)
 # ════════════════════════════════════════════════════════════════════════════
 check_prereqs() {
-    say "0.0 Prerequisite check (tier: core$([ $WITH_OBS = 1 ] && echo +observability)$([ $WITH_HEROKU = 1 ] && echo +heroku)$([ $WITH_GLOBE = 1 ] && echo +globe))"
+    say "0.0 Prerequisite check (tier: core$([ $WITH_OBS = 1 ] && echo +observability)$([ $WITH_HEROKU = 1 ] && echo +heroku)$([ $WITH_GLOBE = 1 ] && echo +globe)$([ $WITH_TRACKING = 1 ] && echo +tracking))"
     local missing=0
     need() { # need <cmd> <why> <hint>
         if command -v "$1" >/dev/null 2>&1; then ok "$1 — $2"
@@ -146,6 +148,13 @@ check_prereqs() {
         info "ENABLED in Setup first (one-time, org-side — install.sh marks this gate)."
         info "Also needs Tier 3's relay URL to bake into the build (run --with-heroku too,"
         info "or set SKYWAVE_HEROKU_ORIGIN). The bundle is built (npm) then deployed."
+    fi
+    if [ "$WITH_TRACKING" = "1" ]; then
+        info "tracking tier: builds the Interaction-SDK + Data Cloud pipeline 100% via the"
+        info "Core /ssot/ API (scripts/datacloud/run_tracking.py). Needs Data Cloud active"
+        info "+ the standard CRM connector's Contact→Individual/Email mappings (so IR's email"
+        info "match fuses web↔CRM). Auth reuses the SF_CLIENT_ID/secrets/jwt.key app (Api"
+        info "scope suffices). The DG step is gated on a fresh org (validate + report)."
     fi
     info "NOTE: 'gh' + a corporate token are only needed by the maintainer to (re)vendor"
     info "QBrix-6 — end users who clone this repo do NOT need them."
@@ -689,6 +698,83 @@ stdm_ready() {
 }
 
 # ════════════════════════════════════════════════════════════════════════════
+#  TIER 5 — INTERACTION-SDK / DATA CLOUD CUSTOMER TRACKING
+# ════════════════════════════════════════════════════════════════════════════
+# The load-bearing websdk deviceId pipeline: WebApp connector → schema → sitemap
+# (publishes the beacon) → streams/DLOs → custom Survey_Response DMO → custom
+# DMO relationship → 6 DLO→DMO mappings → IR ruleset → Skywave_Customers RT data
+# graph → SF_INTERACTIONS_SDK_URL. All 100% via the Core /ssot/ API
+# (scripts/datacloud/run_tracking.py, idempotent). Gated on Data Cloud active.
+# NOTE: ordered AFTER Tier 2 (shares the DC/STDM provisioning) and ideally after
+# the standard CRM connector's Contact→Individual/Email mappings exist (IR's email
+# rule fuses web↔CRM through them).
+tier5_tracking() {
+    state_load
+    say "TIER 5 — Interaction-SDK / Data Cloud customer tracking"
+    command -v python3 >/dev/null 2>&1 || die "python3 required for the tracking runner"
+
+    # ── 5.1 Run the pipeline (connector→schema→sitemap→streams→DMO→rel→maps→IR) ─
+    if section 5.1; then
+        say "5.1 Build the tracking pipeline (Core /ssot/ API)"
+        # The runner emits one JSON line per step; surface them and capture gates.
+        local out; out="$(python3 scripts/datacloud/run_tracking.py --org "$ORG_ALIAS" \
+            --only connector,schema,sitemap,streams,survey-dmo,relationship,mappings,ir 2>/dev/null || true)"
+        printf '%s\n' "$out" | python3 -c "
+import sys, json
+for line in sys.stdin:
+    line=line.strip()
+    if not line.startswith('{'): continue
+    d=json.loads(line)
+    st=d.get('step'); s=d.get('status')
+    if st=='_summary': continue
+    mark='  ✓' if s=='ok' else ('  ⚠' if s in ('partial','gate') else '  ✗')
+    print(f\"{mark} {st}: {s}\" + (f\" — {d.get('note','')}\" if d.get('note') else ''))
+" || true
+        ok "pipeline stages applied (connector/schema/sitemap/streams/DMO/relationship/mappings/IR)"
+        done_mark 5.1
+    fi
+
+    # ── 5.2 Data Graph (Skywave_Customers, REALTIME) ─────────────────[GATE]───
+    # The DG is the riskiest step (phantom fields → status=ERROR). On a fresh org
+    # the runner reports it as a gate; the skill assembles + POSTs the captured
+    # payload on v66 and polls status=ready. If the DG already exists, it's reused.
+    if section 5.2; then
+        say "5.2 Data Graph (Skywave_Customers, REALTIME)"
+        local dgout; dgout="$(python3 scripts/datacloud/run_tracking.py --org "$ORG_ALIAS" --only data-graph 2>/dev/null || true)"
+        if printf '%s' "$dgout" | grep -q '"status": "ok"'; then
+            ok "Skywave_Customers data graph present"
+        else
+            warn "[GATE] Skywave_Customers RT data graph build — the skill POSTs the captured"
+            info "payload (scripts/datacloud/payloads/data_graph.json) on v66 and polls status=ready."
+            info "Needs the custom Survey_Response→Individual relationship (5.1) materialized first."
+        fi
+        done_mark 5.2
+    fi
+
+    # ── 5.3 Wire the beacon URL into Heroku (if Tier 3 ran) ──────────────────
+    if section 5.3; then
+        say "5.3 Wire SF_INTERACTIONS_SDK_URL"
+        local sdk; sdk="$(python3 scripts/datacloud/run_tracking.py --org "$ORG_ALIAS" --print-sdk-url 2>/dev/null | tail -1)"
+        state_set SF_INTERACTIONS_SDK_URL "$sdk"
+        if [ -n "$sdk" ]; then
+            ok "beacon URL: $sdk"
+            if [ "$WITH_HEROKU" = "1" ] && command -v heroku >/dev/null 2>&1 && heroku auth:whoami >/dev/null 2>&1; then
+                heroku config:set -a "$HEROKU_APP" "SF_INTERACTIONS_SDK_URL=$sdk" >/dev/null \
+                    && ok "set SF_INTERACTIONS_SDK_URL on $HEROKU_APP" \
+                    || warn "could not set SF_INTERACTIONS_SDK_URL on Heroku — set it manually"
+            else
+                info "Heroku not in this run — set it later: heroku config:set SF_INTERACTIONS_SDK_URL=$sdk -a $HEROKU_APP"
+            fi
+        else
+            warn "could not resolve the beacon URL (connector not ready?)"
+        fi
+        done_mark 5.3
+    fi
+    say "Tier 5 complete — customer tracking"
+    info "Browse + survey events now flow into Data Cloud; IR stitches anonymous→known on the websdk deviceId."
+}
+
+# ════════════════════════════════════════════════════════════════════════════
 #  TIER 3 — HEROKU RELAY
 # ════════════════════════════════════════════════════════════════════════════
 tier3_heroku() {
@@ -900,6 +986,9 @@ case "$MODE" in
         tier1_core
         [ "$WITH_OBS" = "1" ] && { if dc_present; then tier2_observability; else warn "Data Cloud not detected on '${ORG_ALIAS}' — skipping observability tier. Provision DC, then ./install.sh --with-observability --resume"; fi; }
         [ "$WITH_HEROKU" = "1" ] && tier3_heroku
+        # Tracking after Tier 3 so §5.3 can set SF_INTERACTIONS_SDK_URL on the
+        # provisioned dyno. Gated on Data Cloud (like Tier 2).
+        [ "$WITH_TRACKING" = "1" ] && { if dc_present; then tier5_tracking; else warn "Data Cloud not detected on '${ORG_ALIAS}' — skipping tracking tier. Provision DC, then ./install.sh --with-tracking --resume"; fi; }
         # Globe last: it bakes Tier 3's relay URL into its build. Warn (don't
         # block) if Heroku wasn't provisioned this run — resolve_heroku_origin
         # falls back to a placeholder the operator can rebuild against later.
