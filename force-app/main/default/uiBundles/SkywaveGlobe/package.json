@@ -25,7 +25,6 @@
     "@tailwindcss/vite": "^4.1.17",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "cometd": "^7.0.19",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.562.0",
     "radix-ui": "^1.4.3",

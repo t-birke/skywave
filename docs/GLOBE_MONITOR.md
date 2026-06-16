@@ -18,10 +18,11 @@ capability (open beta).
 
 ---
 
-> **Status (2026-06-15):** DEPLOYED + active in the **`sitest`** Multi-Framework
-> sandbox. Data reads/writes run on the official UI API GraphQL + `@salesforce/sdk-data`
-> path (works in-org natively); only live CometD streaming still uses a custom
-> Vite proxy. `si` is still gated (no Multi-Framework yet). See §6.
+> **Status (2026-06-16):** DEPLOYED + active in **`sitest`** (sandbox) AND **`si`**
+> (production). Data reads/writes run on UI API GraphQL + `@salesforce/sdk-data`
+> (same-origin, in-org native). **Live feed = Heroku relay `/ws/monitor` WebSocket**
+> (Pub/Sub runs server-side; browser-direct CometD/Pub/Sub is impossible — see §6),
+> verified end-to-end on `si`. See §6.
 
 ## 0. TL;DR — run it locally right now
 
@@ -35,15 +36,14 @@ npm install          # first time only
 npm run dev          # Vite dev server → http://localhost:5173
 ```
 
-You need the `si` org authed (`sf org display --target-org si` must return a
-token). On `npm run dev` you should see:
-
-```
-[skywave] CometD proxy → https://trailsignup-....my.salesforce.com (token NNN chars)
-```
+You need the target org authed (`sf org display --target-org <alias>` must
+return a token) — the `salesforce({orgAlias})` plugin uses it to proxy
+`/services/data` (GraphQL reads/writes) for the dev server.
 
 Then open http://localhost:5173. The globe spins; if a demo session is live (or
-you publish events / use Replay), visitors appear. Override the org with
+you publish events / use Replay), visitors appear. The LIVE feed is the same
+relay `wss://…/ws/monitor` WebSocket used in-org (no proxy); point dev at a
+different relay via `VITE_RELAY_WS_URL`. Override the org with
 `SKYWAVE_ORG=<alias> npm run dev`.
 
 **Seeing nothing?** That's expected with no live activity. Click a replay preset
@@ -60,30 +60,30 @@ visitor — see §5.
 | Decision | Why |
 |---|---|
 | **React UIBundle, not an LWC** | Shows off Salesforce Multi-Framework; the centCom globe is react-three-fiber and ports near-verbatim vs. a full vanilla-Three.js LWC rewrite. |
-| **Live data over CometD, not empApi** | `lightning/empApi` is LWC-only. The UIBundle data SDK has **no streaming**. CometD (the Streaming API empApi wraps) works from any browser JS. |
+| **Live data via the Heroku relay WebSocket, not browser CometD/Pub/Sub** | `lightning/empApi` is LWC-only and the UIBundle SDK has no streaming. Browser-direct CometD 403s (the bundle is on `*.salesforce.app`, a different domain than the `*.my.salesforce.com` session cookie) and Pub/Sub `Subscribe` is bidi (gRPC-Web can't). So Pub/Sub runs **server-side in the relay**, which fans `Demo_Event__e` out on an isolated `/ws/monitor` WebSocket the globe connects to. See §6. |
 | **Reads/writes via UI API GraphQL + Data SDK** | `@salesforce/sdk-data` (`createDataSDK().graphql()` for reads, `.fetch()` PATCH `/ui-api/records/{id}` for writes) — the supported path, works in-org natively and in dev through the `salesforce({orgAlias})` plugin's `/services/data` proxy. Replaced the old custom `/sf-query`+`/sf-data` SOQL proxies. |
-| **Live still uses a custom `/cometd` proxy** | The official plugin proxies only graphql/ui-api/connect/chatter/apexrest — NOT streaming. So `useDemoFeed` keeps a thin Vite `/cometd` proxy (Bearer injected; token from `sf org auth show-access-token`, NOT `sf org display` which redacts it). |
-| **Replay from records, not the event buffer** | CometD **cannot replay** `Demo_Event__e` (HighVolume PE — replay is a Pub/Sub-gRPC feature only; verified: `replay -2` and specific-replayId both return zero). So replay reconstructs a Demo_Event-shaped timeline from persisted Contact/Booking records and time-lapses it through the same reducer. |
+| **`wss://` needs its own CspTrustedSite** | The bundle domain enforces `connect-src`, and CSP treats `wss://` as a distinct scheme from `https://` — so the existing `https://…herokuapp.com` grant doesn't cover the WebSocket. `cspTrustedSites/Skywave_Globe_Relay_Wss` grants the `wss://` origin. |
+| **Replay from records, not the event buffer** | CometD/Pub/Sub **cannot replay** `Demo_Event__e` (HighVolume PE — only new events deliver; replay is durable-Pub/Sub only, verified `replay -2`/specific-replayId both return zero). So replay reconstructs a Demo_Event-shaped timeline from persisted Contact/Booking records and time-lapses it through the same reducer. |
 
 ---
 
 ## 2. Architecture at a glance
 
 ```
-                    ┌─────────────────────────────── LOCAL (npm run dev) ───┐
-  si org            │  Vite dev server (localhost:5173)                     │
-  ┌──────────┐      │   ├─ serves the built React app                       │
-  │ Platform │      │   ├─ /cometd   → proxy → org  (Bearer injected)       │
-  │ Events   │──────┼──▶│   └─ /services/data → official plugin → org GQL  │
-  │ (CometD) │ live │   │                                                    │
-  └──────────┘      │   ▼                                                    │
-  ┌──────────┐      │  React app                                            │
-  │ Contact, │      │   ├─ useDemoFeed   (LIVE: CometD subscribe)           │
-  │ Booking, │ GQL  │   ├─ useReplay     (REPLAY: GraphQL → timeline → ticks)│
-  │ Flight   │◀─────┼───┤        both feed →                                │
-  └──────────┘      │   ├─ visitorReducer (shared fold → Visitor[])         │
-                    │   └─ HoloGlobe (react-three-fiber scene)              │
-                    └────────────────────────────────────────────────────────┘
+  si org                                          React app (in-org OR npm run dev)
+  ┌────────────┐   Pub/Sub    ┌───────────────┐    ┌──────────────────────────────┐
+  │ Demo_Event │──gRPC(bidi)─▶│ Heroku relay  │    │ useDemoFeed (LIVE)            │
+  │ __e (HVPE) │  server-side │ pubsub-monitor│    │   ▲ wss://relay/ws/monitor    │
+  └────────────┘              │     ▼         │    │   │ (isolated; no proxy)      │
+                              │ /ws/monitor ──┼───▶│   └───────────────┐           │
+  ┌────────────┐              └───────────────┘    │ useReplay (REPLAY)│           │
+  │ Contact,   │   UI API GraphQL (same-origin)    │   GraphQL→timeline│           │
+  │ Booking,   │◀──────────────────────────────────┤        both feed ─▼           │
+  │ Flight     │  /services/data (in-org native;   │ visitorReducer (shared fold)  │
+  └────────────┘   dev via salesforce() plugin)    │   └─ HoloGlobe (r3f scene)    │
+                                                    └──────────────────────────────┘
+  Phones are on a SEPARATE relay track (Demo_State_Change__e → /ws/<sessionId>);
+  they never see the Demo_Event__e firehose.
 ```
 
 **The key seam:** both LIVE and REPLAY produce `Demo_Event__e`-shaped payloads
@@ -115,8 +115,7 @@ All paths under `force-app/main/default/uiBundles/SkywaveGlobe/src/`.
 |---|---|
 | `visitors.ts` | The **`Visitor` model** + `toMarkers()` / `toArcs()` — maps visitors to globe marker/arc shapes. Owns placement (avatar rides the arc midpoint for booked, geo location otherwise), status→color, route→IATA label. |
 | `visitorReducer.ts` | **Shared fold.** `applyPlatformEvent(map, payload, stampTime)` handles `session_started` / `survey_complete` / `survey_answer` / `flight_booked` / `seat_changed` / `profile_created`. `snapshot(map, now, ttl)` → `Visitor[]`. Used by both live + replay. |
-| `useDemoFeed.ts` | **LIVE.** CometD client (`cometd` npm). Handshake → subscribe `Demo_Event__e` + `Demo_State_Change__e` → fold via reducer. Exposes `{ visitors, stage, status }`. |
-| `cometdReplay.ts` | Salesforce CometD replay extension (`ext.replay` map) — registered on the client; we subscribe with replay `-1` (new only). |
+| `useDemoFeed.ts` | **LIVE.** WebSocket client to the Heroku relay's `/ws/monitor`. Handles `{type:'demo_event', payload}` (folded via the reducer) + `{type:'stage_changed', newState}`, with reconnect/backoff. URL from `VITE_RELAY_WS_URL` (defaults to the prod relay). Exposes `{ visitors, stage, status }`. `[globe-feed]` console logs; `VERBOSE` adds per-event detail. |
 | `useReplay.ts` | **REPLAY.** Fetches the timeline, plays it through the reducer at a steady tick (spread over ~8s so 1000s of events auto-throttle). Exposes `{ phase, visitors, progress, total }`. |
 | `graphql.ts` | **UI API GraphQL helpers** — `queryEdges()` (run a uiapi query, return `edges[].node`), `v()` (unwrap `{ value }`), `sinceIso()`, `updateRecord()` (write via Data SDK `fetch` PATCH `/ui-api/records/{id}`). The data-access seam. |
 | `replayData.ts` | **GraphQL → timeline.** Queries Contact (+geo, +`ContactCardPicture__c` avatar, +`Skywave_Survey_Json__c`) and Booking_Segment→Flight via `queryEdges`; emits ordered `Demo_Event__e`-shaped entries by `CreatedDate`. |
@@ -126,31 +125,34 @@ All paths under `force-app/main/default/uiBundles/SkywaveGlobe/src/`.
 ### UI (`pages/`, `components/`)
 | File | Role |
 |---|---|
-| `pages/Home.tsx` | Top-level: chooses LIVE vs REPLAY, renders `<HoloGlobe>`, the HUD (status dot, stage, visitor count, **LIVE/6H/24H/7D/30D** preset buttons, replay progress bar), loads the option-image map. **Seeds the displayed stage from `Demo_Session__c.State__c`** (one `fetchActiveSession` read, shared with the seat toggle) so the status shows in-org even before/without live CometD; a live `Demo_State_Change__e` event overrides it. |
+| `pages/Home.tsx` | Top-level: chooses LIVE vs REPLAY, renders `<HoloGlobe>`, the HUD (status dot, stage, visitor count, **LIVE/6H/24H/7D/30D** preset buttons, replay progress bar), loads the option-image map. **Seeds the displayed stage from `Demo_Session__c.State__c`** (one `fetchActiveSession` read, shared with the seat toggle) so the status shows before the first live event; a relay `stage_changed` event overrides it. |
 | `components/VisitorPanel.tsx` | The click-detail panel: avatar, name, route/seat, survey-answer thumbnails. Rendered inside the scene (anchored to the avatar) by `HoloGlobe`, so it tracks globe rotation. |
 
 ### Config
 | File | Role |
 |---|---|
-| `vite.config.ts` | **The local bridge.** `salesforce({ orgAlias })` plugin proxies `/services/data` (GraphQL/SDK) — auth-correct. `resolveOrg()` (token from `sf org auth show-access-token`, NOT `sf org display`) + the `/cometd` proxy remain ONLY for live streaming. Serve-only, never `build`. `SKYWAVE_ORG` overrides the alias. |
+| `vite.config.ts` | **The local bridge.** `salesforce({ orgAlias })` plugin proxies `/services/data` (GraphQL/SDK) — auth-correct, `SKYWAVE_ORG` overrides the alias. No `/cometd` proxy anymore — the live feed is the relay's absolute `wss://` URL, which works the same in dev and in-org. |
 | `ui-bundle.json`, `*.uibundle-meta.xml` | UIBundle metadata (label, routing). |
 
 ---
 
 ## 4. How live data flows (LIVE mode)
 
-1. `useDemoFeed` creates a `CometD` client pointed at `window.location.origin/cometd/60.0/`.
-2. **Critical:** `cometd.unregisterTransport('websocket')` — cometd defaults to
-   WebSocket, which Salesforce doesn't speak and the Vite proxy doesn't tunnel;
-   without this the handshake hangs silently. We force **long-polling**.
-3. Handshake → subscribe to `Demo_Event__e` (per-visitor firehose) +
-   `Demo_State_Change__e` (presenter stage).
-4. Each event payload → `applyPlatformEvent()` → `setVisitors(snapshot(...))`.
-5. `toMarkers/toArcs` shape it; `HoloGlobe` renders.
+Browser-direct streaming is impossible here (see §6), so the chain is:
 
-The events themselves are published by Apex during a real demo (see
-ARCHITECTURE.md §3b' — `Skywave_SaveProfile`, `Skywave_AckProfileForm`,
-`Skywave_ChangeSeat`, the Contact-Update trigger).
+1. Apex publishes `Demo_Event__e` during a real demo (see ARCHITECTURE.md §3b' —
+   `Skywave_SaveProfile`, `Skywave_AckProfileForm`, `Skywave_ChangeSeat`, the
+   Contact-Update trigger). HighVolume PE, `PublishImmediately`.
+2. The **Heroku relay** subscribes to `Demo_Event__e` over Pub/Sub gRPC
+   (server-side — `pubsub-monitor.js`, isolated from the consumer phones) and
+   broadcasts each event as `{type:'demo_event', payload}` to `/ws/monitor`.
+3. `useDemoFeed` holds a WebSocket to `wss://<relay>/ws/monitor`, parses each
+   message, and runs the payload through `applyPlatformEvent()` →
+   `setVisitors(snapshot(...))`. `stage_changed` messages update the HUD stage.
+4. `toMarkers/toArcs` shape it; `HoloGlobe` renders.
+
+Stage also seeds from `Demo_Session__c.State__c` on load (same-origin GraphQL),
+so the HUD shows the real stage before the first live event arrives.
 
 ## 4b. How replay works (REPLAY mode)
 
@@ -201,10 +203,11 @@ verification prefer **REPLAY** (click 24H), which reads persisted records.
 **DONE — deployed to BOTH orgs:**
 - **`sitest`** (Multi-Framework sandbox, 2026-06-15) and **`si`** (production
   demo org, 2026-06-16, deploy `0Afg8000006L2pmCAC`, 93/93 components).
-  The bundle is **org-portable** — `dist/` uses only origin-relative paths
-  (`${window.location.origin}/cometd/…`, `/services/data/…`); nothing points at
-  a specific org. (`dist/` is the deploy payload — gitignored but NOT
-  forceignored, so `npm run build` before each deploy.)
+  The bundle is **org-portable** — `dist/` uses origin-relative `/services/data/…`
+  for reads/writes; the only absolute URL is the relay `wss://…/ws/monitor`
+  (build-overridable via `VITE_RELAY_WS_URL`), which is org-independent. Nothing
+  points at a specific Salesforce org. (`dist/` is the deploy payload — gitignored
+  but NOT forceignored, so `npm run build` before each deploy.)
 - **Launch wiring solved.** A deployed UIBundle gets no `AppMenuItem` on its
   own. Fix = a **CustomApplication** with `<uiBundle>c__SkywaveGlobe</uiBundle>`
   (NOT a CustomTab — it rejects `<uiBundle>`; needs `sourceApiVersion` 67.0+) +
@@ -236,34 +239,44 @@ verification prefer **REPLAY** (click 24H), which reads persisted records.
   `wss://` entry: `cspTrustedSites/Skywave_Globe_Relay_Wss` (endpoint
   `wss://skywave-app-…herokuapp.com`, `isApplicableToConnectSrc=true`). Deployed
   to `si` 2026-06-16.
-- **Token fix:** read the dev token from `sf org auth show-access-token`
-  (`result.accessToken`), never `sf org display` (redacts it → 401s). Only
-  matters for the local-dev `/cometd` proxy now.
+- **Live feed VERIFIED end-to-end in production (`si`, 2026-06-16).** Published a
+  `Demo_Event__e` (SaveResult OK) → it flowed Pub/Sub → relay → `/ws/monitor` →
+  the deployed globe and the marker appeared, confirmed in `[globe-feed]` logs
+  (`WebSocket OPEN` → `event applied: session_started … changed: true`). Per-event
+  debug logging is OFF by default (`VERBOSE` in `useDemoFeed.ts`); connection-level
+  logs still print.
 
 **STILL TO DO / VERIFY:**
-1. **My Domain "Require first-party cookies" must be OFF on `si`.** This gates
-   same-origin cookie inheritance for CometD; it's not SOQL-queryable, so
-   confirm in Setup → My Domain → Routing/Policies. If ON, the live handshake
-   will fail in-browser despite the token test passing.
-2. **Watch one live event land in the deployed app.** Handshake auth + delivery
-   are proven separately; the end-to-end (publish `Demo_Event__e` from an end-
-   user device → marker appears in the `si` globe) hasn't been watched yet.
-   Gotcha: `EventBus.publish` can report success while the `SaveResult` failed
-   (missing required `Demo_Session_Id__c`) — verify the SaveResult.
-   Until verified, REPLAY presets populate the globe and the stage is seeded
-   from `Demo_Session__c.State__c` on load (live `Demo_State_Change__e`
-   overrides it).
+1. **Watch a REAL end-user-device event land** (vs. the synthetic test publish).
+   The transport is proven; what's unwatched is an actual visitor on the demo
+   path producing a marker. Gotcha for any manual test: `EventBus.publish` can
+   report success while the `SaveResult` failed (missing required
+   `Demo_Session_Id__c`) — always check the SaveResult.
+2. **The relay is now a globe dependency.** If the Heroku dyno is down, the live
+   feed is down — fall back to REPLAY presets (same-origin GraphQL, no relay).
+   The stage still seeds from `Demo_Session__c.State__c` on load regardless.
 
 ---
 
 ## 7. Gotchas (hard-won — don't relearn these)
 
-- **cometd default transport is WebSocket** → `ws://localhost/...` hangs before
-  handshake. Must `unregisterTransport('websocket')`. (in `useDemoFeed.ts`)
-- **HighVolume PEs don't replay over CometD.** Only live `-1` works. Replay is
-  from records. (the whole reason `replayData.ts` exists)
+- **Browser-direct streaming is impossible from a UIBundle — don't try.** In-org
+  CometD to `…--c.my.salesforce.app/cometd/` → `403::Handshake denied`
+  (`401::Request requires authentication`): the bundle is on `*.salesforce.app`,
+  a different registrable domain than the `*.my.salesforce.com` session cookie,
+  so the browser never sends `sid`, and the bundle gateway injects auth only for
+  the UI-API/GraphQL allowlist, not `/cometd`. Pub/Sub `Subscribe` is *bidi*
+  streaming, which gRPC-Web can't do. → run Pub/Sub server-side (relay) and push
+  over WebSocket. (My Domain "Require first-party cookies" being OFF does NOT
+  rescue CometD — the domain mismatch is the killer.)
+- **`wss://` is a separate CSP scheme from `https://`.** A `https://host`
+  CspTrustedSite does NOT authorize `wss://host` — the WebSocket gets refused by
+  `connect-src`. Add a dedicated `wss://` trusted site (`isApplicableToConnectSrc`).
+- **HighVolume PEs don't replay over CometD/Pub/Sub.** Only new events deliver.
+  Replay is from records. (the whole reason `replayData.ts` exists)
 - **`EventBus.publish` can fail silently** — `success=false` but `sf apex run`
   says "Executed successfully". `Demo_Event__e` requires `Demo_Session_Id__c`.
+  Check the `Database.SaveResult`.
 - **FLS truncates SOQL describe.** `Geo_City__c`/`Geo_Country__c` 404'd in CLI
   SOQL until granted on `Skywave_Demo_Admin` (every custom field needs full
   access there). Don't trust a describe to tell you a field doesn't exist —
@@ -278,9 +291,10 @@ verification prefer **REPLAY** (click 24H), which reads persisted records.
   elsewhere.
 - **`sf org display --json` REDACTS `accessToken`** → returns the literal
   `"[REDACTED] Use 'sf org auth show-access-token' to view"` (~54 chars). Using
-  it as a bearer token → `INVALID_AUTH_HEADER` / CometD `403`. Get the real
-  token (112 chars, has `!`) from `sf org auth show-access-token --json` (parse
-  `result` from the first `{` — the human form prints a confirmation banner).
+  it as a bearer token → `INVALID_AUTH_HEADER`. Get the real token (112 chars,
+  has `!`) from `sf org auth show-access-token --json` under `result.accessToken`
+  (the human form prints a confirmation banner). (Now only relevant for ad-hoc
+  CLI/token tests; the bundle itself holds no token.)
 - **UI API GraphQL:** `Id` is leaf type `ID!` → select it **bare** (`Id`), not
   `Id { value }` (else `SubselectionNotAllowed`). Scalars come back as
   `{ value }`; records as `edges[].node`. Can't filter `where` on a

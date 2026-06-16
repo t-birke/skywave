@@ -53,10 +53,10 @@ export default function Home() {
   const [seatOn, setSeatOn] = useState<boolean>(false);
   const [seatBusy, setSeatBusy] = useState<boolean>(false);
 
-  // Stage seeded from Demo_Session__c.State__c on load. Live CometD events
-  // (useDemoFeed) override this once they flow; in-org (no /cometd proxy yet)
-  // the live stage stays 'idle', so the seeded value is the visible status —
-  // mirroring how the old skywaveDemoMonitor LWC read the active session.
+  // Stage seeded from Demo_Session__c.State__c on load. Live stage_changed
+  // events from the relay (useDemoFeed) override this once they flow; before
+  // the first one arrives the seeded value is the visible status — mirroring
+  // how the old skywaveDemoMonitor LWC read the active session on load.
   const [seededStage, setSeededStage] = useState<string>('idle');
 
   // One active-session read seeds both the seat indicator and the stage.

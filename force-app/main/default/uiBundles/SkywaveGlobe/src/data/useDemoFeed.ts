@@ -49,9 +49,11 @@ const RECONNECT_MIN_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 
 // Lifecycle logging — filter the console by `[globe-feed]` to see only this.
-// Flip VERBOSE to false to quiet the per-event noise once it works.
+// Connection-level logs (mount, OPEN, CLOSE, reconnect, stage) always print;
+// VERBOSE adds per-event / per-message detail. Off for demos (it floods at
+// scale); flip on to debug the feed.
 const LOG = '[globe-feed]';
-const VERBOSE = true;
+const VERBOSE = false;
 const log = (...a: unknown[]) => console.log(LOG, ...a);
 const warn = (...a: unknown[]) => console.warn(LOG, ...a);
 

@@ -16,12 +16,14 @@ npm install          # first time
 npm run dev          # Vite → http://localhost:5173
 ```
 
-Requires the `si` org authed (`sf org display --target-org si`). The Vite dev
-server proxies `/cometd` (live data) and `/sf-query` (replay SOQL) to the org
-with a bearer token injected — no in-org deploy needed to iterate. Override the
-org with `SKYWAVE_ORG=<alias> npm run dev`.
+Requires the target org authed (`sf org display --target-org si`). The
+`salesforce({orgAlias})` Vite plugin proxies `/services/data` (GraphQL reads/
+writes) to the org — no in-org deploy needed to iterate. The LIVE feed is the
+relay `wss://…/ws/monitor` WebSocket (same as in-org, no proxy); point dev at a
+different relay via `VITE_RELAY_WS_URL`. Override the org with
+`SKYWAVE_ORG=<alias> npm run dev`.
 
-No live activity? Click **24H** in the HUD to replay the last 24h from records.
+No live activity? Click **7D**/**30D** in the HUD to replay from records.
 
 ## Build
 
@@ -29,22 +31,27 @@ No live activity? Click **24H** in the HUD to replay the last 24h from records.
 npm run build        # → dist/ (the deploy payload; gitignored, rebuild before deploy)
 ```
 
-## Deploy to org (GATED until the Multi-Framework release update)
+## Deploy to org
 
-`UIBundle` metadata can't deploy until the Setup-UI feature gate is enabled
-(org preference `UIBundleSettings.webAppOptIn` is already set). Once enabled —
-from the **SFDX project root**:
+Multi-Framework is enabled on both `sitest` and `si`. From the **SFDX project
+root**, rebuild then deploy the bundle (+ the launch app/permset + the wss CSP
+trusted site the first time):
 
 ```bash
 cd force-app/main/default/uiBundles/SkywaveGlobe && npm install && npm run build && cd -
-sf project deploy start --source-dir force-app/main/default/uiBundles --target-org si
+sf project deploy start --target-org si \
+  --source-dir force-app/main/default/uiBundles/SkywaveGlobe \
+              force-app/main/default/applications/Skywave_Globe.app-meta.xml \
+              force-app/main/default/permissionsets/Skywave_Globe_App.permissionset-meta.xml \
+              force-app/main/default/cspTrustedSites/Skywave_Globe_Relay_Wss.cspTrustedSite-meta.xml
+sf org assign permset --name Skywave_Globe_App --target-org si   # org-side; not in the deploy
 ```
 
-Then launch from the App Launcher ("SkywaveGlobe"). See the Monday checklist in
-`docs/GLOBE_MONITOR.md` §6 — including the in-org data-path swap (Vite proxies →
-CometD same-origin / GraphQL SDK).
+Then launch **Skywave Globe** from the App Launcher. The live feed also needs
+the relay deployed (`git push heroku …`) — see `docs/GLOBE_MONITOR.md` §6.
 
 ## Stack
 
 React 19 · Vite · TypeScript · Tailwind · three.js + @react-three/fiber +
-@react-three/drei · cometd (Streaming API) · @salesforce/sdk-data (in-org GraphQL).
+@react-three/drei · WebSocket (Heroku relay live feed) · @salesforce/sdk-data
+(in-org UI API GraphQL).

@@ -1,5 +1,4 @@
 import { existsSync } from 'node:fs';
-import { execSync } from 'node:child_process';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
@@ -12,64 +11,16 @@ const schemaPath = resolve(__dirname, '../../../../../schema.graphql');
 const schemaExists = existsSync(schemaPath);
 
 /**
- * DEV/DEMO ONLY — local CometD bridge.
+ * Live feed transport note (no proxy needed):
  *
- * REST reads/writes now go through UI API GraphQL + the Data SDK, proxied by
- * the official salesforce({orgAlias}) plugin (/services/data). The ONE thing
- * that plugin doesn't proxy is the CometD Streaming API, which the live feed
- * needs (the UIBundle SDK has no streaming). So this resolveOrg + the /cometd
- * proxy below remain to bridge Platform Events for local preview: the browser
- * talks to localhost (same-origin), and this forwards /cometd to the org with
- * a Bearer token injected and the BAYEUX_BROWSER cookie rewritten onto
- * localhost. Resolved only for `vite` (serve), never for `vite build`, so the
- * production bundle stays org-independent and deployable as-is.
- *
- * Token source: `sf org auth show-access-token` — NOT `sf org display`, which
- * redacts the token to the literal string "[REDACTED] Use 'sf org auth
- * show-access-token' to view" (a newer CLI security default). Reading the
- * token from `sf org display` yields that placeholder, so every API call 401s.
- * `instanceUrl` still comes from `sf org display` (not redacted).
- * Override the org with SKYWAVE_ORG.
+ * Reads/writes go through UI API GraphQL + the Data SDK, proxied in dev by the
+ * official salesforce({orgAlias}) plugin (/services/data). The LIVE feed is a
+ * WebSocket to the Heroku relay's /ws/monitor channel (Pub/Sub runs server-side
+ * there — see useDemoFeed.ts for why browser-direct CometD/Pub/Sub is a dead
+ * end). That WS is an absolute wss:// URL, so it works the same in dev and
+ * in-org with NO Vite proxy. Point dev at a different relay via VITE_RELAY_WS_URL.
  */
-function resolveOrg(): { instanceUrl: string; accessToken: string } | null {
-  const alias = process.env.SKYWAVE_ORG || 'si';
-  try {
-    const disp = execSync(`sf org display --target-org ${alias} --json`, {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
-    const instanceUrl = JSON.parse(disp).result?.instanceUrl;
-
-    // The token is redacted in `sf org display`; fetch the real one here.
-    // `--json` returns it under result.accessToken (the human form prints a
-    // confirmation banner, so we parse from the first '{').
-    const tokOut = execSync(
-      `sf org auth show-access-token --target-org ${alias} --json`,
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
-    );
-    const parsed = JSON.parse(tokOut.slice(tokOut.indexOf('{')));
-    const accessToken =
-      typeof parsed.result === 'string' ? parsed.result : parsed.result?.accessToken;
-
-    if (instanceUrl && accessToken) {
-      return { instanceUrl, accessToken };
-    }
-  } catch {
-    // sf not available / org not authed — dev server still runs, just no live feed.
-  }
-  return null;
-}
-
-export default defineConfig(({ command }) => {
-  const org = command === 'serve' ? resolveOrg() : null;
-  if (command === 'serve') {
-    console.log(
-      org
-        ? `[skywave] CometD proxy → ${org.instanceUrl} (token ${org.accessToken.length} chars)`
-        : '[skywave] no org token resolved — globe runs without a live feed'
-    );
-  }
-
+export default defineConfig(() => {
   return {
     base: './',
     plugins: [
@@ -93,44 +44,6 @@ export default defineConfig(({ command }) => {
           ]
         : []),
     ] as import('vite').PluginOption[],
-
-    // DEV/DEMO ONLY — CometD bridge to the org (see resolveOrg above).
-    server: org
-      ? {
-          proxy: {
-            '/cometd': {
-              target: org.instanceUrl,
-              changeOrigin: true,
-              secure: true,
-              configure: proxy => {
-                // Inject the org bearer token on every forwarded CometD call.
-                proxy.on('proxyReq', proxyReq => {
-                  proxyReq.setHeader('Authorization', `Bearer ${org.accessToken}`);
-                });
-                // Rewrite Set-Cookie so BAYEUX_BROWSER sticks on localhost
-                // (strip Domain, force Path=/, drop Secure for http dev).
-                proxy.on('proxyRes', proxyRes => {
-                  const sc = proxyRes.headers['set-cookie'];
-                  if (sc) {
-                    proxyRes.headers['set-cookie'] = sc.map(c =>
-                      c
-                        .replace(/;\s*Domain=[^;]+/i, '')
-                        .replace(/;\s*Secure/i, '')
-                        .replace(/;\s*SameSite=[^;]+/i, '; SameSite=Lax')
-                    );
-                  }
-                });
-              },
-            },
-            // NOTE: REST reads/writes (replay, surveyImages, seatToggle) used
-            // to go through custom /sf-query + /sf-data proxies here. They now
-            // use UI API GraphQL + the Data SDK (@salesforce/sdk-data), served
-            // by the official salesforce({orgAlias}) plugin's /services/data
-            // proxy — so only the CometD live-stream bridge remains custom
-            // (the official plugin doesn't proxy /cometd).
-          },
-        }
-      : undefined,
 
     // Build configuration for MPA
     build: {
