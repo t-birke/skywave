@@ -20,7 +20,8 @@ capability (open beta).
 
 > **Status (2026-06-16):** DEPLOYED + active on **`si`** (production) — the real
 > target. (Also exercised in a `sitest` sandbox during dev, but prod is the only
-> deployment target; the globe is **not** part of `install.sh`.) Data reads/writes
+> deployment target.) Installed by **`install.sh` Tier 4** (`--with-globe`/`--all`).
+> Data reads/writes
 > run on UI API GraphQL + `@salesforce/sdk-data` (same-origin, in-org native).
 > **Live feed = Heroku relay `/ws/monitor` WebSocket** (Pub/Sub runs server-side;
 > browser-direct CometD/Pub/Sub is impossible — see §6), verified end-to-end on
@@ -271,7 +272,7 @@ verification prefer **REPLAY** (click 24H), which reads persisted records.
   → the Digital Experiences / Multi-Framework app-domain setting), the deploy can
   succeed but the app won't load. This is a one-time, org-side **prerequisite**
   that does NOT ride the metadata deploy — enable it before deploying the bundle.
-  (The globe ships to prod `si` only and is not part of `install.sh`.)
+  (`install.sh` Tier 4 marks this as a gate; the globe ships to prod `si` only.)
 - **Browser-direct streaming is impossible from a UIBundle — don't try.** In-org
   CometD to `…--c.my.salesforce.app/cometd/` → `403::Handshake denied`
   (`401::Request requires authentication`): the bundle is on `*.salesforce.app`,

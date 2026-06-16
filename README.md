@@ -46,8 +46,9 @@ git config core.hooksPath .githooks   # ARCHITECTURE.md drift reminder on commit
 ```sh
 ./install.sh                       # Tier 1: core demo (agent, MIAW chat, sites, data)
 ./install.sh --with-observability  # + Data Cloud session-tracing dashboards (adds a ~2–3h wait)
-./install.sh --with-heroku         # + live-feed / globe / preflight relay
-./install.sh --all                 # all three
+./install.sh --with-heroku         # + preflight relay + consumer-site backend
+./install.sh --with-globe          # + 3D globe demo-monitor UIBundle (needs the relay; app domain enabled in Setup)
+./install.sh --all                 # all four
 ./install.sh --resume              # continue after any gate (idempotent — always safe)
 ```
 
@@ -80,6 +81,8 @@ one, re-run with `--resume`:
 - **Stream Full Refresh** (observability) — `scripts/refreshDataStreams.mjs`, with
   a Dev Console Apex fallback.
 - **Heroku keys** — the Connected App cert + MIAW JWK upload are manual Setup steps.
+- **Globe app domain** (globe) — enable the Multi-Framework UIBundle app domain
+  (`*.salesforce.app`) in Setup before Tier 4, or the bundle won't load.
 
 See `.claude/skills/skywave-install/SKILL.md` for the full gate playbook.
 

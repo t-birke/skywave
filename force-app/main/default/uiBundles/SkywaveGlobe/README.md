@@ -39,11 +39,17 @@ VITE_RELAY_WS_URL="wss://<your-dyno>.herokuapp.com/ws/monitor" npm run build
 
 ## Deploy to org
 
-**Target: prod (`si`) only** — the globe is NOT part of `install.sh`; deploy it
-separately. **Prerequisite:** enable the Multi-Framework UIBundle app domain
+**Normally handled by `install.sh` Tier 4** (`./install.sh --with-globe` or
+`--all`): it builds with the relay URL and deploys the bundle + app + permset +
+CSP. The manual steps below are the same thing by hand (for iteration).
+
+**Prerequisite:** enable the Multi-Framework UIBundle app domain
 (`*.salesforce.app`) in Setup on the target org first, or the bundle won't serve.
-From the **SFDX project root**, rebuild then deploy the bundle (+ the launch
-app/permset + the wss CSP trusted site the first time):
+The globe is **excluded from the Tier 1 blanket deploy** (a block in the root
+`.forceignore`) because its `dist/` must be built first and the app references
+the bundle — so deploy the whole set together. From the **SFDX project root**,
+rebuild then deploy (note: the root `.forceignore` block must be temporarily
+removed for the app/permset/CSP to deploy — Tier 4 does this automatically):
 
 ```bash
 cd force-app/main/default/uiBundles/SkywaveGlobe && npm install && npm run build && cd -

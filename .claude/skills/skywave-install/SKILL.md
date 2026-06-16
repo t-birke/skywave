@@ -1,6 +1,6 @@
 ---
 name: skywave-install
-description: "Conductor for installing the Skywave Interactive Agentforce demo into a Salesforce Demo Org (SDO) end-to-end — core demo (agent + MIAW chat + Experience Cloud sites + data), optional Data Cloud observability dashboards, and the optional Heroku live-feed/globe/preflight relay. TRIGGER when: the user has cloned the is_interactive_skywave repo and wants to stand the demo up; says 'install Skywave', 'set up the demo', 'run the installer', 'get the demo working on my SDO'; is resuming an install after the Data Cloud provisioning wait; or hits a gate (ESD publish, data-kit instantiation, stream refresh, Heroku config) and needs guidance. DO NOT TRIGGER when: the user is editing the demo's agent/Apex/LWC source (that's normal dev work), debugging a specific runtime failure in an already-installed demo, or asking about a different project."
+description: "Conductor for installing the Skywave Interactive Agentforce demo into a Salesforce Demo Org (SDO) end-to-end — core demo (agent + MIAW chat + Experience Cloud sites + data), optional Data Cloud observability dashboards, the optional Heroku preflight/consumer-site relay, and the optional 3D globe demo-monitor UIBundle. TRIGGER when: the user has cloned the is_interactive_skywave repo and wants to stand the demo up; says 'install Skywave', 'set up the demo', 'run the installer', 'get the demo working on my SDO'; is resuming an install after the Data Cloud provisioning wait; or hits a gate (ESD publish, data-kit instantiation, stream refresh, Heroku config, globe app-domain) and needs guidance. DO NOT TRIGGER when: the user is editing the demo's agent/Apex/LWC source (that's normal dev work), debugging a specific runtime failure in an already-installed demo, or asking about a different project."
 license: MIT
 metadata:
   version: "0.1.0"
@@ -26,13 +26,14 @@ don't change when the demo evolves.
 
 ## How install.sh is structured (read it first)
 
-Open `install.sh` and skim the section banners. It has three tiers and a few modes:
+Open `install.sh` and skim the section banners. It has four tiers and a few modes:
 
 ```
 ./install.sh                       # Tier 1: core demo (agent, MIAW, sites, data)
 ./install.sh --with-observability  # + Tier 2: Data Cloud session-tracing dashboards
-./install.sh --with-heroku         # + Tier 3: live-feed / globe / preflight relay
-./install.sh --all                 # all three
+./install.sh --with-heroku         # + Tier 3: preflight relay + consumer-site backend
+./install.sh --with-globe          # + Tier 4: 3D globe demo-monitor UIBundle (needs Tier 3's relay)
+./install.sh --all                 # all four
 ./install.sh --resume              # skip already-completed sections (use after any gate)
 ./install.sh --check-stdm          # poll: is Data Cloud STDM ready yet? (exit 0/1)
 ./install.sh --check-prereqs       # green/red tool check for the selected tier
@@ -123,6 +124,17 @@ auth → calls the run endpoint). If it fails, the fallback is the Developer Con
 - **Secret config vars** the script can't derive (`SF_CLIENT_ID`,
   `SF_MIAW_JWT_*`, `SKYWAVE_PROOF_KEY`, `IPINFO_TOKEN`, `CORS_PROXY_URL`): set them
   from the user's values per `.env.example` / `SECRETS.md`. Never echo secrets.
+
+### G7 — Globe app domain  (Tier 4, §4.0)
+The globe UIBundle serves from `*.salesforce.app`. That **Multi-Framework UIBundle
+app domain must be enabled in Setup** (one-time, org-side — can't be scripted) or
+the deploy succeeds but the app won't load. Confirm the user has enabled it, then
+`--resume`. Tier 4 otherwise runs unattended: it builds the bundle with the relay
+URL baked in (from Tier 3's origin — run `--with-heroku` first or in the same
+`--all`), deploys the bundle + app + permset + CSP, and assigns the launcher
+permset. If the user runs `--with-globe` without Tier 3, the globe is built
+against a placeholder relay URL — rerun `--with-heroku --with-globe --resume`
+once the dyno exists so the feed connects.
 
 ## When something breaks
 

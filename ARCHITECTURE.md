@@ -62,7 +62,7 @@ the stage list and the rationale (it replaced a manual "check state" button).
 | ├ `triggers/` | 4 triggers (Demo_Session, Contact-update PE, phone-digits, VoiceCall resolve) |
 | ├ `lwc/` | Chat/voice cards (CLT renderers), demo monitor, survey author, contact card |
 | ├ `objects/` | Custom objects + the Platform Events + custom fields on Contact/VoiceCall |
-| ├ `uiBundles/SkywaveGlobe/` | **3D globe demo monitor** — React UIBundle (Salesforce Multi-Framework). Successor to the 2D `skywaveDemoMonitor`/`skywaveWorldMap` LWCs. See §3b'' and **`docs/GLOBE_MONITOR.md`**. Deployed to **prod (`si`) only**; data via UI API GraphQL + Data SDK. **Not part of `install.sh`** — separate build+deploy (needs the Multi-Framework app domain enabled in Setup first). Runs locally via `npm run dev`. |
+| ├ `uiBundles/SkywaveGlobe/` | **3D globe demo monitor** — React UIBundle (Salesforce Multi-Framework). Successor to the 2D `skywaveDemoMonitor`/`skywaveWorldMap` LWCs. See §3b'' and **`docs/GLOBE_MONITOR.md`**. Installed by **`install.sh` Tier 4** (`--with-globe`/`--all`): excluded from the Tier 1 blanket deploy (`.forceignore`), then built (relay URL baked in) + deployed with its app/permset/CSP. Needs the Multi-Framework app domain enabled in Setup first. Runs locally via `npm run dev`. |
 | `heroku/skywave-app/` | Node app: static consumer site + WebSocket state relay |
 | └ `public/assets/website.css/.js` | Skywave Airlines marketing-site backdrop (nav, hero, search, deals, footer). Visible to every audience phone behind the demo modal. Extensible target for future booking/account features. |
 | └ `public/assets/site.css/.js` | The demo flow itself. Renders into a centered modal (`#modal-content`) overlaid on the website backdrop. Modal is hidden during agent stages so the chat icon takes over. Closable any time via X. |
@@ -389,12 +389,17 @@ plugin doesn't proxy streaming).
 
 **Status:** **deployed + active on `si` (production demo org, 2026-06-16)**;
 reads/writes verified in-org via GraphQL. (Also exercised in a `sitest` sandbox
-during development, but the real deployment target is prod only — the globe is
-**not** part of `install.sh`; it's a separate build+deploy.) **Prerequisite:**
-the Multi-Framework UIBundle app domain (`*.salesforce.app`) must be **enabled
-in Setup** on the target org before the bundle will serve. Launched via a
+during development, but prod is the only deployment target.) **Installed by
+`install.sh` Tier 4** (`--with-globe`/`--all`): it's excluded from the Tier 1
+blanket deploy via a `.forceignore` block (so Tier 1 never ships an unbuilt
+bundle or an app that references a missing bundle), then Tier 4 builds it
+(`npm run build` with `VITE_RELAY_WS_URL` from the resolved relay origin) and
+deploys the bundle + app + permset + CSP together (temporarily neutralizing that
+`.forceignore` block, then restoring it). **Prerequisite:** the Multi-Framework
+UIBundle app domain (`*.salesforce.app`) must be **enabled in Setup** before the
+bundle will serve (Tier 4 marks this as a gate). Launched via a
 **CustomApplication** (`<uiBundle>c__SkywaveGlobe</uiBundle>`, API 67.0+) + the
-**`Skywave_Globe_App` permset** — which must be **assigned to the running user**
+**`Skywave_Globe_App` permset** — which Tier 4 assigns to the running user
 (org-side; doesn't ride the deploy) or the app stays hidden.
 The bundle is **org-portable**: `dist/` uses only origin-relative paths, so the
 same build deploys to any org. The displayed stage is **seeded from

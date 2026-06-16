@@ -13,8 +13,9 @@
 # TIERS (opt in with flags; default = core only):
 #   ./install.sh                       Tier 1: core demo (agent, MIAW, sites, data)
 #   ./install.sh --with-observability  Tiers 1 + 2 (Data Cloud session-tracing dashboards)
-#   ./install.sh --with-heroku         Tiers 1 + 3 (live-feed / globe / preflight relay)
-#   ./install.sh --all                 Tiers 1 + 2 + 3
+#   ./install.sh --with-heroku         Tiers 1 + 3 (preflight relay + consumer-site backend)
+#   ./install.sh --with-globe          Tiers 1 + 4 (3D globe demo monitor UIBundle; needs Tier 3's relay)
+#   ./install.sh --all                 Tiers 1 + 2 + 3 + 4
 #   ./install.sh --resume              Re-run; skips completed sections (see STATE FILE)
 #   ./install.sh --check-stdm          Poll-only: is Data Cloud STDM ready yet? (exit 0/1)
 #   ./install.sh --check-prereqs       Report required CLIs for the selected tier; exit
@@ -56,12 +57,13 @@ STATE_DIR="${REPO_ROOT}/.deploy-tmp"
 STATE_FILE="${STATE_DIR}/install-state.env"
 
 # ─── Flags ──────────────────────────────────────────────────────────────────
-WITH_OBS=0; WITH_HEROKU=0; RESUME=0; MODE="install"
+WITH_OBS=0; WITH_HEROKU=0; WITH_GLOBE=0; RESUME=0; MODE="install"
 for arg in "$@"; do
     case "$arg" in
         --with-observability) WITH_OBS=1 ;;
         --with-heroku)        WITH_HEROKU=1 ;;
-        --all)                WITH_OBS=1; WITH_HEROKU=1 ;;
+        --with-globe)         WITH_GLOBE=1 ;;
+        --all)                WITH_OBS=1; WITH_HEROKU=1; WITH_GLOBE=1 ;;
         --resume)             RESUME=1 ;;
         --check-stdm)         MODE="check-stdm" ;;
         --check-prereqs)      MODE="check-prereqs" ;;
@@ -109,7 +111,7 @@ section()    { local id="$1"; if [ "$RESUME" = "1" ] && is_done "$id"; then info
 #  PREREQ CHECKS  (§0.0)
 # ════════════════════════════════════════════════════════════════════════════
 check_prereqs() {
-    say "0.0 Prerequisite check (tier: core$([ $WITH_OBS = 1 ] && echo +observability)$([ $WITH_HEROKU = 1 ] && echo +heroku))"
+    say "0.0 Prerequisite check (tier: core$([ $WITH_OBS = 1 ] && echo +observability)$([ $WITH_HEROKU = 1 ] && echo +heroku)$([ $WITH_GLOBE = 1 ] && echo +globe))"
     local missing=0
     need() { # need <cmd> <why> <hint>
         if command -v "$1" >/dev/null 2>&1; then ok "$1 — $2"
@@ -133,6 +135,13 @@ check_prereqs() {
         info "observability tier: the data-kit instantiation step (G4) is run by the"
         info "Claude skill via the data360 MCP (creds in .secrets/dc.env) or a Setup UI"
         info "click — install.sh marks the gate and continues; see SKILL.md."
+    fi
+    if [ "$WITH_GLOBE" = "1" ]; then
+        need npm "globe UIBundle build" "ships with Node"
+        info "globe tier: needs the Multi-Framework UIBundle app domain (*.salesforce.app)"
+        info "ENABLED in Setup first (one-time, org-side — install.sh marks this gate)."
+        info "Also needs Tier 3's relay URL to bake into the build (run --with-heroku too,"
+        info "or set SKYWAVE_HEROKU_ORIGIN). The bundle is built (npm) then deployed."
     fi
     info "NOTE: 'gh' + a corporate token are only needed by the maintainer to (re)vendor"
     info "QBrix-6 — end users who clone this repo do NOT need them."
@@ -773,6 +782,97 @@ tier3_heroku() {
 }
 
 # ════════════════════════════════════════════════════════════════════════════
+#  TIER 4 — GLOBE DEMO MONITOR (Multi-Framework UIBundle)
+# ════════════════════════════════════════════════════════════════════════════
+# The globe is excluded from Tier 1's blanket force-app deploy (a block in the
+# root .forceignore) and shipped here instead, because: (1) its dist/ is
+# gitignored and must be BUILT from source first, with the relay URL baked in at
+# build time; (2) the CustomApplication references <uiBundle>c__SkywaveGlobe, so
+# app+permset+CSP must deploy WITH the bundle (deploying the app without the
+# bundle errors "forceignored but is required"). .forceignore is honored even on
+# explicit --source-dir, so §4.2 temporarily neutralizes the globe block for the
+# deploy and restores it (node_modules stays excluded by the bundle's local
+# .forceignore, keeping the payload small). Verified on si: 94 components, 0 err.
+GLOBE_DIR="force-app/main/default/uiBundles/SkywaveGlobe"
+tier4_globe() {
+    state_load
+    say "TIER 4 — globe demo monitor"
+    command -v node >/dev/null 2>&1 || die "node not installed (needed to build the globe UIBundle)"
+
+    # ── 4.0 App-domain prerequisite (Setup-only) ───────────────────[GATE]────
+    if section 4.0; then
+        say "4.0 Multi-Framework app domain"
+        warn "[GATE] The UIBundle serves from *.salesforce.app. Enable the Multi-Framework"
+        info  "UIBundle app domain in Setup (one-time, org-side — can't be scripted) BEFORE"
+        info  "the bundle will load. The skill confirms this; mark 4.0 done + --resume."
+        # Don't hard-block: the deploy itself can succeed; the app just won't
+        # render until the domain is on. Continue so a re-run isn't required
+        # solely for this, but the gate is logged for the operator/skill.
+        done_mark 4.0
+    fi
+
+    # ── 4.1 Build the bundle with the relay URL baked in ─────────────────────
+    if section 4.1; then
+        say "4.1 Build the UIBundle"
+        resolve_heroku_origin
+        local ws="${SKYWAVE_HEROKU_ORIGIN/https:/wss:}/ws/monitor"
+        info "VITE_RELAY_WS_URL=${ws}"
+        ( cd "$GLOBE_DIR" \
+            && { [ -d node_modules ] || npm ci 2>/dev/null || npm install; } \
+            && VITE_RELAY_WS_URL="$ws" npm run build ) \
+            && ok "bundle built (dist/)" \
+            || die "globe build failed — check $GLOBE_DIR (npm install / npm run build)"
+        [ -f "$GLOBE_DIR/dist/index.html" ] || die "no dist/index.html after build"
+        done_mark 4.1
+    fi
+
+    # ── 4.2 Deploy the globe set ─────────────────────────────────────────────
+    # The globe set (bundle + app + permset + CSP) is excluded from Tier 1 by a
+    # block in the root .forceignore. .forceignore is honored even on explicit
+    # --source-dir deploys, so we temporarily neutralize JUST that block for this
+    # one deploy, then always restore it (trap). node_modules stays excluded by
+    # the bundle's OWN .forceignore, so the payload stays small.
+    if section 4.2; then
+        say "4.2 Deploy globe bundle + app + permset + CSP"
+        local fi=".forceignore" fibak; fibak="$(mktemp)"
+        cp "$fi" "$fibak"
+        # shellcheck disable=SC2064
+        trap "cp '$fibak' '$fi'; rm -f '$fibak'" RETURN
+        FI="$fi" python3 - <<'PYEOF'
+import os
+p = os.environ['FI']; lines = open(p).read().splitlines(); out=[]; skip=False
+for l in lines:
+    if 'Globe demo monitor (UIBundle)' in l: skip=True            # start of the globe block
+    if skip and l.strip()=='': skip=False; continue               # blank line ends it
+    if skip: continue
+    out.append(l)
+open(p,'w').write('\n'.join(out)+'\n')
+PYEOF
+        sf project deploy start --target-org "$ORG_ALIAS" \
+            --source-dir "$GLOBE_DIR" \
+            --source-dir force-app/main/default/applications/Skywave_Globe.app-meta.xml \
+            --source-dir force-app/main/default/permissionsets/Skywave_Globe_App.permissionset-meta.xml \
+            --source-dir force-app/main/default/cspTrustedSites/Skywave_Globe_Relay_Wss.cspTrustedSite-meta.xml \
+            --ignore-conflicts --wait 30 --concise \
+            && ok "globe deployed (bundle + app + permset + CSP)" \
+            || die "globe deploy failed (is the Multi-Framework app domain enabled? see §4.0)"
+        cp "$fibak" "$fi"; rm -f "$fibak"; trap - RETURN
+        done_mark 4.2
+    fi
+
+    # ── 4.3 Assign the launcher permset (org-side; doesn't ride the deploy) ──
+    if section 4.3; then
+        say "4.3 Assign Skywave_Globe_App permset"
+        sf org assign permset --target-org "$ORG_ALIAS" --name Skywave_Globe_App 2>/dev/null \
+            && ok "permset assigned (running user)" \
+            || warn "permset assign failed/already assigned — assign Skywave_Globe_App to see the app in App Launcher"
+        done_mark 4.3
+    fi
+    say "Tier 4 complete — globe demo monitor"
+    info "Open the 'Skywave Globe' app from the App Launcher (after the app domain is enabled)."
+}
+
+# ════════════════════════════════════════════════════════════════════════════
 #  DISPATCH
 # ════════════════════════════════════════════════════════════════════════════
 usage() { sed -n '2,30p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
@@ -796,6 +896,13 @@ case "$MODE" in
         tier1_core
         [ "$WITH_OBS" = "1" ] && { if dc_present; then tier2_observability; else warn "Data Cloud not detected on '${ORG_ALIAS}' — skipping observability tier. Provision DC, then ./install.sh --with-observability --resume"; fi; }
         [ "$WITH_HEROKU" = "1" ] && tier3_heroku
+        # Globe last: it bakes Tier 3's relay URL into its build. Warn (don't
+        # block) if Heroku wasn't provisioned this run — resolve_heroku_origin
+        # falls back to a placeholder the operator can rebuild against later.
+        if [ "$WITH_GLOBE" = "1" ]; then
+            [ "$WITH_HEROKU" = "1" ] || warn "globe baked with the current relay origin; if the dyno isn't provisioned yet, re-run --with-heroku --with-globe --resume after Tier 3."
+            tier4_globe
+        fi
         say "Done."
         info "State: ${STATE_FILE} (re-run with --resume to continue any skipped/gated steps)"
         ;;

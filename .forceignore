@@ -38,6 +38,18 @@ node_modules/
 **/genAiPlannerBundles/**
 **/bots/**
 
+# Globe demo monitor (UIBundle) — EXCLUDED from the blanket force-app deploy so
+# Tier 1 never tries to deploy an unbuilt bundle (dist/ is gitignored) or the
+# CustomApplication that references it (deploying the app without the bundle
+# errors "forceignored but is required"). install.sh Tier 4 (--with-globe)
+# builds the bundle, then temporarily neutralizes THIS block (it restores it
+# after) to deploy the whole set. Keep these four lines together as one block
+# ended by a blank line — Tier 4's strip keys on the comment + the blank line.
+**/uiBundles/SkywaveGlobe/**
+**/applications/Skywave_Globe.app-meta.xml
+**/permissionsets/Skywave_Globe_App.permissionset-meta.xml
+**/cspTrustedSites/Skywave_Globe_Relay_Wss.cspTrustedSite-meta.xml
+
 # Vendored observability QBrix (vendor/sdo-agentforce-observability) — re-include
 # the Data Cloud types the global rules above ignore. In force-app those rules
 # drop auto-retrieved DC junk; in the vendored dir these ARE source we deploy.
