@@ -8,8 +8,8 @@ import advanceState from '@salesforce/apex/Skywave_DemoMonitorController.advance
 import searchSessions from '@salesforce/apex/Skywave_DemoMonitorController.searchSessions';
 import getOptionImageMap from '@salesforce/apex/Skywave_DemoMonitorController.getOptionImageMap';
 import getAirportGeo from '@salesforce/apex/Skywave_DemoMonitorController.getAirportGeo';
+import getHerokuOrigin from '@salesforce/apex/Skywave_DemoMonitorController.getHerokuOrigin';
 
-const CONSUMER_SITE_URL = 'https://skywave-app-bb0e8666933b.herokuapp.com/';
 const STATE_CHANNEL = '/event/Demo_State_Change__e';
 const EVENT_CHANNEL = '/event/Demo_Event__e';
 // How long a session is considered "active" without a fresh event from it.
@@ -134,6 +134,7 @@ export default class SkywaveDemoMonitor extends LightningElement {
     qrCodeGenerated = false;
     qrcodeClass = 'qrcode';
     _qrLibLoaded = false;
+    consumerSiteUrl = ''; // Heroku origin (trailing slash) for the QR code; from Apex on mount
 
     @track showSettings = false;
 
@@ -162,6 +163,14 @@ export default class SkywaveDemoMonitor extends LightningElement {
     }
 
     async connectedCallback() {
+        // Resolve the consumer-site (Heroku) origin before rendering the QR so
+        // it encodes the provisioned dyno, not a hardcoded host.
+        try {
+            this.consumerSiteUrl = await getHerokuOrigin();
+        } catch (e) {
+            console.error('getHerokuOrigin failed', e);
+        }
+
         try {
             await loadScript(this, QRCodeJS);
             this._qrLibLoaded = true;
@@ -409,6 +418,7 @@ export default class SkywaveDemoMonitor extends LightningElement {
 
     renderQRCode() {
         if (!this._qrLibLoaded) return;
+        if (!this.consumerSiteUrl) return; // origin not resolved yet; re-rendered once it is
         const container = this.template.querySelector('.qrcodecontainer');
         if (!container) {
             setTimeout(() => this.renderQRCode(), 100);
@@ -417,7 +427,7 @@ export default class SkywaveDemoMonitor extends LightningElement {
         container.innerHTML = '';
         // eslint-disable-next-line no-undef, new-cap
         new QRCode(container, {
-            text: CONSUMER_SITE_URL,
+            text: this.consumerSiteUrl,
             width: 512,
             height: 512,
             colorDark: '#0b1d3a',

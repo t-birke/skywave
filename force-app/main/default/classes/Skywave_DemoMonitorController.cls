@@ -117,6 +117,17 @@ public with sharing class Skywave_DemoMonitorController {
         return out;
     }
 
+    /**
+     * The Heroku consumer-site origin (with trailing slash) the monitor encodes
+     * into its QR code. Read from the single CMD source of truth so it follows
+     * the provisioned dyno without a code change. Empty string if unset.
+     */
+    @AuraEnabled(cacheable=true)
+    public static String getHerokuOrigin() {
+        String origin = Skywave_HerokuConfig.originUrl();
+        return String.isBlank(origin) ? '' : origin + '/';
+    }
+
     @AuraEnabled
     public static String advanceState(Id sessionId, String newState) {
         Demo_Session__c d = new Demo_Session__c(Id = sessionId, State__c = newState);

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CspTrustedSite xmlns="http://soap.sforce.com/2006/04/metadata">
     <context>All</context>
-    <description>Globe UIBundle live feed — WebSocket to the Heroku relay /ws/monitor. CSP treats wss:// as a distinct scheme from https://, so the existing skywave_heroku (https) entry does NOT cover the WebSocket; this grants the wss:// origin in connect-src.</description>
-    <endpointUrl>wss://skywave-app-bb0e8666933b.herokuapp.com</endpointUrl>
+    <description>Globe UIBundle live feed — WebSocket to the Heroku relay /ws/monitor. CSP treats wss:// as distinct from https://, so the https heroku entry does NOT cover it. Wildcarded to *.herokuapp.com so it follows any provisioned dyno (no per-install substitution).</description>
+    <endpointUrl>wss://*.herokuapp.com</endpointUrl>
     <isActive>true</isActive>
     <isApplicableToConnectSrc>true</isApplicableToConnectSrc>
     <isApplicableToFontSrc>false</isApplicableToFontSrc>

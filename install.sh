@@ -214,6 +214,30 @@ PYEOF
     state_set SCRATCH_ORG_VF_HOST "$SCRATCH_ORG_VF_HOST"
     state_set SCRT2_URL "$SCRT2_URL"
     export SCRATCH_ORG_SITE_HOST SCRATCH_ORG_VF_HOST
+
+    # The CMD + remote-site files carry %%SKYWAVE_HEROKU_ORIGIN%%, substituted by
+    # sfdx-project.json replaceWithEnv at EVERY deploy — and replaceWithEnv ERRORS
+    # if the var is unset (same trap as AGENT_USER). So SKYWAVE_HEROKU_ORIGIN must
+    # always be exported, even on a core-only install before Heroku exists.
+    resolve_heroku_origin
+}
+
+# Resolve the Heroku relay origin into SKYWAVE_HEROKU_ORIGIN (https, no trailing
+# slash). Priority: live dyno (if the app exists) > state file > a harmless
+# placeholder so deploys never fail before Tier 3 provisions the app. Tier 3
+# re-resolves to the real URL and redeploys the two files that embed it.
+resolve_heroku_origin() {
+    state_load
+    local origin=""
+    if command -v heroku >/dev/null 2>&1 && heroku auth:whoami >/dev/null 2>&1; then
+        origin="$(heroku apps:info -a "$HEROKU_APP" --json 2>/dev/null | jq -r '.app.web_url // empty' 2>/dev/null)"
+        origin="${origin%/}"   # strip trailing slash heroku adds
+    fi
+    [ -z "$origin" ] && origin="${SKYWAVE_HEROKU_ORIGIN:-}"
+    [ -z "$origin" ] && origin="https://${HEROKU_APP}.herokuapp.com"  # placeholder until provisioned
+    SKYWAVE_HEROKU_ORIGIN="$origin"
+    export SKYWAVE_HEROKU_ORIGIN
+    state_set SKYWAVE_HEROKU_ORIGIN "$origin"
 }
 
 # Best-effort Data Cloud presence probe. DataStream is a DC-only sObject that's
@@ -668,18 +692,47 @@ tier3_heroku() {
         done_mark 3.1
     fi
 
-    # ── 3.2 Ensure the Heroku app + git remote ───────────────────────────────
+    # ── 3.2 Ensure the Heroku app + git remote, capture the REAL url ─────────
+    # `heroku create skywave-app` keeps the name 'skywave-app' but the
+    # herokuapp.com URL gets a per-app random hash (Heroku security behavior
+    # since 2023-06-14), so the URL is only knowable from apps:info — never
+    # constructed. We capture it into SKYWAVE_HEROKU_ORIGIN here.
     if section 3.2; then
         say "3.2 Heroku app '${HEROKU_APP}'"
-        if heroku apps:info -a "$HEROKU_APP" >/dev/null 2>&1; then ok "app exists"; else heroku create "$HEROKU_APP" && ok "app created"; fi
+        if heroku apps:info -a "$HEROKU_APP" >/dev/null 2>&1; then
+            ok "app exists (reusing)"
+        else
+            heroku create "$HEROKU_APP" && ok "app created" \
+                || die "heroku create failed (name '${HEROKU_APP}' taken on another account? set HEROKU_APP=<unique>)"
+        fi
         git remote get-url heroku >/dev/null 2>&1 || heroku git:remote -a "$HEROKU_APP"
+        resolve_heroku_origin   # now picks up the live web_url
+        ok "relay origin: ${SKYWAVE_HEROKU_ORIGIN}"
         done_mark 3.2
+    fi
+
+    # ── 3.2b Embed the real URL into the org (CMD + remote site) ─────────────
+    # These two files carry %%SKYWAVE_HEROKU_ORIGIN%%; Tier 1 deployed them with
+    # the placeholder, so redeploy them now that the real URL is known. (All
+    # Apex/LWC read the CMD at runtime, the CSP + ESW iframe allow *.herokuapp.com
+    # by wildcard, so ONLY these two need the concrete value.)
+    if section 3.2b; then
+        say "3.2b Embed relay URL into the org"
+        state_load; resolve_heroku_origin
+        sf project deploy start --target-org "$ORG_ALIAS" \
+            --source-dir force-app/main/default/customMetadata/Skywave_Preflight_Config.Default.md-meta.xml \
+            --source-dir force-app/main/default/remoteSiteSettings/Skywave_Heroku_Relay.remoteSite-meta.xml \
+            --ignore-conflicts --json >/dev/null \
+            && ok "CMD + remote site point at ${SKYWAVE_HEROKU_ORIGIN}" \
+            || warn "redeploy of CMD/remote-site failed — set Heroku_Origin_Url__c manually to ${SKYWAVE_HEROKU_ORIGIN}"
+        info "globe UIBundle: rebuild with VITE_RELAY_WS_URL=\"${SKYWAVE_HEROKU_ORIGIN/https:/wss:}/ws/monitor\" (see its README)"
+        done_mark 3.2b
     fi
 
     # ── 3.3 Config vars (derived from tier-1 outputs + secrets) ──────────────
     if section 3.3; then
         say "3.3 Set Heroku config vars"
-        state_load
+        state_load; resolve_heroku_origin
         [ -n "${ESW_SITE_URL:-}" ] || warn "ESW_SITE_URL not in state — run tier 1 first (or --resume) so the relay can serve the widget"
         local sets=()
         sets+=("SF_LOGIN_URL=https://login.salesforce.com")
@@ -688,7 +741,7 @@ tier3_heroku() {
         sets+=("SF_ESW_ESC_NAME=${ESC_NAME}")
         [ -n "${ESW_SITE_URL:-}" ] && sets+=("SF_ESW_SITE_URL=${ESW_SITE_URL}")
         sets+=("SF_ESW_SCRT2_URL=${SCRT2_URL}")
-        sets+=("SKYWAVE_PUBLIC_ORIGIN=https://${HEROKU_APP}.herokuapp.com")
+        sets+=("SKYWAVE_PUBLIC_ORIGIN=${SKYWAVE_HEROKU_ORIGIN}")
         heroku config:set -a "$HEROKU_APP" "${sets[@]}" >/dev/null
         ok "derived config vars set"
         # Secret-bearing vars (only if the local secret exists; never echoed).
@@ -709,13 +762,14 @@ tier3_heroku() {
     # ── 3.5 Smoke test ───────────────────────────────────────────────────────
     if section 3.5; then
         say "3.5 Smoke test /api/preflight"
-        local url="https://${HEROKU_APP}.herokuapp.com/api/preflight" key=""
+        state_load; resolve_heroku_origin
+        local url="${SKYWAVE_HEROKU_ORIGIN}/api/preflight" key=""
         [ -f .secrets/preflight.key ] && key="$(cat .secrets/preflight.key)"
         if curl -sf -H "x-preflight-key: ${key}" "$url" >/dev/null 2>&1; then ok "relay healthy"; else warn "preflight check did not pass — verify config vars + dyno logs (heroku logs -a ${HEROKU_APP})"; fi
         done_mark 3.5
     fi
     say "Tier 3 complete — Heroku relay"
-    info "Relay: https://${HEROKU_APP}.herokuapp.com"
+    info "Relay: ${SKYWAVE_HEROKU_ORIGIN}"
 }
 
 # ════════════════════════════════════════════════════════════════════════════

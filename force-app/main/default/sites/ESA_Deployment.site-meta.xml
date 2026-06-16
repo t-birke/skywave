@@ -56,13 +56,10 @@
         <url>%%SCRATCH_ORG_VF_HOST%%</url>
     </siteIframeWhiteListUrls>
     <!-- The Skywave consumer site is hosted on Heroku, not on a Salesforce
-         site host. Without these entries the chat iframe load is blocked
-         by the LWR CSP `frame-ancestors` directive on the embedding page.
-         Allow both the specific app host and the herokuapp.com wildcard so
-         this works across Heroku app renames. -->
-    <siteIframeWhiteListUrls>
-        <url>skywave-app-bb0e8666933b.herokuapp.com</url>
-    </siteIframeWhiteListUrls>
+         site host. Without this entry the chat iframe load is blocked by the
+         LWR CSP `frame-ancestors` directive on the embedding page. The
+         herokuapp.com wildcard covers any provisioned dyno (and survives app
+         renames), so no per-install host substitution is needed. -->
     <siteIframeWhiteListUrls>
         <url>*.herokuapp.com</url>
     </siteIframeWhiteListUrls>

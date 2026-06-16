@@ -4,7 +4,7 @@
     <protected>false</protected>
     <values>
         <field>Heroku_Origin_Url__c</field>
-        <value xsi:type="xsd:string">https://skywave-app-bb0e8666933b.herokuapp.com</value>
+        <value xsi:type="xsd:string">%%SKYWAVE_HEROKU_ORIGIN%%</value>
     </values>
     <values>
         <field>Statuspage_Base_Url__c</field>

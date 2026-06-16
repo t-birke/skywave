@@ -11,8 +11,17 @@
 @RestResource(urlMapping='/skywave/session/start')
 global without sharing class Skywave_SessionStart {
 
-    // TODO Phase 1: surface this via Custom Metadata so we can repoint without code change.
-    private static final String WS_BASE_URL = 'wss://skywave-app-bb0e8666933b.herokuapp.com/ws';
+    // The Heroku relay origin is the single source of truth in
+    // Skywave_Preflight_Config.Default.Heroku_Origin_Url__c (set by install.sh
+    // once the dyno is provisioned). We derive the WS base from it so there's
+    // no hardcoded host to repoint. Falls back to a sane shape if unset.
+    @TestVisible
+    private static String wsBaseUrl() {
+        String origin = Skywave_HerokuConfig.originUrl();      // https://host (no trailing /)
+        if (String.isBlank(origin)) return null;
+        // https://host -> wss://host/ws
+        return origin.replaceFirst('^https?://', 'wss://') + '/ws';
+    }
 
     @HttpPost
     global static void post() {
@@ -76,11 +85,12 @@ global without sharing class Skywave_SessionStart {
             startPayload
         );
 
+        String wsBase = wsBaseUrl();
         Map<String, Object> response = new Map<String, Object>{
             'sessionId' => sessionId,
             'demoSessionId' => demoSessionId,
             'currentState' => currentState,
-            'wsUrl' => WS_BASE_URL + '/' + sessionId
+            'wsUrl' => (wsBase == null) ? null : wsBase + '/' + sessionId
         };
         res.statusCode = 200;
         res.responseBody = Blob.valueOf(JSON.serialize(response));

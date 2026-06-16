@@ -27,8 +27,14 @@ No live activity? Click **7D**/**30D** in the HUD to replay from records.
 
 ## Build
 
+`VITE_RELAY_WS_URL` is **required** at build time — the relay host carries a
+per-install Heroku hash, so there is no hardcoded default. Without it the globe
+loads but the live feed never connects (it logs an error and stays idle).
+
 ```bash
-npm run build        # → dist/ (the deploy payload; gitignored, rebuild before deploy)
+# point at YOUR provisioned relay (see install.sh Tier 3 output / heroku apps:info):
+VITE_RELAY_WS_URL="wss://<your-dyno>.herokuapp.com/ws/monitor" npm run build
+# → dist/ (the deploy payload; gitignored, rebuild before deploy)
 ```
 
 ## Deploy to org

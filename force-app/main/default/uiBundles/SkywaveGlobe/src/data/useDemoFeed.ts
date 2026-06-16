@@ -38,11 +38,19 @@ export interface DemoFeed {
 }
 
 // Relay WebSocket URL. The bundle runs on a different origin than the relay, so
-// this is an ABSOLUTE wss:// URL, not origin-relative. Overridable at build via
-// VITE_RELAY_WS_URL; defaults to the known prod relay /ws/monitor channel.
-const RELAY_WS_URL =
-  (import.meta.env?.VITE_RELAY_WS_URL as string | undefined) ??
-  'wss://skywave-app-bb0e8666933b.herokuapp.com/ws/monitor';
+// this is an ABSOLUTE wss:// URL, not origin-relative. The relay host carries a
+// per-install Heroku hash, so there is NO hardcoded default — it MUST be
+// supplied at build time via VITE_RELAY_WS_URL (e.g.
+//   VITE_RELAY_WS_URL="wss://<your-dyno>.herokuapp.com/ws/monitor" npm run build
+// ). See the bundle README. Missing it logs an error and the feed stays idle.
+const RELAY_WS_URL = import.meta.env?.VITE_RELAY_WS_URL as string | undefined;
+if (!RELAY_WS_URL) {
+  // eslint-disable-next-line no-console
+  console.error(
+    '[SkywaveGlobe] VITE_RELAY_WS_URL is not set — the live feed will not connect. ' +
+      'Rebuild with VITE_RELAY_WS_URL=wss://<your-relay-host>/ws/monitor.'
+  );
+}
 
 // Reconnect backoff (mirrors the consumer site): start 1s, double to 30s cap.
 const RECONNECT_MIN_MS = 1000;
@@ -103,6 +111,12 @@ export function useDemoFeed(activeDemoSessionId?: string | null): DemoFeed {
 
     const connect = () => {
       if (unloaded) return;
+      if (!RELAY_WS_URL) {
+        // No relay URL baked in (VITE_RELAY_WS_URL was unset at build) — stay
+        // idle rather than throwing on new WebSocket(undefined).
+        setStatus('error');
+        return;
+      }
       log('opening WebSocket…');
       setStatus('connecting');
       try {

@@ -39,6 +39,16 @@
             "filename": "force-app/main/default/sites/ESA_Deployment.site-meta.xml",
             "stringToReplace": "%%SCRATCH_ORG_VF_HOST%%",
             "replaceWithEnv": "SCRATCH_ORG_VF_HOST"
+        },
+        {
+            "filename": "force-app/main/default/customMetadata/Skywave_Preflight_Config.Default.md-meta.xml",
+            "stringToReplace": "%%SKYWAVE_HEROKU_ORIGIN%%",
+            "replaceWithEnv": "SKYWAVE_HEROKU_ORIGIN"
+        },
+        {
+            "filename": "force-app/main/default/remoteSiteSettings/Skywave_Heroku_Relay.remoteSite-meta.xml",
+            "stringToReplace": "%%SKYWAVE_HEROKU_ORIGIN%%",
+            "replaceWithEnv": "SKYWAVE_HEROKU_ORIGIN"
         }
     ],
     "name": "skywave-scratch",
