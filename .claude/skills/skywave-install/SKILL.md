@@ -1,6 +1,6 @@
 ---
 name: skywave-install
-description: "Conductor for installing the Skywave Interactive Agentforce demo into a Salesforce Demo Org (SDO) end-to-end — core demo (agent + MIAW chat + Experience Cloud sites + data), optional Data Cloud observability dashboards, the optional Heroku preflight/consumer-site relay, and the optional 3D globe demo-monitor UIBundle. TRIGGER when: the user has cloned the is_interactive_skywave repo and wants to stand the demo up; says 'install Skywave', 'set up the demo', 'run the installer', 'get the demo working on my SDO'; is resuming an install after the Data Cloud provisioning wait; or hits a gate (ESD publish, data-kit instantiation, stream refresh, Heroku config, globe app-domain) and needs guidance. DO NOT TRIGGER when: the user is editing the demo's agent/Apex/LWC source (that's normal dev work), debugging a specific runtime failure in an already-installed demo, or asking about a different project."
+description: "Conductor for installing the Skywave Interactive Agentforce demo into a Salesforce Demo Org (SDO) end-to-end — core demo (agent + MIAW chat + Experience Cloud sites + data), optional Data Cloud observability dashboards, the optional Heroku preflight/consumer-site relay, the optional 3D globe demo-monitor UIBundle, and the optional Interaction-SDK + Data Cloud customer-tracking pipeline (Web Connector, mappings, identity resolution, real-time data graph). TRIGGER when: the user has cloned the is_interactive_skywave repo and wants to stand the demo up; says 'install Skywave', 'set up the demo', 'run the installer', 'get the demo working on my SDO'; is resuming an install after the Data Cloud provisioning wait; or hits a gate (ESD publish, data-kit instantiation, stream refresh, Heroku config, globe app-domain, tracking data-graph) and needs guidance. DO NOT TRIGGER when: the user is editing the demo's agent/Apex/LWC source (that's normal dev work), debugging a specific runtime failure in an already-installed demo, or asking about a different project."
 license: MIT
 metadata:
   version: "0.1.0"
@@ -33,7 +33,8 @@ Open `install.sh` and skim the section banners. It has four tiers and a few mode
 ./install.sh --with-observability  # + Tier 2: Data Cloud session-tracing dashboards
 ./install.sh --with-heroku         # + Tier 3: preflight relay + consumer-site backend
 ./install.sh --with-globe          # + Tier 4: 3D globe demo-monitor UIBundle (needs Tier 3's relay)
-./install.sh --all                 # all four
+./install.sh --with-tracking       # + Tier 5: Interaction-SDK + Data Cloud customer tracking (needs DC)
+./install.sh --all                 # all five
 ./install.sh --resume              # skip already-completed sections (use after any gate)
 ./install.sh --check-stdm          # poll: is Data Cloud STDM ready yet? (exit 0/1)
 ./install.sh --check-prereqs       # green/red tool check for the selected tier
@@ -155,6 +156,28 @@ URL baked in (from Tier 3's origin — run `--with-heroku` first or in the same
 permset. If the user runs `--with-globe` without Tier 3, the globe is built
 against a placeholder relay URL — rerun `--with-heroku --with-globe --resume`
 once the dyno exists so the feed connects.
+
+### G8 — Tracking pipeline + data graph  (Tier 5, §5.1–5.3)
+Tier 5 builds the Interaction-SDK + Data Cloud pipeline (the load-bearing websdk
+deviceId every downstream step keys on) 100% via the Core `/ssot/` API
+(`scripts/datacloud/run_tracking.py`, idempotent). Two things need judgment:
+- **CRM email-fusion dependency:** IR's "Match by Email" rule fuses the web
+  Individual to the CRM Contact only if the **standard CRM connector's
+  `Contact_Home`→`Individual`/`ContactPointEmail` mappings exist**. Those come
+  from the Data Cloud CRM connector (part of DC setup), NOT Tier 5. If anonymous
+  visitors never resolve to known Contacts, check those CRM-side mappings exist.
+- **Data graph (G8a):** `Skywave_Customers` (REALTIME) is the riskiest step
+  (phantom projected fields → `status=ERROR`). On a fresh org §5.2 reports it as
+  a gate — POST the captured payload (`scripts/datacloud/payloads/data_graph.json`)
+  on **v66**, then poll `GET /ssot/data-graphs/Skywave_Customers` until
+  `status=ready`. It depends on the custom Survey_Response→Individual relationship
+  (§5.1) being materialized first. If the DG lands `ERROR`, it can only be deleted
+  + re-POSTed (PATCH=405 on a realtime DG); drop any field the live DMOs don't have.
+- Run `--with-tracking` together with `--with-heroku` (or `--all`) so §5.3 sets
+  `SF_INTERACTIONS_SDK_URL` (the beacon CDN url) on the dyno; otherwise it prints
+  the manual `heroku config:set` command.
+- Slowness note: `/data-streams?limit=200` is ~46s on a populated DC org; the
+  runner caches it, so a full Tier-5 pass is ~1–2 min, not stuck.
 
 ## When something breaks
 

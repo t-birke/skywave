@@ -48,7 +48,8 @@ git config core.hooksPath .githooks   # ARCHITECTURE.md drift reminder on commit
 ./install.sh --with-observability  # + Data Cloud session-tracing dashboards (adds a ~2–3h wait)
 ./install.sh --with-heroku         # + preflight relay + consumer-site backend
 ./install.sh --with-globe          # + 3D globe demo-monitor UIBundle (needs the relay; app domain enabled in Setup)
-./install.sh --all                 # all four
+./install.sh --with-tracking       # + Interaction-SDK + Data Cloud customer tracking (needs Data Cloud)
+./install.sh --all                 # all five
 ./install.sh --resume              # continue after any gate (idempotent — always safe)
 ```
 
@@ -83,6 +84,10 @@ one, re-run with `--resume`:
 - **Heroku keys** — the Connected App cert + MIAW JWK upload are manual Setup steps.
 - **Globe app domain** (globe) — enable the Multi-Framework UIBundle app domain
   (`*.salesforce.app`) in Setup before Tier 4, or the bundle won't load.
+- **Tracking data graph** (tracking) — the `Skywave_Customers` real-time data
+  graph is built by Tier 5; on a fresh org the skill POSTs it on API v66 and
+  polls `status=ready`. Needs the standard CRM connector's Contact→Individual
+  mappings present so identity resolution can fuse web visitors to CRM Contacts.
 
 See `.claude/skills/skywave-install/SKILL.md` for the full gate playbook.
 
