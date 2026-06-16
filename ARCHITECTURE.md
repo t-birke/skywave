@@ -759,6 +759,19 @@ Config: `Skywave_Preflight_Config__mdt.Default` holds `Heroku_Origin_Url__c`,
 in source — the value never lands in git, only in `.secrets/preflight.key`
 locally and as the `PREFLIGHT_KEY` Heroku config var.
 
+**Heroku relay origin — one source of truth.** The dyno URL carries a per-install
+Heroku hash (`skywave-app-<hash>.herokuapp.com`), so it can't be hardcoded. It
+lives once in `Heroku_Origin_Url__c` and everything reads it through
+`Skywave_HerokuConfig.originUrl()` — `Skywave_SessionStart` (derives the `wss`
+URL), `skywaveDemoMonitor` (QR target, via `getHerokuOrigin`), and
+`Skywave_PreflightController`. The CMD record + `Skywave_Heroku_Relay` remote
+site carry a `%%SKYWAVE_HEROKU_ORIGIN%%` placeholder (sfdx-project.json
+`replaceWithEnv`), which `install.sh` Tier 3 fills with the captured
+`heroku apps:info` URL and redeploys (§3.2b). Security allowlists that can't read
+a CMD — the globe `wss://` CspTrustedSite and the ESW iframe whitelist —
+wildcard `*.herokuapp.com` instead. The globe UIBundle bakes its relay URL at
+build via `VITE_RELAY_WS_URL` (no default; see its README).
+
 ---
 
 ## 4. Moving parts that are NOT in git
@@ -772,7 +785,8 @@ must be redone. Treat this as the operational checklist.
 | `AGENT_USER` env var | shell, inline before `sf` agent commands | deploy AND publish fail without it (`sfdx-project.json` replaceWithEnv). (memory) |
 | Queue routing config | org data | General Voice queue repointed to `skywave_routing` (LeastActive) or transfers drop. Not in metadata. (memory) |
 | Agentforce Voice PSTN toggles 6 + 7 | Setup → Agentforce Voice Setup | "Connect Related Voice Calls" + "Record Voice Calls" — empty transcript without them. |
-| Heroku Config Vars | `skywave-app` dyno | `IPINFO_TOKEN`, `SF_ESW_*`, JWT key, etc. See `.env.example` + SECRETS.md. |
+| Heroku Config Vars | `skywave-app` dyno | `IPINFO_TOKEN`, `SF_ESW_*`, JWT key, etc. `install.sh` Tier 3 sets the derivable ones; secrets are manual. See `.env.example` + SECRETS.md. |
+| Heroku relay origin | `Heroku_Origin_Url__c` CMD + remote site (`replaceWithEnv`); globe via `VITE_RELAY_WS_URL` | Single source of truth read via `Skywave_HerokuConfig`. `install.sh` §3.2b fills it from `heroku apps:info` post-provision. Globe must be rebuilt with the build flag. |
 | `Skywave_Demo_Admin` FLS | permset (in git); regen via `scripts/regen-demo-admin-fls.py` | Every new custom field/object must get full FLS on this permset or the presenter hits phantom INVALID_FIELD. Add it to the script's `OUR_OBJECTS`/`STD_FIELDS`, run the script, deploy the permset. (default rule, memory) |
 | Inactive BotVersions | org | Can't be deleted — every API path is dep-blocked. Failed iterations stay pinned. (memory) |
 
