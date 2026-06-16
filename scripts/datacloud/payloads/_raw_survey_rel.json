@@ -1,0 +1,34 @@
+{
+  "currentPageUrl": "/services/data/v62.0/ssot/data-model-objects/Survey_Response__dlm/relationships?dataspace=default&limit=20&offset=0&orderBy=filtersortorderasc&sortBy=DeveloperName",
+  "relationships": [
+    {
+      "cardinality": "ManyToOne",
+      "creationType": "Custom",
+      "id": "0geg8000000XrNJAA0",
+      "name": "Survey_Response_SessionId_map_ssot_Individual_ssot_Id_1779152892455",
+      "owner": "DataCloud",
+      "sourceField": {
+        "label": "Session Id",
+        "name": "SessionId__c",
+        "type": "MktDataModelField"
+      },
+      "sourceObject": {
+        "keyQualifierField": null,
+        "label": "Survey Response",
+        "name": "Survey_Response__dlm"
+      },
+      "status": "ACTIVE",
+      "targetField": {
+        "label": "Individual Id",
+        "name": "ssot__Id__c",
+        "type": "MktDataModelField"
+      },
+      "targetObject": {
+        "keyQualifierField": null,
+        "label": "Individual",
+        "name": "ssot__Individual__dlm"
+      }
+    }
+  ],
+  "totalSize": 1
+}

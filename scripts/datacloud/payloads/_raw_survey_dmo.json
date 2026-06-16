@@ -1,0 +1,143 @@
+{
+  "category": "ENGAGEMENT",
+  "creationType": "Custom",
+  "dataSpaceName": "default",
+  "description": "Skywave Interactive — survey answers from Web Connector userProfiling events.",
+  "fields": [
+    {
+      "creationType": "Custom",
+      "isDistinct": false,
+      "isMapped": true,
+      "label": "Answer Key",
+      "name": "AnswerKey__c",
+      "type": "Text",
+      "usageTag": "None"
+    },
+    {
+      "creationType": "Custom",
+      "isDistinct": false,
+      "isMapped": true,
+      "label": "Answer Text",
+      "name": "AnswerText__c",
+      "type": "Text",
+      "usageTag": "None"
+    },
+    {
+      "creationType": "System",
+      "isDistinct": false,
+      "isMapped": true,
+      "label": "Data Source",
+      "name": "DataSource__c",
+      "type": "Text",
+      "usageTag": "None"
+    },
+    {
+      "creationType": "System",
+      "isDistinct": false,
+      "isMapped": true,
+      "label": "Data Source Object",
+      "name": "DataSourceObject__c",
+      "type": "Text",
+      "usageTag": "None"
+    },
+    {
+      "creationType": "Custom",
+      "isDistinct": false,
+      "isMapped": true,
+      "label": "Device Id",
+      "name": "DeviceId__c",
+      "type": "Text",
+      "usageTag": "None"
+    },
+    {
+      "creationType": "Custom",
+      "isDistinct": false,
+      "isMapped": true,
+      "label": "Engagement Type",
+      "name": "EngagementType__c",
+      "type": "Text",
+      "usageTag": "None"
+    },
+    {
+      "creationType": "Custom",
+      "isDistinct": false,
+      "isMapped": true,
+      "label": "Event Date Time",
+      "name": "EventDateTime__c",
+      "type": "DateTime",
+      "usageTag": "None"
+    },
+    {
+      "creationType": "System",
+      "isDistinct": false,
+      "label": "Internal Organization",
+      "name": "InternalOrganization__c",
+      "type": "Text",
+      "usageTag": "None"
+    },
+    {
+      "creationType": "System",
+      "isDistinct": false,
+      "isMapped": true,
+      "label": "Key Qualifier Session Id",
+      "name": "KQ_SessionId__c",
+      "type": "Text",
+      "usageTag": "KeyQualifier"
+    },
+    {
+      "creationType": "System",
+      "isDistinct": false,
+      "isMapped": true,
+      "label": "Key Qualifier Survey Response Id",
+      "name": "KQ_Id__c",
+      "type": "Text",
+      "usageTag": "KeyQualifier"
+    },
+    {
+      "creationType": "Custom",
+      "isDistinct": false,
+      "isMapped": true,
+      "label": "Question Key",
+      "name": "QuestionKey__c",
+      "type": "Text",
+      "usageTag": "None"
+    },
+    {
+      "creationType": "Custom",
+      "isDistinct": false,
+      "isMapped": true,
+      "label": "Question Text",
+      "name": "QuestionText__c",
+      "type": "Text",
+      "usageTag": "None"
+    },
+    {
+      "creationType": "Custom",
+      "isDistinct": false,
+      "isMapped": true,
+      "keyQualifierName": "KQ_SessionId",
+      "label": "Session Id",
+      "name": "SessionId__c",
+      "type": "Text",
+      "usageTag": "None"
+    },
+    {
+      "creationType": "Custom",
+      "isDistinct": false,
+      "isMapped": true,
+      "isPrimaryKey": true,
+      "keyQualifierName": "KQ_Id",
+      "label": "Survey Response Id",
+      "name": "Id__c",
+      "type": "Text",
+      "usageTag": "None"
+    }
+  ],
+  "hasExternalDataLakeObjectMappings": false,
+  "id": "0gjg8000000ESndAAG",
+  "isEditable": true,
+  "isEnabled": true,
+  "isSegmentable": false,
+  "label": "Survey Response",
+  "name": "Survey_Response__dlm"
+}

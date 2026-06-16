@@ -1,0 +1,119 @@
+{
+  "label": "Skywave Unified Individual",
+  "description": "Exact-match IR for RTDG. Match by email or AnonymousId (cross-DMO).",
+  "configurationType": "individual",
+  "dataSpaceName": "default",
+  "doesRunAutomatically": false,
+  "matchRules": [
+    {
+      "criteria": [
+        {
+          "caseSensitiveMatch": false,
+          "entityName": "ssot__ContactPointEmail__dlm",
+          "fieldName": "ssot__EmailAddress__c",
+          "matchMethodType": "exactnormalized",
+          "shouldMatchOnBlank": false
+        }
+      ],
+      "label": "Match by Email"
+    },
+    {
+      "criteria": [
+        {
+          "caseSensitiveMatch": false,
+          "entityName": "ssot__PartyIdentification__dlm",
+          "fieldName": "ssot__IdentificationNumber__c",
+          "matchMethodType": "exact",
+          "partyIdentificationInfo": {
+            "partyName": "AnonymousId",
+            "partyType": "CookieId"
+          },
+          "shouldMatchOnBlank": false,
+          "targetEntityName": "ssot__Individual__dlm",
+          "targetFieldName": "AnonymousId__c"
+        }
+      ],
+      "label": "Match by AnonymousId"
+    }
+  ],
+  "reconciliationRules": [
+    {
+      "entityName": "ssot__Individual__dlm",
+      "fields": [
+        {
+          "fieldName": "ssot__LastName__c",
+          "ruleType": "sourcesequence",
+          "shouldIgnoreEmptyValue": true,
+          "sources": [
+            {
+              "name": "skywave_app_identity_8D2D3E28__dll"
+            }
+          ]
+        },
+        {
+          "fieldName": "ssot__FirstName__c",
+          "ruleType": "sourcesequence",
+          "shouldIgnoreEmptyValue": true,
+          "sources": [
+            {
+              "name": "skywave_app_identity_8D2D3E28__dll"
+            }
+          ]
+        }
+      ],
+      "linkDmoName": "UnifiedLinkssotIndividual__dlm",
+      "ruleType": "sourcesequence",
+      "shouldIgnoreEmptyValue": true,
+      "sources": [
+        {
+          "name": "skywave_app_identity_8D2D3E28__dll"
+        }
+      ],
+      "unifiedDmoName": "UnifiedIndividual__dlm"
+    },
+    {
+      "entityName": "ssot__ContactPointEmail__dlm",
+      "fields": [],
+      "linkDmoName": "UnifiedLinkssotContactPointEmail__dlm",
+      "ruleType": "sourcesequence",
+      "shouldIgnoreEmptyValue": true,
+      "sources": [
+        {
+          "name": "skywave_app_contactPointEmail_D4D3D1DA__dll"
+        }
+      ],
+      "unifiedDmoName": "UnifiedssotContactPointEmail__dlm"
+    },
+    {
+      "entityName": "ssot__PartyIdentification__dlm",
+      "fields": [],
+      "linkDmoName": "UnifiedLinkssotPartyIdentification__dlm",
+      "ruleType": "sourcesequence",
+      "shouldIgnoreEmptyValue": true,
+      "sources": [
+        {
+          "name": "skywave_app_partyIdentification_920CD48D__dll"
+        }
+      ],
+      "unifiedDmoName": "UnifiedssotPartyIdentification__dlm"
+    },
+    {
+      "entityName": "ssot__ContactPointPhone__dlm",
+      "fields": [],
+      "linkDmoName": "UnifiedLinkssotContactPointPhone__dlm",
+      "ruleType": "lastupdated",
+      "shouldIgnoreEmptyValue": true,
+      "sources": [],
+      "unifiedDmoName": "UnifiedssotContactPointPhone__dlm"
+    },
+    {
+      "entityName": "ssot__ContactPointAddress__dlm",
+      "fields": [],
+      "linkDmoName": "UnifiedLinkssotContactPointAddress__dlm",
+      "ruleType": "lastupdated",
+      "shouldIgnoreEmptyValue": true,
+      "sources": [],
+      "unifiedDmoName": "UnifiedssotContactPointAddress__dlm"
+    }
+  ]
+}

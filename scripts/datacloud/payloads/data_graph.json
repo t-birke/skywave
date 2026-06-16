@@ -1,0 +1,420 @@
+{
+  "name": "Skywave_Customers",
+  "label": "Skywave Customers",
+  "type": "REALTIME",
+  "isRealTimeToggleEnabled": true,
+  "isRecordCachingDisabled": false,
+  "cacheDurationInDays": 30,
+  "maxRecordsCached": 100000,
+  "sessionEnd": 120,
+  "sessionEndTimeUnit": "MINUTES",
+  "primaryObjectName": "UnifiedIndividual__dlm",
+  "dataspaceName": "default",
+  "sourceObject": {
+    "referenceDeveloperName": "UnifiedIndividual",
+    "label": "Unified Individual swv2",
+    "type": "derived",
+    "categoryDevName": "Profile",
+    "fields": [
+      {
+        "dataType": "Text",
+        "fieldRoles": [],
+        "isDGRootKeyField": false,
+        "isKeyColumn": true,
+        "isProjected": true,
+        "name": "Skywave_Customers_UnifiedssotI_XyPRDbrG",
+        "sourceFieldLabel": "Unified Individual Id",
+        "sourceFieldName": "ssot__Id__c",
+        "usageTag": "none"
+      }
+    ],
+    "relatedObjects": [
+      {
+        "referenceDeveloperName": "IndividualIdentityLink",
+        "label": "Unified Link Individual swv2",
+        "type": "bridge",
+        "categoryDevName": "Related",
+        "fields": [
+          {
+            "dataType": "Text",
+            "fieldRoles": [],
+            "isDGRootKeyField": false,
+            "isKeyColumn": true,
+            "isProjected": true,
+            "keyQualifierName": "KQ_SourceRecordId__c",
+            "name": "Skywave_Customers_UnifiedLinks_cTIsdGrR",
+            "sourceFieldLabel": "Individual Id",
+            "sourceFieldName": "SourceRecordId__c",
+            "usageTag": "none"
+          },
+          {
+            "dataType": "Text",
+            "fieldRoles": [],
+            "isDGRootKeyField": false,
+            "isKeyColumn": false,
+            "isProjected": true,
+            "name": "Skywave_Customers_UnifiedLinks_FsNJTiQk",
+            "sourceFieldLabel": "Key Qualifier Id",
+            "sourceFieldName": "KQ_SourceRecordId__c",
+            "usageTag": "key_qualifier"
+          },
+          {
+            "dataType": "Number",
+            "fieldRoles": [],
+            "isDGRootKeyField": false,
+            "isKeyColumn": false,
+            "isProjected": true,
+            "name": "Skywave_Customers_UnifiedLinks_kACLohuK",
+            "sourceFieldLabel": "Priority Bucket",
+            "sourceFieldName": "PriorityBucket__c",
+            "usageTag": "none"
+          },
+          {
+            "dataType": "Text",
+            "fieldRoles": [],
+            "isDGRootKeyField": false,
+            "isKeyColumn": false,
+            "isProjected": true,
+            "name": "Skywave_Customers_UnifiedLinks_MnbOFtdM",
+            "sourceFieldLabel": "Unified Individual Id",
+            "sourceFieldName": "UnifiedRecordId__c",
+            "usageTag": "none"
+          },
+          {
+            "dataType": "Text",
+            "fieldRoles": [],
+            "isDGRootKeyField": false,
+            "isKeyColumn": false,
+            "isProjected": true,
+            "name": "Skywave_Customers_UnifiedLinkssotIndividual_DataSourceId",
+            "sourceFieldLabel": "Data Source",
+            "sourceFieldName": "ssot__DataSourceId__c",
+            "usageTag": "none"
+          },
+          {
+            "dataType": "Text",
+            "fieldRoles": [],
+            "isDGRootKeyField": false,
+            "isKeyColumn": false,
+            "isProjected": true,
+            "name": "Skywave_Customers_UnifiedLinkssotIndividual_DataSourceObjectId",
+            "sourceFieldLabel": "Data Source Object",
+            "sourceFieldName": "ssot__DataSourceObjectId__c",
+            "usageTag": "none"
+          }
+        ],
+        "relatedObjects": [
+          {
+            "referenceDeveloperName": "Individual",
+            "label": "Individual",
+            "type": "standard",
+            "categoryDevName": "Profile",
+            "fields": [
+              {
+                "dataType": "Text",
+                "fieldRoles": [],
+                "isDGRootKeyField": false,
+                "isKeyColumn": true,
+                "isProjected": true,
+                "keyQualifierName": "KQ_Id__c",
+                "name": "Skywave_Customers_Individual_Id",
+                "sourceFieldLabel": "Individual Id",
+                "sourceFieldName": "ssot__Id__c",
+                "usageTag": "none"
+              },
+              {
+                "dataType": "Text",
+                "fieldRoles": [],
+                "isDGRootKeyField": false,
+                "isKeyColumn": false,
+                "isProjected": true,
+                "name": "Skywave_Customers_Individual_I_TznDzfcZ",
+                "sourceFieldLabel": "Is Anonymous",
+                "sourceFieldName": "ssot__IsAnonymous__c",
+                "usageTag": "none"
+              },
+              {
+                "dataType": "Text",
+                "fieldRoles": [],
+                "isDGRootKeyField": false,
+                "isKeyColumn": false,
+                "isProjected": true,
+                "name": "Skywave_Customers_Individual_KQ_Id",
+                "sourceFieldLabel": "Key Qualifier Individual Id",
+                "sourceFieldName": "KQ_Id__c",
+                "usageTag": "key_qualifier"
+              }
+            ],
+            "relatedObjects": [
+              {
+                "referenceDeveloperName": "ProductBrowseEngagement",
+                "label": "Product Browse Engagement",
+                "type": "standard",
+                "categoryDevName": "Engagement",
+                "recencyCriteria": [
+                  {
+                    "devName": "Skywave_Customers_ProductBrowseEngagement",
+                    "fieldLabel": "Engagement Date Time",
+                    "fieldName": "ssot__EngagementDateTm__c",
+                    "value": 7,
+                    "valueType": "time",
+                    "valueUnit": "DAY"
+                  },
+                  {
+                    "devName": "Skywave_Customers_ProductBrowseEngagement",
+                    "fieldLabel": "Engagement Date Time",
+                    "fieldName": "ssot__EngagementDateTm__c",
+                    "value": 10,
+                    "valueType": "record",
+                    "valueUnit": "RECORD"
+                  }
+                ],
+                "fields": [
+                  {
+                    "dataType": "DateTime",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": false,
+                    "isProjected": true,
+                    "name": "Skywave_Customers_ProductBrows_PCZOqpVw",
+                    "sourceFieldLabel": "Engagement Date Time",
+                    "sourceFieldName": "ssot__EngagementDateTm__c",
+                    "usageTag": "none"
+                  },
+                  {
+                    "dataType": "Text",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": false,
+                    "isProjected": true,
+                    "name": "Skywave_Customers_ProductBrows_FpQaLPHW",
+                    "sourceFieldLabel": "Key Qualifier Product Browse Engagement Id",
+                    "sourceFieldName": "KQ_Id__c",
+                    "usageTag": "key_qualifier"
+                  },
+                  {
+                    "dataType": "Text",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": false,
+                    "isProjected": true,
+                    "name": "Skywave_Customers_ProductBrows_HomARVKO",
+                    "sourceFieldLabel": "Key Qualifier Session",
+                    "sourceFieldName": "KQ_SessionId__c",
+                    "usageTag": "key_qualifier"
+                  },
+                  {
+                    "dataType": "Text",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": false,
+                    "isProjected": true,
+                    "name": "Skywave_Customers_ProductBrows_gJTQOfPt",
+                    "sourceFieldLabel": "Name",
+                    "sourceFieldName": "ssot__Name__c",
+                    "usageTag": "none"
+                  },
+                  {
+                    "dataType": "Text",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": false,
+                    "isProjected": true,
+                    "name": "Skywave_Customers_ProductBrows_DZPsSOjL",
+                    "sourceFieldLabel": "Page Id",
+                    "sourceFieldName": "ssot__PageId__c",
+                    "usageTag": "none"
+                  },
+                  {
+                    "dataType": "Text",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": false,
+                    "isProjected": true,
+                    "name": "Skywave_Customers_ProductBrows_AUwYVSNx",
+                    "sourceFieldLabel": "Page Name",
+                    "sourceFieldName": "ssot__PageName__c",
+                    "usageTag": "none"
+                  },
+                  {
+                    "dataType": "Text",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": false,
+                    "isProjected": true,
+                    "name": "Skywave_Customers_ProductBrows_PuJrVtNu",
+                    "sourceFieldLabel": "Page URL",
+                    "sourceFieldName": "ssot__PageURL__c",
+                    "usageTag": "none"
+                  },
+                  {
+                    "dataType": "Text",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": true,
+                    "isProjected": true,
+                    "keyQualifierName": "KQ_Id__c",
+                    "name": "Skywave_Customers_ProductBrows_iCCZkraM",
+                    "sourceFieldLabel": "Product Browse Engagement Id",
+                    "sourceFieldName": "ssot__Id__c",
+                    "usageTag": "none"
+                  },
+                  {
+                    "dataType": "Text",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": false,
+                    "isProjected": true,
+                    "keyQualifierName": "KQ_SessionId__c",
+                    "name": "Skywave_Customers_ProductBrows_LYJCElDM",
+                    "sourceFieldLabel": "Session",
+                    "sourceFieldName": "ssot__SessionId__c",
+                    "usageTag": "none"
+                  },
+                  {
+                    "dataType": "Text",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": false,
+                    "isProjected": true,
+                    "name": "Skywave_Customers_ProductBrows_vZPbRjzJ",
+                    "sourceFieldLabel": "Webpage Type",
+                    "sourceFieldName": "ssot__WebpageType__c",
+                    "usageTag": "none"
+                  }
+                ]
+              },
+              {
+                "name": "Survey_Response__dlm",
+                "label": "Survey Response",
+                "type": "custom",
+                "categoryDevName": "Engagement",
+                "recencyCriteria": [
+                  {
+                    "devName": "Skywave_Customers_Survey_Response",
+                    "fieldLabel": "Event Date Time",
+                    "fieldName": "EventDateTime__c",
+                    "value": 7,
+                    "valueType": "time",
+                    "valueUnit": "DAY"
+                  },
+                  {
+                    "devName": "Skywave_Customers_Survey_Response",
+                    "fieldLabel": "Event Date Time",
+                    "fieldName": "EventDateTime__c",
+                    "value": 10,
+                    "valueType": "record",
+                    "valueUnit": "RECORD"
+                  }
+                ],
+                "fields": [
+                  {
+                    "dataType": "Text",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": false,
+                    "isProjected": true,
+                    "name": "Skywave_Customers_Survey_Respo_pHXiCtrL",
+                    "sourceFieldLabel": "Answer Key",
+                    "sourceFieldName": "AnswerKey__c",
+                    "usageTag": "none"
+                  },
+                  {
+                    "dataType": "Text",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": false,
+                    "isProjected": true,
+                    "name": "Skywave_Customers_Survey_Respo_JFWmRPSV",
+                    "sourceFieldLabel": "Answer Text",
+                    "sourceFieldName": "AnswerText__c",
+                    "usageTag": "none"
+                  },
+                  {
+                    "dataType": "DateTime",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": false,
+                    "isProjected": true,
+                    "name": "Skywave_Customers_Survey_Respo_uUUscUIq",
+                    "sourceFieldLabel": "Event Date Time",
+                    "sourceFieldName": "EventDateTime__c",
+                    "usageTag": "none"
+                  },
+                  {
+                    "dataType": "Text",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": false,
+                    "isProjected": true,
+                    "name": "Skywave_Customers_Survey_Respo_DRkumvaL",
+                    "sourceFieldLabel": "Key Qualifier Session Id",
+                    "sourceFieldName": "KQ_SessionId__c",
+                    "usageTag": "key_qualifier"
+                  },
+                  {
+                    "dataType": "Text",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": false,
+                    "isProjected": true,
+                    "name": "Skywave_Customers_Survey_Response_KQ_Id",
+                    "sourceFieldLabel": "Key Qualifier Survey Response Id",
+                    "sourceFieldName": "KQ_Id__c",
+                    "usageTag": "key_qualifier"
+                  },
+                  {
+                    "dataType": "Text",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": false,
+                    "isProjected": true,
+                    "name": "Skywave_Customers_Survey_Respo_tgmyjeIB",
+                    "sourceFieldLabel": "Question Key",
+                    "sourceFieldName": "QuestionKey__c",
+                    "usageTag": "none"
+                  },
+                  {
+                    "dataType": "Text",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": false,
+                    "isProjected": true,
+                    "name": "Skywave_Customers_Survey_Respo_kakTvBLL",
+                    "sourceFieldLabel": "Question Text",
+                    "sourceFieldName": "QuestionText__c",
+                    "usageTag": "none"
+                  },
+                  {
+                    "dataType": "Text",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": false,
+                    "isProjected": true,
+                    "keyQualifierName": "KQ_SessionId__c",
+                    "name": "Skywave_Customers_Survey_Respo_akrNNmKX",
+                    "sourceFieldLabel": "Session Id",
+                    "sourceFieldName": "SessionId__c",
+                    "usageTag": "none"
+                  },
+                  {
+                    "dataType": "Text",
+                    "fieldRoles": [],
+                    "isDGRootKeyField": false,
+                    "isKeyColumn": true,
+                    "isProjected": true,
+                    "keyQualifierName": "KQ_Id__c",
+                    "name": "Skywave_Customers_Survey_Response_Id",
+                    "sourceFieldLabel": "Survey Response Id",
+                    "sourceFieldName": "Id__c",
+                    "usageTag": "none"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

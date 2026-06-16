@@ -1,0 +1,7 @@
+{
+  "cardinality": "ManyToOne",
+  "sourceObject": "Survey_Response__dlm",
+  "sourceField": "SessionId__c",
+  "targetObject": "ssot__Individual__dlm",
+  "targetField": "ssot__Id__c"
+}

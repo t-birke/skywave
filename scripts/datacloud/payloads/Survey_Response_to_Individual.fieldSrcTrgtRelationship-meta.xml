@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Custom DMO relationship: Survey_Response__dlm.SessionId__c → ssot__Individual__dlm.ssot__Id__c
+     (ManyToOne). LOAD-BEARING: the Skywave_Customers RT data graph attaches the
+     Survey_Response node under Individual via this link; without it the DG build
+     400s "Participating DMOs are not related". Deployed via the Metadata API
+     because the REST POST /ssot/data-model-objects/{dmo}/relationships returns
+     UNKNOWN_EXCEPTION. lookupFieldName is OMITTED so the platform mints the
+     companion lookup field (the live si one carried an epoch-suffixed name;
+     a fresh deploy lets the platform name it deterministically). -->
+<FieldSrcTrgtRelationship xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <definitionCreationType>Custom</definitionCreationType>
+    <masterLabel>Survey_Response SessionId map Individual ssot Id</masterLabel>
+    <owner>DataCloud</owner>
+    <relationshipCardinality>ManyToOne</relationshipCardinality>
+    <sourceFieldName>Survey_Response__dlm.SessionId__c</sourceFieldName>
+    <targetEntity xsi:nil="true"/>
+    <targetFieldName>ssot__Individual__dlm.ssot__Id__c</targetFieldName>
+</FieldSrcTrgtRelationship>

@@ -1,0 +1,681 @@
+{
+  "schemas": [
+    {
+      "availabilityStatus": "In Use",
+      "category": "Engagement",
+      "fields": [
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "category",
+          "name": "category",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "DateTime",
+          "isDataRequired": true,
+          "label": "dateTime",
+          "name": "dateTime",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "deviceId",
+          "name": "deviceId",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "eventId",
+          "name": "eventId",
+          "primaryIndexOrder": 1
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "eventType",
+          "name": "eventType",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "id",
+          "name": "id",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "interactionName",
+          "name": "interactionName",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Number",
+          "isDataRequired": false,
+          "label": "pageView",
+          "name": "pageView",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "personalizationContentId",
+          "name": "personalizationContentId",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "personalizationId",
+          "name": "personalizationId",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "sessionId",
+          "name": "sessionId",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourceChannel",
+          "name": "sourceChannel",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourceLocale",
+          "name": "sourceLocale",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourcePageType",
+          "name": "sourcePageType",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourceUrl",
+          "name": "sourceUrl",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourceUrlReferrer",
+          "name": "sourceUrlReferrer",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "type",
+          "name": "type",
+          "primaryIndexOrder": 0
+        }
+      ],
+      "label": "Catalog",
+      "name": "catalog",
+      "schemaType": "StreamingApp"
+    },
+    {
+      "availabilityStatus": "In Use",
+      "category": "Engagement",
+      "fields": [
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "category",
+          "name": "category",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "DateTime",
+          "isDataRequired": true,
+          "label": "dateTime",
+          "name": "dateTime",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "deviceId",
+          "name": "deviceId",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "eventId",
+          "name": "eventId",
+          "primaryIndexOrder": 1
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "eventType",
+          "name": "eventType",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "provider",
+          "name": "provider",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "purpose",
+          "name": "purpose",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "sessionId",
+          "name": "sessionId",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "status",
+          "name": "status",
+          "primaryIndexOrder": 0
+        }
+      ],
+      "label": "Consent",
+      "name": "consentLog",
+      "schemaType": "StreamingApp"
+    },
+    {
+      "availabilityStatus": "In Use",
+      "category": "Profile",
+      "fields": [
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "category",
+          "name": "category",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "DateTime",
+          "isDataRequired": true,
+          "label": "dateTime",
+          "name": "dateTime",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "deviceId",
+          "name": "deviceId",
+          "primaryIndexOrder": 1
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "email",
+          "name": "email",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "eventId",
+          "name": "eventId",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "eventType",
+          "name": "eventType",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Number",
+          "isDataRequired": false,
+          "label": "pageView",
+          "name": "pageView",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "sessionId",
+          "name": "sessionId",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourceChannel",
+          "name": "sourceChannel",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourceLocale",
+          "name": "sourceLocale",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourcePageType",
+          "name": "sourcePageType",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourceUrl",
+          "name": "sourceUrl",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourceUrlReferrer",
+          "name": "sourceUrlReferrer",
+          "primaryIndexOrder": 0
+        }
+      ],
+      "label": "Contact Point Email",
+      "name": "contactPointEmail",
+      "schemaType": "StreamingApp"
+    },
+    {
+      "availabilityStatus": "In Use",
+      "category": "Profile",
+      "fields": [
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "addressLine1",
+          "name": "addressLine1",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "addressLine2",
+          "name": "addressLine2",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "addressLine3",
+          "name": "addressLine3",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "addressLine4",
+          "name": "addressLine4",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "category",
+          "name": "category",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "city",
+          "name": "city",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "country",
+          "name": "country",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "DateTime",
+          "isDataRequired": true,
+          "label": "dateTime",
+          "name": "dateTime",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "deviceId",
+          "name": "deviceId",
+          "primaryIndexOrder": 1
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "email",
+          "name": "email",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "eventId",
+          "name": "eventId",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "eventType",
+          "name": "eventType",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "firstName",
+          "name": "firstName",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "isAnonymous",
+          "name": "isAnonymous",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "lastName",
+          "name": "lastName",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Number",
+          "isDataRequired": false,
+          "label": "pageView",
+          "name": "pageView",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "phoneNumber",
+          "name": "phoneNumber",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "postalCode",
+          "name": "postalCode",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "sessionId",
+          "name": "sessionId",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourceChannel",
+          "name": "sourceChannel",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourceLocale",
+          "name": "sourceLocale",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourcePageType",
+          "name": "sourcePageType",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourceUrl",
+          "name": "sourceUrl",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourceUrlReferrer",
+          "name": "sourceUrlReferrer",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "stateProvince",
+          "name": "stateProvince",
+          "primaryIndexOrder": 0
+        }
+      ],
+      "label": "Identity",
+      "name": "identity",
+      "schemaType": "StreamingApp"
+    },
+    {
+      "availabilityStatus": "In Use",
+      "category": "Profile",
+      "fields": [
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "category",
+          "name": "category",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "DateTime",
+          "isDataRequired": true,
+          "label": "dateTime",
+          "name": "dateTime",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "deviceId",
+          "name": "deviceId",
+          "primaryIndexOrder": 1
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "eventId",
+          "name": "eventId",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "eventType",
+          "name": "eventType",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "IDName",
+          "name": "IDName",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "IDType",
+          "name": "IDType",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Number",
+          "isDataRequired": false,
+          "label": "pageView",
+          "name": "pageView",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "sessionId",
+          "name": "sessionId",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourceChannel",
+          "name": "sourceChannel",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourceLocale",
+          "name": "sourceLocale",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourcePageType",
+          "name": "sourcePageType",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourceUrl",
+          "name": "sourceUrl",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": false,
+          "label": "sourceUrlReferrer",
+          "name": "sourceUrlReferrer",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "userId",
+          "name": "userId",
+          "primaryIndexOrder": 0
+        }
+      ],
+      "label": "Party Identification",
+      "name": "partyIdentification",
+      "schemaType": "StreamingApp"
+    },
+    {
+      "availabilityStatus": "In Use",
+      "category": "Engagement",
+      "fields": [
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "Answer",
+          "name": "attributesAnswer",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "Answer Key",
+          "name": "attributesAnswerKey",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "Question",
+          "name": "attributesQuestion",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "Question Key",
+          "name": "attributesQuestionKey",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "category",
+          "name": "category",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "DateTime",
+          "isDataRequired": true,
+          "label": "dateTime",
+          "name": "dateTime",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "deviceId",
+          "name": "deviceId",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "eventId",
+          "name": "eventId",
+          "primaryIndexOrder": 1
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "eventType",
+          "name": "eventType",
+          "primaryIndexOrder": 0
+        },
+        {
+          "dataType": "Text",
+          "isDataRequired": true,
+          "label": "sessionId",
+          "name": "sessionId",
+          "primaryIndexOrder": 0
+        }
+      ],
+      "label": "User Profiling Event",
+      "name": "userProfiling",
+      "schemaType": "StreamingApp"
+    }
+  ]
+}

@@ -76,3 +76,4 @@ docs/ecv2-reference/raw-assets/init.min.css
 docs/ecv2-reference/raw-assets/embedded-messaging-styling.min.css
 docs/ecv2-reference/raw-assets/iframe-shell.html
 docs/ecv2-reference/raw-assets/*-extract.txt
+__pycache__/

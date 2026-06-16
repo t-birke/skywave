@@ -1,0 +1,52 @@
+{
+  "objectSourceTargetMaps": [
+    {
+      "developerName": "skywave_app_Behavioral_Events_F0A96086_map_PrivacyConsentLog_1779097401315",
+      "fieldMappings": [
+        {
+          "developerName": "eventId__c_fieldmap_ssot__Id__c",
+          "sourceFieldDeveloperName": "eventId__c",
+          "targetFieldDeveloperName": "ssot__Id__c"
+        },
+        {
+          "developerName": "KQ_eventId__c_fieldmap_KQ_Id__c",
+          "sourceFieldDeveloperName": "KQ_eventId__c",
+          "targetFieldDeveloperName": "KQ_Id__c"
+        },
+        {
+          "developerName": "dateTime__c_fieldmap_ssot__PrivacyConsentActivityDttm__c",
+          "sourceFieldDeveloperName": "dateTime__c",
+          "targetFieldDeveloperName": "ssot__PrivacyConsentActivityDttm__c"
+        },
+        {
+          "developerName": "DataSource__c_fieldmap_ssot__DataSourceId__c",
+          "sourceFieldDeveloperName": "DataSource__c",
+          "targetFieldDeveloperName": "ssot__DataSourceId__c"
+        },
+        {
+          "developerName": "consentLog_provider__c_fieldmap_ssot__ExternalSourceId__c",
+          "sourceFieldDeveloperName": "consentLog_provider__c",
+          "targetFieldDeveloperName": "ssot__ExternalSourceId__c"
+        },
+        {
+          "developerName": "DataSourceObject__c_fieldmap_ssot__DataSourceObjectId__c",
+          "sourceFieldDeveloperName": "DataSourceObject__c",
+          "targetFieldDeveloperName": "ssot__DataSourceObjectId__c"
+        },
+        {
+          "developerName": "deviceId__c_fieldmap_ssot__ExternalRecordId__c",
+          "sourceFieldDeveloperName": "deviceId__c",
+          "targetFieldDeveloperName": "ssot__ExternalRecordId__c"
+        },
+        {
+          "developerName": "eventType__c_fieldmap_ssot__ConsentTriggeringEventTypeId__c",
+          "sourceFieldDeveloperName": "eventType__c",
+          "targetFieldDeveloperName": "ssot__ConsentTriggeringEventTypeId__c"
+        }
+      ],
+      "sourceEntityDeveloperName": "skywave_app_Behavioral_Events_F0A96086__dll",
+      "status": "ACTIVE",
+      "targetEntityDeveloperName": "ssot__PrivacyConsentLog__dlm"
+    }
+  ]
+}

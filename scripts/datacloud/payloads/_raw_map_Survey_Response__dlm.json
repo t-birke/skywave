@@ -1,0 +1,77 @@
+{
+  "objectSourceTargetMaps": [
+    {
+      "developerName": "skywave_app_Behavioral_Events_F0A96086_map_Survey_Response_1779104233235",
+      "fieldMappings": [
+        {
+          "developerName": "eventId__c_fieldmap_Id__c",
+          "sourceFieldDeveloperName": "eventId__c",
+          "targetFieldDeveloperName": "Id__c"
+        },
+        {
+          "developerName": "KQ_eventId__c_fieldmap_KQ_Id__c",
+          "sourceFieldDeveloperName": "KQ_eventId__c",
+          "targetFieldDeveloperName": "KQ_Id__c"
+        },
+        {
+          "developerName": "dateTime__c_fieldmap_EventDateTime__c",
+          "sourceFieldDeveloperName": "dateTime__c",
+          "targetFieldDeveloperName": "EventDateTime__c"
+        },
+        {
+          "developerName": "DataSource__c_fieldmap_DataSource__c",
+          "sourceFieldDeveloperName": "DataSource__c",
+          "targetFieldDeveloperName": "DataSource__c"
+        },
+        {
+          "developerName": "userProfiling_attributesAnswer__c_fieldmap_AnswerText__c",
+          "sourceFieldDeveloperName": "userProfiling_attributesAnswer__c",
+          "targetFieldDeveloperName": "AnswerText__c"
+        },
+        {
+          "developerName": "sessionId__c_fieldmap_SessionId__c",
+          "sourceFieldDeveloperName": "sessionId__c",
+          "targetFieldDeveloperName": "SessionId__c"
+        },
+        {
+          "developerName": "DataSourceObject__c_fieldmap_DataSourceObject__c",
+          "sourceFieldDeveloperName": "DataSourceObject__c",
+          "targetFieldDeveloperName": "DataSourceObject__c"
+        },
+        {
+          "developerName": "userProfiling_attributesAnswerKey__c_fieldmap_AnswerKey__c",
+          "sourceFieldDeveloperName": "userProfiling_attributesAnswerKey__c",
+          "targetFieldDeveloperName": "AnswerKey__c"
+        },
+        {
+          "developerName": "userProfiling_attributesQuestion__c_fieldmap_QuestionText__c",
+          "sourceFieldDeveloperName": "userProfiling_attributesQuestion__c",
+          "targetFieldDeveloperName": "QuestionText__c"
+        },
+        {
+          "developerName": "userProfiling_attributesQuestionKey__c_fieldmap_QuestionKey__c",
+          "sourceFieldDeveloperName": "userProfiling_attributesQuestionKey__c",
+          "targetFieldDeveloperName": "QuestionKey__c"
+        },
+        {
+          "developerName": "deviceId__c_fieldmap_DeviceId__c",
+          "sourceFieldDeveloperName": "deviceId__c",
+          "targetFieldDeveloperName": "DeviceId__c"
+        },
+        {
+          "developerName": "eventType__c_fieldmap_EngagementType__c",
+          "sourceFieldDeveloperName": "eventType__c",
+          "targetFieldDeveloperName": "EngagementType__c"
+        },
+        {
+          "developerName": "KQ_sessionId__c_fieldmap_KQ_SessionId__c",
+          "sourceFieldDeveloperName": "KQ_sessionId__c",
+          "targetFieldDeveloperName": "KQ_SessionId__c"
+        }
+      ],
+      "sourceEntityDeveloperName": "skywave_app_Behavioral_Events_F0A96086__dll",
+      "status": "ACTIVE",
+      "targetEntityDeveloperName": "Survey_Response__dlm"
+    }
+  ]
+}

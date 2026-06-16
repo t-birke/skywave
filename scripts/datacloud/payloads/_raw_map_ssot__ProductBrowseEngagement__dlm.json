@@ -1,0 +1,92 @@
+{
+  "objectSourceTargetMaps": [
+    {
+      "developerName": "skywave_app_Behavioral_Events_F0A96086_map_ProductBrowseEngagement_1779097474392",
+      "fieldMappings": [
+        {
+          "developerName": "eventId__c_fieldmap_ssot__Id__c",
+          "sourceFieldDeveloperName": "eventId__c",
+          "targetFieldDeveloperName": "ssot__Id__c"
+        },
+        {
+          "developerName": "KQ_eventId__c_fieldmap_KQ_Id__c",
+          "sourceFieldDeveloperName": "KQ_eventId__c",
+          "targetFieldDeveloperName": "KQ_Id__c"
+        },
+        {
+          "developerName": "catalog_sourceUrl__c_fieldmap_ssot__PageURL__c",
+          "sourceFieldDeveloperName": "catalog_sourceUrl__c",
+          "targetFieldDeveloperName": "ssot__PageURL__c"
+        },
+        {
+          "developerName": "catalog_interactionName__c_fieldmap_ssot__Name__c",
+          "sourceFieldDeveloperName": "catalog_interactionName__c",
+          "targetFieldDeveloperName": "ssot__Name__c"
+        },
+        {
+          "developerName": "dateTime__c_fieldmap_ssot__EngagementDateTm__c",
+          "sourceFieldDeveloperName": "dateTime__c",
+          "targetFieldDeveloperName": "ssot__EngagementDateTm__c"
+        },
+        {
+          "developerName": "catalog_sourceUrlReferrer__c_fieldmap_ssot__ReferrerURL__c",
+          "sourceFieldDeveloperName": "catalog_sourceUrlReferrer__c",
+          "targetFieldDeveloperName": "ssot__ReferrerURL__c"
+        },
+        {
+          "developerName": "catalog_id__c_fieldmap_ssot__PageId__c",
+          "sourceFieldDeveloperName": "catalog_id__c",
+          "targetFieldDeveloperName": "ssot__PageId__c"
+        },
+        {
+          "developerName": "DataSource__c_fieldmap_ssot__DataSourceId__c",
+          "sourceFieldDeveloperName": "DataSource__c",
+          "targetFieldDeveloperName": "ssot__DataSourceId__c"
+        },
+        {
+          "developerName": "catalog_type__c_fieldmap_ssot__WebpageType__c",
+          "sourceFieldDeveloperName": "catalog_type__c",
+          "targetFieldDeveloperName": "ssot__WebpageType__c"
+        },
+        {
+          "developerName": "sessionId__c_fieldmap_ssot__SessionId__c",
+          "sourceFieldDeveloperName": "sessionId__c",
+          "targetFieldDeveloperName": "ssot__SessionId__c"
+        },
+        {
+          "developerName": "DataSourceObject__c_fieldmap_ssot__DataSourceObjectId__c",
+          "sourceFieldDeveloperName": "DataSourceObject__c",
+          "targetFieldDeveloperName": "ssot__DataSourceObjectId__c"
+        },
+        {
+          "developerName": "catalog_sourcePageType__c_fieldmap_ssot__PageName__c",
+          "sourceFieldDeveloperName": "catalog_sourcePageType__c",
+          "targetFieldDeveloperName": "ssot__PageName__c"
+        },
+        {
+          "developerName": "deviceId__c_fieldmap_ssot__WebCookieId__c",
+          "sourceFieldDeveloperName": "deviceId__c",
+          "targetFieldDeveloperName": "ssot__WebCookieId__c"
+        },
+        {
+          "developerName": "eventType__c_fieldmap_ssot__EngagementTypeId__c",
+          "sourceFieldDeveloperName": "eventType__c",
+          "targetFieldDeveloperName": "ssot__EngagementTypeId__c"
+        },
+        {
+          "developerName": "eventType__c_fieldmap_ssot__EngagementTypeId__c",
+          "sourceFieldDeveloperName": "eventType__c",
+          "targetFieldDeveloperName": "ssot__EngagementTypeId__c"
+        },
+        {
+          "developerName": "KQ_sessionId__c_fieldmap_KQ_SessionId__c",
+          "sourceFieldDeveloperName": "KQ_sessionId__c",
+          "targetFieldDeveloperName": "KQ_SessionId__c"
+        }
+      ],
+      "sourceEntityDeveloperName": "skywave_app_Behavioral_Events_F0A96086__dll",
+      "status": "ACTIVE",
+      "targetEntityDeveloperName": "ssot__ProductBrowseEngagement__dlm"
+    }
+  ]
+}

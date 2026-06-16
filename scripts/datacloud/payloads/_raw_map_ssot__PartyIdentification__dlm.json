@@ -1,0 +1,67 @@
+{
+  "objectSourceTargetMaps": [
+    {
+      "developerName": "skywave_app_partyIdentification_920CD48D_map_PartyIdentification_1779151416957",
+      "fieldMappings": [
+        {
+          "developerName": "eventId__c_fieldmap_ssot__CreationEventId__c",
+          "sourceFieldDeveloperName": "eventId__c",
+          "targetFieldDeveloperName": "ssot__CreationEventId__c"
+        },
+        {
+          "developerName": "eventId__c_fieldmap_ssot__Id__c",
+          "sourceFieldDeveloperName": "eventId__c",
+          "targetFieldDeveloperName": "ssot__Id__c"
+        },
+        {
+          "developerName": "KQ_eventId__c_fieldmap_KQ_Id__c",
+          "sourceFieldDeveloperName": "KQ_eventId__c",
+          "targetFieldDeveloperName": "KQ_Id__c"
+        },
+        {
+          "developerName": "userId__c_fieldmap_ssot__IdentificationNumber__c",
+          "sourceFieldDeveloperName": "userId__c",
+          "targetFieldDeveloperName": "ssot__IdentificationNumber__c"
+        },
+        {
+          "developerName": "IDName__c_fieldmap_ssot__Name__c",
+          "sourceFieldDeveloperName": "IDName__c",
+          "targetFieldDeveloperName": "ssot__Name__c"
+        },
+        {
+          "developerName": "dateTime__c_fieldmap_ssot__CreatedDate__c",
+          "sourceFieldDeveloperName": "dateTime__c",
+          "targetFieldDeveloperName": "ssot__CreatedDate__c"
+        },
+        {
+          "developerName": "DataSource__c_fieldmap_ssot__DataSourceId__c",
+          "sourceFieldDeveloperName": "DataSource__c",
+          "targetFieldDeveloperName": "ssot__DataSourceId__c"
+        },
+        {
+          "developerName": "DataSourceObject__c_fieldmap_ssot__DataSourceObjectId__c",
+          "sourceFieldDeveloperName": "DataSourceObject__c",
+          "targetFieldDeveloperName": "ssot__DataSourceObjectId__c"
+        },
+        {
+          "developerName": "IDType__c_fieldmap_ssot__PartyIdentificationTypeId__c",
+          "sourceFieldDeveloperName": "IDType__c",
+          "targetFieldDeveloperName": "ssot__PartyIdentificationTypeId__c"
+        },
+        {
+          "developerName": "deviceId__c_fieldmap_ssot__PartyId__c",
+          "sourceFieldDeveloperName": "deviceId__c",
+          "targetFieldDeveloperName": "ssot__PartyId__c"
+        },
+        {
+          "developerName": "KQ_deviceId__c_fieldmap_KQ_PartyId__c",
+          "sourceFieldDeveloperName": "KQ_deviceId__c",
+          "targetFieldDeveloperName": "KQ_PartyId__c"
+        }
+      ],
+      "sourceEntityDeveloperName": "skywave_app_partyIdentification_920CD48D__dll",
+      "status": "ACTIVE",
+      "targetEntityDeveloperName": "ssot__PartyIdentification__dlm"
+    }
+  ]
+}

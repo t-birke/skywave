@@ -1,0 +1,258 @@
+{
+  "objectSourceTargetMaps": [
+    {
+      "developerName": "Lead_Home_map_Individual_1778877117618",
+      "fieldMappings": [
+        {
+          "developerName": "Salutation__c_fieldmap_ssot__Salutation__c",
+          "sourceFieldDeveloperName": "Salutation__c",
+          "targetFieldDeveloperName": "ssot__Salutation__c"
+        },
+        {
+          "developerName": "SfdcOrganizationId__c_fieldmap_ssot__ExternalSourceId__c",
+          "sourceFieldDeveloperName": "SfdcOrganizationId__c",
+          "targetFieldDeveloperName": "ssot__ExternalSourceId__c"
+        },
+        {
+          "developerName": "CreatedDate__c_fieldmap_ssot__CreatedDate__c",
+          "sourceFieldDeveloperName": "CreatedDate__c",
+          "targetFieldDeveloperName": "ssot__CreatedDate__c"
+        },
+        {
+          "developerName": "Name__c_fieldmap_ssot__PersonName__c",
+          "sourceFieldDeveloperName": "Name__c",
+          "targetFieldDeveloperName": "ssot__PersonName__c"
+        },
+        {
+          "developerName": "ConvertedAccountId__c_fieldmap_ssot__PrimaryAccountId__c",
+          "sourceFieldDeveloperName": "ConvertedAccountId__c",
+          "targetFieldDeveloperName": "ssot__PrimaryAccountId__c"
+        },
+        {
+          "developerName": "DataSource__c_fieldmap_ssot__DataSourceId__c",
+          "sourceFieldDeveloperName": "DataSource__c",
+          "targetFieldDeveloperName": "ssot__DataSourceId__c"
+        },
+        {
+          "developerName": "LastName__c_fieldmap_ssot__LastName__c",
+          "sourceFieldDeveloperName": "LastName__c",
+          "targetFieldDeveloperName": "ssot__LastName__c"
+        },
+        {
+          "developerName": "DataSourceObject__c_fieldmap_ssot__DataSourceObjectId__c",
+          "sourceFieldDeveloperName": "DataSourceObject__c",
+          "targetFieldDeveloperName": "ssot__DataSourceObjectId__c"
+        },
+        {
+          "developerName": "Id__c_fieldmap_ssot__Id__c",
+          "sourceFieldDeveloperName": "Id__c",
+          "targetFieldDeveloperName": "ssot__Id__c"
+        },
+        {
+          "developerName": "KQ_Id__c_fieldmap_KQ_Id__c",
+          "sourceFieldDeveloperName": "KQ_Id__c",
+          "targetFieldDeveloperName": "KQ_Id__c"
+        },
+        {
+          "developerName": "Id__c_fieldmap_ssot__ExternalRecordId__c",
+          "sourceFieldDeveloperName": "Id__c",
+          "targetFieldDeveloperName": "ssot__ExternalRecordId__c"
+        },
+        {
+          "developerName": "PhotoUrl__c_fieldmap_ssot__PhotoURL__c",
+          "sourceFieldDeveloperName": "PhotoUrl__c",
+          "targetFieldDeveloperName": "ssot__PhotoURL__c"
+        },
+        {
+          "developerName": "LastModifiedDate__c_fieldmap_ssot__LastModifiedDate__c",
+          "sourceFieldDeveloperName": "LastModifiedDate__c",
+          "targetFieldDeveloperName": "ssot__LastModifiedDate__c"
+        },
+        {
+          "developerName": "FirstName__c_fieldmap_ssot__FirstName__c",
+          "sourceFieldDeveloperName": "FirstName__c",
+          "targetFieldDeveloperName": "ssot__FirstName__c"
+        },
+        {
+          "developerName": "KQ_ConvertedAccountId__c_fieldmap_KQ_PrimaryAccountId__c",
+          "sourceFieldDeveloperName": "KQ_ConvertedAccountId__c",
+          "targetFieldDeveloperName": "KQ_PrimaryAccountId__c"
+        }
+      ],
+      "sourceEntityDeveloperName": "Lead_Home__dll",
+      "status": "ACTIVE",
+      "targetEntityDeveloperName": "ssot__Individual__dlm"
+    },
+    {
+      "developerName": "Contact_Home_map_Individual_1778877159931",
+      "fieldMappings": [
+        {
+          "developerName": "AccountId__c_fieldmap_ssot__PrimaryAccountId__c",
+          "sourceFieldDeveloperName": "AccountId__c",
+          "targetFieldDeveloperName": "ssot__PrimaryAccountId__c"
+        },
+        {
+          "developerName": "Name__c_fieldmap_ssot__PersonName__c",
+          "sourceFieldDeveloperName": "Name__c",
+          "targetFieldDeveloperName": "ssot__PersonName__c"
+        },
+        {
+          "developerName": "Birthdate__c_fieldmap_ssot__BirthDate__c",
+          "sourceFieldDeveloperName": "Birthdate__c",
+          "targetFieldDeveloperName": "ssot__BirthDate__c"
+        },
+        {
+          "developerName": "DeceasedDate__c_fieldmap_ssot__DeathDate__c",
+          "sourceFieldDeveloperName": "DeceasedDate__c",
+          "targetFieldDeveloperName": "ssot__DeathDate__c"
+        },
+        {
+          "developerName": "GenderIdentity__c_fieldmap_ssot__GenderIdentity__c",
+          "sourceFieldDeveloperName": "GenderIdentity__c",
+          "targetFieldDeveloperName": "ssot__GenderIdentity__c"
+        },
+        {
+          "developerName": "Gender__c_fieldmap_ssot__GenderId__c",
+          "sourceFieldDeveloperName": "Gender__c",
+          "targetFieldDeveloperName": "ssot__GenderId__c"
+        },
+        {
+          "developerName": "Title__c_fieldmap_ssot__TitleName__c",
+          "sourceFieldDeveloperName": "Title__c",
+          "targetFieldDeveloperName": "ssot__TitleName__c"
+        },
+        {
+          "developerName": "Pronouns__c_fieldmap_ssot__Pronoun__c",
+          "sourceFieldDeveloperName": "Pronouns__c",
+          "targetFieldDeveloperName": "ssot__Pronoun__c"
+        },
+        {
+          "developerName": "Salutation__c_fieldmap_ssot__Salutation__c",
+          "sourceFieldDeveloperName": "Salutation__c",
+          "targetFieldDeveloperName": "ssot__Salutation__c"
+        },
+        {
+          "developerName": "CreatedDate__c_fieldmap_ssot__CreatedDate__c",
+          "sourceFieldDeveloperName": "CreatedDate__c",
+          "targetFieldDeveloperName": "ssot__CreatedDate__c"
+        },
+        {
+          "developerName": "SfdcOrganizationId__c_fieldmap_ssot__ExternalSourceId__c",
+          "sourceFieldDeveloperName": "SfdcOrganizationId__c",
+          "targetFieldDeveloperName": "ssot__ExternalSourceId__c"
+        },
+        {
+          "developerName": "DataSource__c_fieldmap_ssot__DataSourceId__c",
+          "sourceFieldDeveloperName": "DataSource__c",
+          "targetFieldDeveloperName": "ssot__DataSourceId__c"
+        },
+        {
+          "developerName": "LastName__c_fieldmap_ssot__LastName__c",
+          "sourceFieldDeveloperName": "LastName__c",
+          "targetFieldDeveloperName": "ssot__LastName__c"
+        },
+        {
+          "developerName": "DataSourceObject__c_fieldmap_ssot__DataSourceObjectId__c",
+          "sourceFieldDeveloperName": "DataSourceObject__c",
+          "targetFieldDeveloperName": "ssot__DataSourceObjectId__c"
+        },
+        {
+          "developerName": "Id__c_fieldmap_ssot__Id__c",
+          "sourceFieldDeveloperName": "Id__c",
+          "targetFieldDeveloperName": "ssot__Id__c"
+        },
+        {
+          "developerName": "KQ_Id__c_fieldmap_KQ_Id__c",
+          "sourceFieldDeveloperName": "KQ_Id__c",
+          "targetFieldDeveloperName": "KQ_Id__c"
+        },
+        {
+          "developerName": "Id__c_fieldmap_ssot__ExternalRecordId__c",
+          "sourceFieldDeveloperName": "Id__c",
+          "targetFieldDeveloperName": "ssot__ExternalRecordId__c"
+        },
+        {
+          "developerName": "PhotoUrl__c_fieldmap_ssot__PhotoURL__c",
+          "sourceFieldDeveloperName": "PhotoUrl__c",
+          "targetFieldDeveloperName": "ssot__PhotoURL__c"
+        },
+        {
+          "developerName": "LastModifiedDate__c_fieldmap_ssot__LastModifiedDate__c",
+          "sourceFieldDeveloperName": "LastModifiedDate__c",
+          "targetFieldDeveloperName": "ssot__LastModifiedDate__c"
+        },
+        {
+          "developerName": "FirstName__c_fieldmap_ssot__FirstName__c",
+          "sourceFieldDeveloperName": "FirstName__c",
+          "targetFieldDeveloperName": "ssot__FirstName__c"
+        },
+        {
+          "developerName": "KQ_AccountId__c_fieldmap_KQ_PrimaryAccountId__c",
+          "sourceFieldDeveloperName": "KQ_AccountId__c",
+          "targetFieldDeveloperName": "KQ_PrimaryAccountId__c"
+        }
+      ],
+      "sourceEntityDeveloperName": "Contact_Home__dll",
+      "status": "ACTIVE",
+      "targetEntityDeveloperName": "ssot__Individual__dlm"
+    },
+    {
+      "developerName": "skywave_app_identity_8D2D3E28_map_Individual_1779096712696",
+      "fieldMappings": [
+        {
+          "developerName": "eventId__c_fieldmap_ssot__CreationEventId__c",
+          "sourceFieldDeveloperName": "eventId__c",
+          "targetFieldDeveloperName": "ssot__CreationEventId__c"
+        },
+        {
+          "developerName": "lastName__c_fieldmap_ssot__LastName__c",
+          "sourceFieldDeveloperName": "lastName__c",
+          "targetFieldDeveloperName": "ssot__LastName__c"
+        },
+        {
+          "developerName": "dateTime__c_fieldmap_ssot__CreatedDate__c",
+          "sourceFieldDeveloperName": "dateTime__c",
+          "targetFieldDeveloperName": "ssot__CreatedDate__c"
+        },
+        {
+          "developerName": "firstName__c_fieldmap_ssot__FirstName__c",
+          "sourceFieldDeveloperName": "firstName__c",
+          "targetFieldDeveloperName": "ssot__FirstName__c"
+        },
+        {
+          "developerName": "DataSource__c_fieldmap_ssot__DataSourceId__c",
+          "sourceFieldDeveloperName": "DataSource__c",
+          "targetFieldDeveloperName": "ssot__DataSourceId__c"
+        },
+        {
+          "developerName": "isAnonymous__c_fieldmap_ssot__IsAnonymous__c",
+          "sourceFieldDeveloperName": "isAnonymous__c",
+          "targetFieldDeveloperName": "ssot__IsAnonymous__c"
+        },
+        {
+          "developerName": "DataSourceObject__c_fieldmap_ssot__DataSourceObjectId__c",
+          "sourceFieldDeveloperName": "DataSourceObject__c",
+          "targetFieldDeveloperName": "ssot__DataSourceObjectId__c"
+        },
+        {
+          "developerName": "deviceId__c_fieldmap_ssot__Id__c",
+          "sourceFieldDeveloperName": "deviceId__c",
+          "targetFieldDeveloperName": "ssot__Id__c"
+        },
+        {
+          "developerName": "KQ_deviceId__c_fieldmap_KQ_Id__c",
+          "sourceFieldDeveloperName": "KQ_deviceId__c",
+          "targetFieldDeveloperName": "KQ_Id__c"
+        },
+        {
+          "developerName": "deviceId__c_fieldmap_AnonymousId__c",
+          "sourceFieldDeveloperName": "deviceId__c",
+          "targetFieldDeveloperName": "AnonymousId__c"
+        }
+      ],
+      "sourceEntityDeveloperName": "skywave_app_identity_8D2D3E28__dll",
+      "status": "ACTIVE",
+      "targetEntityDeveloperName": "ssot__Individual__dlm"
+    }
+  ]
+}

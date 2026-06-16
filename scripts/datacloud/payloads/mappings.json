@@ -1,0 +1,308 @@
+{
+  "mappings": [
+    {
+      "targetDmo": "Survey_Response__dlm",
+      "sourceToken": "__web_engagement__",
+      "fieldMappings": [
+        {
+          "sourceFieldDeveloperName": "eventId__c",
+          "targetFieldDeveloperName": "Id__c"
+        },
+        {
+          "sourceFieldDeveloperName": "KQ_eventId__c",
+          "targetFieldDeveloperName": "KQ_Id__c"
+        },
+        {
+          "sourceFieldDeveloperName": "dateTime__c",
+          "targetFieldDeveloperName": "EventDateTime__c"
+        },
+        {
+          "sourceFieldDeveloperName": "DataSource__c",
+          "targetFieldDeveloperName": "DataSource__c"
+        },
+        {
+          "sourceFieldDeveloperName": "userProfiling_attributesAnswer__c",
+          "targetFieldDeveloperName": "AnswerText__c"
+        },
+        {
+          "sourceFieldDeveloperName": "sessionId__c",
+          "targetFieldDeveloperName": "SessionId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "DataSourceObject__c",
+          "targetFieldDeveloperName": "DataSourceObject__c"
+        },
+        {
+          "sourceFieldDeveloperName": "userProfiling_attributesAnswerKey__c",
+          "targetFieldDeveloperName": "AnswerKey__c"
+        },
+        {
+          "sourceFieldDeveloperName": "userProfiling_attributesQuestion__c",
+          "targetFieldDeveloperName": "QuestionText__c"
+        },
+        {
+          "sourceFieldDeveloperName": "userProfiling_attributesQuestionKey__c",
+          "targetFieldDeveloperName": "QuestionKey__c"
+        },
+        {
+          "sourceFieldDeveloperName": "deviceId__c",
+          "targetFieldDeveloperName": "DeviceId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "eventType__c",
+          "targetFieldDeveloperName": "EngagementType__c"
+        },
+        {
+          "sourceFieldDeveloperName": "KQ_sessionId__c",
+          "targetFieldDeveloperName": "KQ_SessionId__c"
+        }
+      ]
+    },
+    {
+      "targetDmo": "ssot__ProductBrowseEngagement__dlm",
+      "sourceToken": "__web_engagement__",
+      "fieldMappings": [
+        {
+          "sourceFieldDeveloperName": "eventId__c",
+          "targetFieldDeveloperName": "ssot__Id__c"
+        },
+        {
+          "sourceFieldDeveloperName": "KQ_eventId__c",
+          "targetFieldDeveloperName": "KQ_Id__c"
+        },
+        {
+          "sourceFieldDeveloperName": "catalog_sourceUrl__c",
+          "targetFieldDeveloperName": "ssot__PageURL__c"
+        },
+        {
+          "sourceFieldDeveloperName": "catalog_interactionName__c",
+          "targetFieldDeveloperName": "ssot__Name__c"
+        },
+        {
+          "sourceFieldDeveloperName": "dateTime__c",
+          "targetFieldDeveloperName": "ssot__EngagementDateTm__c"
+        },
+        {
+          "sourceFieldDeveloperName": "catalog_sourceUrlReferrer__c",
+          "targetFieldDeveloperName": "ssot__ReferrerURL__c"
+        },
+        {
+          "sourceFieldDeveloperName": "catalog_id__c",
+          "targetFieldDeveloperName": "ssot__PageId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "DataSource__c",
+          "targetFieldDeveloperName": "ssot__DataSourceId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "catalog_type__c",
+          "targetFieldDeveloperName": "ssot__WebpageType__c"
+        },
+        {
+          "sourceFieldDeveloperName": "sessionId__c",
+          "targetFieldDeveloperName": "ssot__SessionId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "DataSourceObject__c",
+          "targetFieldDeveloperName": "ssot__DataSourceObjectId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "catalog_sourcePageType__c",
+          "targetFieldDeveloperName": "ssot__PageName__c"
+        },
+        {
+          "sourceFieldDeveloperName": "deviceId__c",
+          "targetFieldDeveloperName": "ssot__WebCookieId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "eventType__c",
+          "targetFieldDeveloperName": "ssot__EngagementTypeId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "eventType__c",
+          "targetFieldDeveloperName": "ssot__EngagementTypeId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "KQ_sessionId__c",
+          "targetFieldDeveloperName": "KQ_SessionId__c"
+        }
+      ]
+    },
+    {
+      "targetDmo": "ssot__PrivacyConsentLog__dlm",
+      "sourceToken": "__web_engagement__",
+      "fieldMappings": [
+        {
+          "sourceFieldDeveloperName": "eventId__c",
+          "targetFieldDeveloperName": "ssot__Id__c"
+        },
+        {
+          "sourceFieldDeveloperName": "KQ_eventId__c",
+          "targetFieldDeveloperName": "KQ_Id__c"
+        },
+        {
+          "sourceFieldDeveloperName": "dateTime__c",
+          "targetFieldDeveloperName": "ssot__PrivacyConsentActivityDttm__c"
+        },
+        {
+          "sourceFieldDeveloperName": "DataSource__c",
+          "targetFieldDeveloperName": "ssot__DataSourceId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "consentLog_provider__c",
+          "targetFieldDeveloperName": "ssot__ExternalSourceId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "DataSourceObject__c",
+          "targetFieldDeveloperName": "ssot__DataSourceObjectId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "deviceId__c",
+          "targetFieldDeveloperName": "ssot__ExternalRecordId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "eventType__c",
+          "targetFieldDeveloperName": "ssot__ConsentTriggeringEventTypeId__c"
+        }
+      ]
+    },
+    {
+      "targetDmo": "ssot__ContactPointEmail__dlm",
+      "sourceToken": "web:contactPointEmail",
+      "fieldMappings": [
+        {
+          "sourceFieldDeveloperName": "eventId__c",
+          "targetFieldDeveloperName": "ssot__CreationEventId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "dateTime__c",
+          "targetFieldDeveloperName": "ssot__CreatedDate__c"
+        },
+        {
+          "sourceFieldDeveloperName": "DataSource__c",
+          "targetFieldDeveloperName": "ssot__DataSourceId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "email__c",
+          "targetFieldDeveloperName": "ssot__EmailAddress__c"
+        },
+        {
+          "sourceFieldDeveloperName": "DataSourceObject__c",
+          "targetFieldDeveloperName": "ssot__DataSourceObjectId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "deviceId__c",
+          "targetFieldDeveloperName": "ssot__Id__c"
+        },
+        {
+          "sourceFieldDeveloperName": "KQ_deviceId__c",
+          "targetFieldDeveloperName": "KQ_Id__c"
+        },
+        {
+          "sourceFieldDeveloperName": "deviceId__c",
+          "targetFieldDeveloperName": "ssot__PartyId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "KQ_deviceId__c",
+          "targetFieldDeveloperName": "KQ_PartyId__c"
+        }
+      ]
+    },
+    {
+      "targetDmo": "ssot__Individual__dlm",
+      "sourceToken": "web:identity",
+      "fieldMappings": [
+        {
+          "sourceFieldDeveloperName": "eventId__c",
+          "targetFieldDeveloperName": "ssot__CreationEventId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "lastName__c",
+          "targetFieldDeveloperName": "ssot__LastName__c"
+        },
+        {
+          "sourceFieldDeveloperName": "dateTime__c",
+          "targetFieldDeveloperName": "ssot__CreatedDate__c"
+        },
+        {
+          "sourceFieldDeveloperName": "firstName__c",
+          "targetFieldDeveloperName": "ssot__FirstName__c"
+        },
+        {
+          "sourceFieldDeveloperName": "DataSource__c",
+          "targetFieldDeveloperName": "ssot__DataSourceId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "isAnonymous__c",
+          "targetFieldDeveloperName": "ssot__IsAnonymous__c"
+        },
+        {
+          "sourceFieldDeveloperName": "DataSourceObject__c",
+          "targetFieldDeveloperName": "ssot__DataSourceObjectId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "deviceId__c",
+          "targetFieldDeveloperName": "ssot__Id__c"
+        },
+        {
+          "sourceFieldDeveloperName": "KQ_deviceId__c",
+          "targetFieldDeveloperName": "KQ_Id__c"
+        },
+        {
+          "sourceFieldDeveloperName": "deviceId__c",
+          "targetFieldDeveloperName": "AnonymousId__c"
+        }
+      ]
+    },
+    {
+      "targetDmo": "ssot__PartyIdentification__dlm",
+      "sourceToken": "web:partyIdentification",
+      "fieldMappings": [
+        {
+          "sourceFieldDeveloperName": "eventId__c",
+          "targetFieldDeveloperName": "ssot__CreationEventId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "eventId__c",
+          "targetFieldDeveloperName": "ssot__Id__c"
+        },
+        {
+          "sourceFieldDeveloperName": "KQ_eventId__c",
+          "targetFieldDeveloperName": "KQ_Id__c"
+        },
+        {
+          "sourceFieldDeveloperName": "userId__c",
+          "targetFieldDeveloperName": "ssot__IdentificationNumber__c"
+        },
+        {
+          "sourceFieldDeveloperName": "IDName__c",
+          "targetFieldDeveloperName": "ssot__Name__c"
+        },
+        {
+          "sourceFieldDeveloperName": "dateTime__c",
+          "targetFieldDeveloperName": "ssot__CreatedDate__c"
+        },
+        {
+          "sourceFieldDeveloperName": "DataSource__c",
+          "targetFieldDeveloperName": "ssot__DataSourceId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "DataSourceObject__c",
+          "targetFieldDeveloperName": "ssot__DataSourceObjectId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "IDType__c",
+          "targetFieldDeveloperName": "ssot__PartyIdentificationTypeId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "deviceId__c",
+          "targetFieldDeveloperName": "ssot__PartyId__c"
+        },
+        {
+          "sourceFieldDeveloperName": "KQ_deviceId__c",
+          "targetFieldDeveloperName": "KQ_PartyId__c"
+        }
+      ]
+    }
+  ]
+}
