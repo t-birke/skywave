@@ -872,7 +872,19 @@ tier3_heroku() {
         ok "derived config vars set"
         # Secret-bearing vars (only if the local secret exists; never echoed).
         [ -f secrets/jwt.key ] && heroku config:set -a "$HEROKU_APP" SF_JWT_PRIVATE_KEY="$(cat secrets/jwt.key)" >/dev/null && ok "SF_JWT_PRIVATE_KEY set"
-        [ -f .secrets/preflight.key ] && heroku config:set -a "$HEROKU_APP" PREFLIGHT_KEY="$(cat .secrets/preflight.key)" >/dev/null && ok "PREFLIGHT_KEY set"
+        if [ -f .secrets/preflight.key ]; then
+            local _pfk; _pfk="$(cat .secrets/preflight.key)"
+            heroku config:set -a "$HEROKU_APP" PREFLIGHT_KEY="$_pfk" >/dev/null && ok "PREFLIGHT_KEY set on Heroku"
+            # Mirror the SAME key into the org's CMD so the preflight callout auth
+            # matches (the key is a secret — never committed to the CMD XML; set
+            # here via the native Metadata API in anonymous Apex). §3g.
+            local _pfapex; _pfapex="$(mktemp -t skywave-pfk.XXXXXX).apex"
+            sed "s#%%PREFLIGHT_KEY%%#${_pfk}#g" scripts/apex/setPreflightKey.apex > "$_pfapex"
+            sf apex run --target-org "$ORG_ALIAS" --file "$_pfapex" >/dev/null 2>&1 \
+                && ok "Preflight_Key__c CMD set in org (matches Heroku)" \
+                || warn "could not set Preflight_Key__c CMD — preflight relay checks will fail until it matches PREFLIGHT_KEY"
+            rm -f "$_pfapex"
+        fi
         warn "[GATE] Set remaining secret vars manually if used: SF_CLIENT_ID, SF_MIAW_JWT_*, SKYWAVE_PROOF_KEY, IPINFO_TOKEN, CORS_PROXY_URL (see .env.example / SECRETS.md)."
         done_mark 3.3
     fi
