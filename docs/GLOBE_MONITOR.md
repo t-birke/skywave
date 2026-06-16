@@ -18,22 +18,25 @@ capability (open beta).
 
 ---
 
-> **Status (2026-06-16):** DEPLOYED + active in **`sitest`** (sandbox) AND **`si`**
-> (production). Data reads/writes run on UI API GraphQL + `@salesforce/sdk-data`
-> (same-origin, in-org native). **Live feed = Heroku relay `/ws/monitor` WebSocket**
-> (Pub/Sub runs server-side; browser-direct CometD/Pub/Sub is impossible — see §6),
-> verified end-to-end on `si`. See §6.
+> **Status (2026-06-16):** DEPLOYED + active on **`si`** (production) — the real
+> target. (Also exercised in a `sitest` sandbox during dev, but prod is the only
+> deployment target; the globe is **not** part of `install.sh`.) Data reads/writes
+> run on UI API GraphQL + `@salesforce/sdk-data` (same-origin, in-org native).
+> **Live feed = Heroku relay `/ws/monitor` WebSocket** (Pub/Sub runs server-side;
+> browser-direct CometD/Pub/Sub is impossible — see §6), verified end-to-end on
+> `si`. **Prerequisite:** the Multi-Framework UIBundle app domain
+> (`*.salesforce.app`) must be enabled in Setup before deploying. See §6.
 
 ## 0. TL;DR — run it locally right now
 
-Local `npm run dev` is the fastest iteration loop (and how to drive it against
-the deployed sandbox). Use `SKYWAVE_ORG=sitest` for the Multi-Framework org:
+Local `npm run dev` is the fastest iteration loop. It proxies `/services/data`
+to whichever org is authed (default `si`); override with `SKYWAVE_ORG=<alias>`:
 
 ```bash
 cd force-app/main/default/uiBundles/SkywaveGlobe
 npm install          # first time only
-# SKYWAVE_ORG=sitest npm run dev   # ← against the Multi-Framework sandbox
-npm run dev          # Vite dev server → http://localhost:5173
+# SKYWAVE_ORG=<alias> npm run dev   # ← point at a different authed org
+npm run dev          # Vite dev server → http://localhost:5173 (uses si)
 ```
 
 You need the target org authed (`sf org display --target-org <alias>` must
@@ -200,9 +203,12 @@ verification prefer **REPLAY** (click 24H), which reads persisted records.
 
 ## 6. In-org status & remaining work
 
-**DONE — deployed to BOTH orgs:**
-- **`sitest`** (Multi-Framework sandbox, 2026-06-15) and **`si`** (production
-  demo org, 2026-06-16, deploy `0Afg8000006L2pmCAC`, 93/93 components).
+**DONE — deployed to prod (`si`):**
+- **`si`** (production demo org, 2026-06-16, deploy `0Afg8000006L2pmCAC`, 93/93
+  components). The real deployment target is **prod only**; the globe is not part
+  of `install.sh`. (A `sitest` sandbox was used during dev, 2026-06-15, but isn't
+  a deployment target.) **Requires the Multi-Framework UIBundle app domain
+  (`*.salesforce.app`) enabled in Setup first.**
   The bundle is **org-portable** — `dist/` uses origin-relative `/services/data/…`
   for reads/writes; the only absolute URL is the relay `wss://…/ws/monitor`
   (build-overridable via `VITE_RELAY_WS_URL`), which is org-independent. Nothing
@@ -260,6 +266,12 @@ verification prefer **REPLAY** (click 24H), which reads persisted records.
 
 ## 7. Gotchas (hard-won — don't relearn these)
 
+- **The Multi-Framework app domain must be enabled in Setup first.** A UIBundle
+  serves from `*.salesforce.app`; until that domain is enabled on the org (Setup
+  → the Digital Experiences / Multi-Framework app-domain setting), the deploy can
+  succeed but the app won't load. This is a one-time, org-side **prerequisite**
+  that does NOT ride the metadata deploy — enable it before deploying the bundle.
+  (The globe ships to prod `si` only and is not part of `install.sh`.)
 - **Browser-direct streaming is impossible from a UIBundle — don't try.** In-org
   CometD to `…--c.my.salesforce.app/cometd/` → `403::Handshake denied`
   (`401::Request requires authentication`): the bundle is on `*.salesforce.app`,
@@ -306,7 +318,7 @@ verification prefer **REPLAY** (click 24H), which reads persisted records.
   proxy allowlist → 404). See `graphql.ts` `updateRecord()`.
 - **Official `sf ui-bundle dev` defers to the in-Vite plugin.** It detects the
   `salesforce()` plugin and skips its standalone proxy — so just
-  `SKYWAVE_ORG=sitest npm run dev`; the plugin (with `orgAlias`) is the proxy.
+  `SKYWAVE_ORG=<alias> npm run dev`; the plugin (with `orgAlias`) is the proxy.
 
 ---
 

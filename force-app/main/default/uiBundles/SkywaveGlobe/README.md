@@ -39,9 +39,11 @@ VITE_RELAY_WS_URL="wss://<your-dyno>.herokuapp.com/ws/monitor" npm run build
 
 ## Deploy to org
 
-Multi-Framework is enabled on both `sitest` and `si`. From the **SFDX project
-root**, rebuild then deploy the bundle (+ the launch app/permset + the wss CSP
-trusted site the first time):
+**Target: prod (`si`) only** — the globe is NOT part of `install.sh`; deploy it
+separately. **Prerequisite:** enable the Multi-Framework UIBundle app domain
+(`*.salesforce.app`) in Setup on the target org first, or the bundle won't serve.
+From the **SFDX project root**, rebuild then deploy the bundle (+ the launch
+app/permset + the wss CSP trusted site the first time):
 
 ```bash
 cd force-app/main/default/uiBundles/SkywaveGlobe && npm install && npm run build && cd -
