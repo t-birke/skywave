@@ -133,3 +133,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Hide the platform-injected "Logged in as …" session banner. The host
+   <sf-session-banner> is a light-DOM sibling of #root in the same document, so
+   hiding the host removes its whole shadow tree. Salesforce also stamps
+   `sf-session-banner-active` on <body> (reserves top space for the banner) —
+   neutralize that so the globe fills the full viewport. Cosmetic only; the
+   session is unaffected. !important to beat the platform's own styles. */
+sf-session-banner {
+  display: none !important;
+}
+body.sf-session-banner-active {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
