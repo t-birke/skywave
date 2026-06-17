@@ -10,10 +10,10 @@
 # The data360 MCP's d360_datakit_deploy CANNOT express this (DMO-level only), so we
 # call the API directly with the client_credentials token from .secrets/dc.env.
 #
-# PRECONDITION: a Data Cloud connection of connector type CRM/SalesforceCRM keyed by
-# the org id must exist, or each job fails "No CRM Connection exists for
-# externalRecordId: <orgId>". (Standard on QBrix target orgs; on a bare SDO you may
-# need to connect the Salesforce CRM home connection in Data Cloud Setup first.)
+# orgId MUST be the 15-CHAR org id (the standard CRM home connection's
+# organizationId). Passing the 18-char id fails the job with "No CRM Connection
+# exists for externalRecordId: <18-char>" — which is NOT a missing connection (every
+# SDO ships it standard), just an id-length mismatch. We truncate below.
 #
 # Usage: ORG_ALIAS=si2 ./scripts/datacloud/deploy_data_kit_bundles.sh
 # Env:   DC_ENV (default .secrets/dc.env), KIT (default SDO_Agentforce_Observability),
@@ -34,7 +34,13 @@ read -r -a BUNDLES <<< "${BUNDLES:-SDO_AFO_STDM SDO_AFO_Optimization SDO_AFO_Ext
 set -a; . "$DC_ENV"; set +a
 : "${DC_LOGIN_URL:?}"; : "${DC_INSTANCE_URL:?}"; : "${DC_CONSUMER_KEY:?}"; : "${DC_CONSUMER_SECRET:?}"
 
-ORG_ID="$(sf org display --target-org "$ORG_ALIAS" --json | jq -r '.result.id')"
+# The bundle binds to the Data Cloud CRM connection keyed by the 15-CHAR org id
+# (the connection's organizationId). `sf org display .id` returns the 18-char id —
+# passing that fails the job with "No CRM Connection exists for externalRecordId:
+# <18-char>". Truncate to 15. (The connection itself ships standard with the SDO;
+# its label/connectorType vary by how the SDO was acquired — e.g. "Salesforce Trial
+# Org Request & Manage" / SalesforceDotCom — so we key on the org id, not a name.)
+ORG_ID="$(sf org display --target-org "$ORG_ALIAS" --json | jq -r '.result.id[0:15]')"
 TOKEN="$(curl -s -X POST "${DC_LOGIN_URL}/services/oauth2/token" \
     -d grant_type=client_credentials -d "client_id=${DC_CONSUMER_KEY}" -d "client_secret=${DC_CONSUMER_SECRET}" \
     | jq -r '.access_token // empty')"

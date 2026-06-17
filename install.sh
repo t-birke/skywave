@@ -760,18 +760,16 @@ tier2_observability() {
     # QbrixCustomDataKitDeploy): POST /ssot/data-kits/{kit}?asyncMode=true + poll
     # BackgroundOperation. The data360 MCP can't express it (DMO-level only), so
     # deploy_data_kit_bundles.sh calls the API directly with the .secrets/dc.env
-    # client_credentials token. PRECONDITION: a CRM/SalesforceCRM Data Cloud
-    # connection keyed by the org id (standard on QBrix orgs; on a bare SDO connect
-    # the Salesforce CRM home connection in DC Setup first or the job errors "No CRM
-    # Connection exists"). Needs the consolidated Connected App's client_credentials
-    # set up (run-as user + cdp scopes + consumer secret in .secrets/dc.env).
+    # client_credentials token (keyed by the 15-char org id — see the script header).
+    # Needs the consolidated Connected App's client_credentials set up (run-as user +
+    # cdp scopes + consumer secret in .secrets/dc.env). Verified end-to-end on si2.
     if section 2.6; then
         say "2.6 Data-kit instantiation"
         if [ -f .secrets/dc.env ] && ORG_ALIAS="$ORG_ALIAS" ./scripts/datacloud/deploy_data_kit_bundles.sh; then
             ok "data-kit bundles instantiated (SDO_Analytics_* streams created)"; done_mark 2.6
         else
             echo "DATA_KIT_INSTANTIATION_GATE kit=SDO_Agentforce_Observability bundles=SDO_AFO_STDM,SDO_AFO_Optimization,SDO_AFO_Extra"
-            warn "[GATE] Auto data-kit deploy didn't complete (missing .secrets/dc.env, or the CRM connection / client-credentials precondition). Fix per skill G4, or instantiate via Setup → Data Cloud → Data Kits → SDO Agentforce Observability → Components → Deploy."
+            warn "[GATE] Auto data-kit deploy didn't complete (likely missing .secrets/dc.env or its client_credentials setup — run-as user + cdp scopes + consumer secret). Fix per skill G4 + SECRETS.md, then --resume. UI fallback: Setup → Data Cloud → Data Kits → SDO Agentforce Observability → Components → Deploy."
             info "Mark §2.6 done once the SDO_Analytics_* data streams exist (SELECT Name FROM DataStream WHERE Name LIKE 'SDO_Analytics_%'), then --resume."
             return 0
         fi

@@ -122,21 +122,25 @@ be set first).
 (the script does).
 
 **Two traps that cost real time — heed them:**
-1. **MCP org-mismatch:** the data360 MCP reads creds from `~/.claude.json` at
+1. **orgId MUST be 15-char.** The bundle binds to the org's standard Data Cloud CRM
+   home connection, keyed by the **15-char** org id. `sf org display .id` gives the
+   18-char id; passing it fails the job `No CRM Connection exists for externalRecordId:
+   <18-char>`. That is NOT a missing connection — every SDO ships the CRM home
+   connection standard (its label/connector-type vary by how the SDO was acquired,
+   e.g. "Salesforce Trial Org Request & Manage" / SalesforceDotCom; `connectorType=
+   SalesforceCRM` may return 0 but is irrelevant — key on the org id). The script
+   truncates to 15. (CumulusCI's `org.org_id` is already 15-char, so the QBrix never hit this.)
+2. **MCP org-mismatch:** the data360 MCP reads creds from `~/.claude.json` at
    **startup**. If you edit that file mid-session the running MCP still hits the OLD
-   org — so MCP results can silently describe the wrong org (it showed si's kit as
-   `SDO_ASA/SDR_Observability_Data` while si2's real bundles are `SDO_AFO_*`). Verify
-   via a connection's `organizationId`, or just use the direct REST API + dc.env token.
-2. **CRM-connection precondition:** the CRM bundles bind to a Data Cloud connection
-   of connector type **CRM/`SalesforceCRM`** keyed by the org id. A bare SDO with only
-   a `SalesforceDotCom_Home` connection fails each job with
-   `Error: No CRM Connection exists for externalRecordId: <orgId>`. Establish the
-   Salesforce CRM home connection in Data Cloud Setup (it's standard on QBrix orgs)
-   before the deploy succeeds.
+   org — its `d360_*` results can silently describe the wrong org (it showed si's kit
+   component names while si2's differed). Verify via a connection's `organizationId`,
+   or just use the direct REST API + dc.env token (the script does — fresh each run).
 
+Verified end-to-end on si2 (2026-06-17): all 11 `SDO_Analytics_*` streams created.
 Verify success: `sf data query -q "SELECT Name FROM DataStream WHERE Name LIKE
-'SDO_Analytics_%'"` (or the `__dll` via Data Cloud SQL). The script is idempotent
-(skips ACTIVE bundles); once streams exist, §2.6 is marked done automatically.
+'SDO_Analytics_%'"`. The script is idempotent (skips ACTIVE bundles; a "Failed"
+current-status from a prior bad attempt redeploys fine); once streams exist, §2.6 is
+marked done automatically.
 
 ### G5 — Refresh the data streams  (§2.8, §2.9)
 SalesforceDotCom streams refresh only from an **interactive browser session**, not
