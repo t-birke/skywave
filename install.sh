@@ -1045,6 +1045,20 @@ tier3_heroku() {
             heroku create "$HEROKU_APP" && ok "app created" \
                 || die "heroku create failed (name '${HEROKU_APP}' taken on another account? set HEROKU_APP=<unique>)"
         fi
+        # The relay lives in the heroku/skywave-app/ SUBDIR of this repo, but we push
+        # from the repo root (§3.4). So the dyno needs the monorepo buildpack (which
+        # cd's into APP_BASE) ahead of the Node buildpack — else Heroku builds the
+        # repo ROOT (no start script → "Missing script: start" → crash). Idempotent:
+        # set APP_BASE + ensure the buildpack order, clearing any stale set first.
+        heroku config:set -a "$HEROKU_APP" APP_BASE=heroku/skywave-app >/dev/null
+        if ! heroku buildpacks -a "$HEROKU_APP" 2>/dev/null | grep -q 'heroku-buildpack-monorepo'; then
+            heroku buildpacks:clear -a "$HEROKU_APP" >/dev/null 2>&1 || true
+            heroku buildpacks:add -a "$HEROKU_APP" -i 1 https://github.com/lstoll/heroku-buildpack-monorepo >/dev/null
+            heroku buildpacks:add -a "$HEROKU_APP" -i 2 heroku/nodejs >/dev/null
+            ok "buildpacks set (monorepo → nodejs), APP_BASE=heroku/skywave-app"
+        else
+            ok "monorepo buildpack already configured"
+        fi
         # Always (re)point the 'heroku' git remote at THIS app — never trust a
         # pre-existing remote, which may still target another org's app (e.g. a
         # shared account where 'skywave-app' belongs to a different demo org). A
