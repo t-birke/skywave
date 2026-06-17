@@ -6,16 +6,15 @@
  * Agentforce observability dashboards, after Skywave_ObservabilitySeeder has
  * rewritten the SDO_Analytics_* tables.
  *
- * WHY A BROWSER IS INVOLVED
- * The Connect endpoint that runs a stream import —
- *   POST /services/data/v66.0/ssot/data-streams/{id}/actions/run
- * — rejects bare sf-CLI / JWT tokens for SalesforceDotCom-type streams:
- *   "Connector type SalesforceDotCom is not allowed to run in non-interactive
- *    mode" (the scope is only granted to interactive web sessions). This is the
- *    same wall Skywave_DataStreamRunner.cls documents, and why `sf apex run`
- *    can't do it. So we frontdoor-auth a real browser session (exactly like
- *    scripts/publishEmbeddedServiceDeployment.mjs), capture that INTERACTIVE
- *    session cookie, and call the run endpoint with it.
+ * WHY A BROWSER IS INVOLVED (and why we CLICK, not call the API)
+ * The Connect endpoint POST /ssot/data-streams/{id}/actions/run rejects ALL
+ * token-based callers for SalesforceDotCom-type streams — even a frontdoor-bridged
+ * session — with "Connector type SalesforceDotCom is not allowed to run in
+ * non-interactive mode". A bearer-header fetch is always "non-interactive"; only a
+ * genuine in-page Lightning action carries the scope. So we do exactly what the
+ * canonical QBrix (qx QbrixDataCloud.refresh_data_stream) does: open each DataStream
+ * record page and CLICK Refresh Now → Full Refresh → Refresh Now. (This supersedes
+ * the earlier API-call approach, which always 400'd on these streams.)
  *
  * Stream set (queried live, never hardcoded — single source of truth is the org):
  *   - SDO_Analytics_%_Home   (the 11 STDM/optimization streams)
@@ -82,9 +81,20 @@ async function main() {
     }
     console.log(`  ${streams.length} stream(s): ${streams.map(s => s.Name).join(', ')}`);
 
-    // Bridge the API access token into an INTERACTIVE web session via frontdoor.
+    // Bridge the API token into an INTERACTIVE web session via frontdoor, then
+    // drive the Lightning UI per stream — Refresh Now → Full Refresh → Refresh Now —
+    // exactly like the qx QbrixDataCloud.refresh_data_stream keyword. The Lightning
+    // record page lives on the *.lightning.force.com origin; frontdoor's retURL
+    // bounces us there with a live session.
+    const lightningHost = new URL(instanceUrl).host
+        .replace('.my.salesforce.com', '.lightning.force.com')
+        .replace('.my.pc-rnd.salesforce.com', '.lightning.pc-rnd.force.com')
+        .replace('.sandbox.my.salesforce.com', '.sandbox.lightning.force.com');
+    const recordPath = (id) => `/lightning/r/DataStream/${id}/view`;
     const frontdoorUrl =
-        `${instanceUrl}/secur/frontdoor.jsp?sid=${encodeURIComponent(accessToken)}&retURL=%2F`;
+        `${instanceUrl}/secur/frontdoor.jsp?sid=${encodeURIComponent(accessToken)}` +
+        `&retURL=${encodeURIComponent(recordPath(streams[0].Id))}`;
+
     const headless = process.env.SF_HEADED !== '1';
     console.log(`→ Launching Chromium (headless=${headless})…`);
     const browser = await chromium.launch({ headless });
@@ -95,54 +105,55 @@ async function main() {
     try {
         console.log('→ Authenticating via frontdoor (interactive session)…');
         await page.goto(frontdoorUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
-        await page.waitForTimeout(5_000); // let the redirect chain settle
+        await page.waitForTimeout(8_000); // let the redirect chain + Lightning boot settle
 
-        // Grab the interactive session id from the cookie jar. frontdoor sets
-        // 'sid' on the *.my.salesforce.com domain — that's the web session that
-        // carries the scope the run endpoint demands.
-        const cookies = await context.cookies();
-        const host = new URL(instanceUrl).host;
-        const sidCookie =
-            cookies.find(c => c.name === 'sid' && host.endsWith(c.domain.replace(/^\./, ''))) ||
-            cookies.find(c => c.name === 'sid');
-        if (!sidCookie) throw new Error('Could not capture an interactive sid cookie after frontdoor auth.');
-        const interactiveSid = sidCookie.value;
-
-        // Fire the run action per stream from inside the browser context, so
-        // the request carries the interactive session (and same-origin cookies).
         for (const s of streams) {
-            const url = `${instanceUrl}/services/data/${API}/ssot/data-streams/${s.Id}/actions/run`;
-            const res = await page.evaluate(async ({ url, sid }) => {
-                try {
-                    const r = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bearer ${sid}`, 'Content-Type': 'application/json' },
-                        body: '{}',
-                    });
-                    const text = await r.text();
-                    return { status: r.status, body: text.slice(0, 200) };
-                } catch (e) {
-                    return { status: -1, body: String(e) };
-                }
-            }, { url, sid: interactiveSid });
-            const good = res.status >= 200 && res.status < 300;
-            results.push({ name: s.Name, ...res, good });
-            console.log(`  ${good ? '✓' : '✗'} ${s.Name} → ${res.status}${good ? '' : ': ' + res.body}`);
+            let good = false, detail = '';
+            try {
+                await page.goto(`https://${lightningHost}${recordPath(s.Id)}`,
+                    { waitUntil: 'domcontentloaded', timeout: 60_000 });
+                await page.waitForTimeout(4_000); // Lightning record page render
+
+                // 1) the "Refresh Now" header action (a forceActionLink anchor)
+                const refreshAction = page.locator(
+                    "a.forceActionLink:has-text('Refresh Now'), button:has-text('Refresh Now')").first();
+                await refreshAction.waitFor({ state: 'visible', timeout: 20_000 });
+                await refreshAction.click();
+                await page.waitForTimeout(1_500);
+
+                // 2) choose "Full Refresh" in the dialog (radio/option)
+                const fullRefresh = page.locator(
+                    "span:has-text('Full Refresh'), label:has-text('Full Refresh')").first();
+                if (await fullRefresh.count()) { await fullRefresh.click(); await page.waitForTimeout(800); }
+
+                // 3) confirm with the dialog's "Refresh Now" button
+                const confirm = page.locator(
+                    ".modal-container button:has-text('Refresh Now'), .slds-modal button:has-text('Refresh Now'), button:has-text('Refresh Now')").last();
+                await confirm.click({ timeout: 10_000 });
+                await page.waitForTimeout(2_500);
+                good = true;
+            } catch (e) {
+                detail = (e.message || String(e)).split('\n')[0].slice(0, 160);
+            }
+            results.push({ name: s.Name, good, detail });
+            console.log(`  ${good ? '✓' : '✗'} ${s.Name}${good ? ' — Full Refresh triggered' : ': ' + detail}`);
         }
     } finally {
+        if (process.env.SF_KEEP_SCREENSHOT) await page.screenshot({ path: '/tmp/sf-refresh-streams.png', fullPage: true }).catch(() => {});
         await browser.close();
     }
 
     const failed = results.filter(r => !r.good);
     console.log(`\n${results.length - failed.length}/${results.length} streams refreshed.`);
     if (failed.length) {
-        console.error('\nSome streams did not refresh. If the error mentions "non-interactive mode",');
-        console.error('run the Apex fallback from the Developer Console (browser Execute Anonymous):');
+        console.error('\nSome streams did not refresh via the UI. Fallback — Developer Console (browser');
+        console.error('Execute Anonymous, which has the interactive scope):');
         console.error('  Skywave_DataStreamRunner.refreshSdoAnalyticsStreams();');
         console.error('  Skywave_DataStreamRunner.refreshBotStreams();');
+        console.error('Or Setup → Data Cloud → Data Streams → each → Refresh Now → Full Refresh.');
         process.exit(1);
     }
-    console.log('✓ Done. DMO rows populate within a few minutes of a successful refresh.');
+    console.log('✓ Done. DMO rows populate within a few minutes of a successful Full Refresh.');
 }
 
 main().catch(err => {
