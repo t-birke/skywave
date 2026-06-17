@@ -194,16 +194,23 @@ human (no metadata/API path):
   `SKYWAVE_PROOF_KEY`, `IPINFO_TOKEN`, `CORS_PROXY_URL`): set them from the user's
   values per `.env.example` / `SECRETS.md`. Never echo secrets.
 
-### G7 — Globe app domain  (Tier 4, §4.0)
-The globe UIBundle serves from `*.salesforce.app`. That **Multi-Framework UIBundle
-app domain must be enabled in Setup** (one-time, org-side — can't be scripted) or
-the deploy succeeds but the app won't load. Confirm the user has enabled it, then
-`--resume`. Tier 4 otherwise runs unattended: it builds the bundle with the relay
-URL baked in (from Tier 3's origin — run `--with-heroku` first or in the same
-`--all`), deploys the bundle + app + permset + CSP, and assigns the launcher
-permset. If the user runs `--with-globe` without Tier 3, the globe is built
-against a placeholder relay URL — rerun `--with-heroku --with-globe --resume`
-once the dyno exists so the feed connects.
+### G7 — Multi-Framework feature gate  (Tier 4, §4.0)  ← HARD deploy blocker
+The globe UIBundle needs the **Agentforce Vibe for Multi-Framework** feature
+enabled in Setup. This is NOT a soft "won't render" gate (the old wording was
+wrong): with it OFF, §4.2 **fails to deploy** with `UIBundle Metadata API is not
+enabled because the Agentforce Vibe for MultiFramework feature gate is disabled`
+(cascading to `field uiBundle isn't valid` on Skywave_Globe + `no CustomApplication
+named Skywave_Globe` on the permset). The UIBundle also serves from
+`*.salesforce.app`, so confirm that app domain too. Both are one-time, org-side,
+can't be scripted — verified on si2. Enable, then `--resume`.
+
+Tier 4 otherwise runs unattended: §4.1 builds the bundle with the relay URL baked in
+(from Tier 3's origin — run `--with-heroku` first or in the same `--all`); §4.2
+temporarily strips the globe block from `.forceignore` (restored via a RETURN+EXIT
+trap — the EXIT part matters, else a deploy `die` leaves it stripped), deploys the
+bundle + app + permset + CSP, and assigns the launcher permset. If `--with-globe`
+runs without Tier 3, the globe bakes a placeholder relay URL — rerun
+`--with-heroku --with-globe --resume` once the dyno exists so the feed connects.
 
 ### G8 — Tracking pipeline + data graph  (Tier 5, §5.1–5.3)
 Tier 5 builds the Interaction-SDK + Data Cloud pipeline (the load-bearing websdk
