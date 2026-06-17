@@ -236,9 +236,10 @@ deviceId every downstream step keys on) 100% via the Core `/ssot/` API
 
 ### G9 — Voice agent (Tier 6, §6.1–6.4) — UI-gated
 Voice (Chapter 9) is mostly UI-only — no public API for the number/channel or the
-PSTN toggles. Tier 6 scripts the agent publish + permsets; you conduct the gates,
-ideally by handing off to the **`voice-agent-demo` skill** (it has the full SDO
-recipe + failure modes). The ORDER is load-bearing:
+PSTN toggles. Tier 6 scripts the agent publish + permsets; you conduct the gates.
+**The full, self-contained click-by-click steps + troubleshooting live in the repo at
+`docs/VOICE_SETUP.md`** (no external skill needed — that's the portable source of
+truth; conduct the user through it). The ORDER is load-bearing:
 1. §6.1 assigns the 3 NativeCCaaS permsets — then the user **must log out and back
    in** (softphone provisions at session start; the channel UI won't appear otherwise).
 2. §6.3: claim a phone number + create a **NativeVoice channel** in Setup →

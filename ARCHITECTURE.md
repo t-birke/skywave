@@ -595,8 +595,10 @@ globe. Silent no-op if the token is unset.
 Cloud Voice). A `VoiceCall` before-insert trigger (`Skywave_VoiceCallResolve`)
 matches the caller's phone to a Contact by trailing-9-digits and stamps caller
 name fields for a personalized greeting. Escalation is single-hop to a queue
-via routing flow. Setup specifics live in the `voice-agent-demo` skill and
-memory `skywave-voice-agent`.
+via routing flow. **Full setup steps (the UI-only gates: permset re-login,
+number + NativeVoice channel, PSTN toggles, Omni-Flow binding) are documented
+self-contained in `docs/VOICE_SETUP.md`** — `install.sh --with-voice` scripts the
+agent publish/permsets and points there for the manual gates.
 
 ### 3e'. Hardened website surface (`/api/website/*`)
 

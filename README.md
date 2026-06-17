@@ -9,7 +9,9 @@ a public LWR Experience Cloud site with an embedded Agentforce Messaging
 > fit together (data flows, components, and the moving parts that aren't in
 > git). [`SKYWAVE_INTERACTIVE_DESIGN.md`](SKYWAVE_INTERACTIVE_DESIGN.md) has
 > the demo vision; [`docs/STYLE_GUIDE.md`](docs/STYLE_GUIDE.md) the visual
-> language for new UI; [`SECRETS.md`](SECRETS.md) covers credentials.
+> language for new UI; [`SECRETS.md`](SECRETS.md) covers credentials;
+> [`docs/VOICE_SETUP.md`](docs/VOICE_SETUP.md) is the self-contained voice
+> (Chapter 9) setup guide for the UI-only gates.
 
 ## Installing the demo
 

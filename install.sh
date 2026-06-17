@@ -168,8 +168,8 @@ check_prereqs() {
     if [ "$WITH_VOICE" = "1" ]; then
         info "voice tier (Chapter 9): publishes/activates Skywave_Voice_Agent + assigns the"
         info "NativeCCaaS permsets (scripted), but the phone number + NativeVoice channel and"
-        info "the 2 PSTN toggles are UI-ONLY (no public API — confirmed). The skill conducts"
-        info "those gates via the voice-agent-demo skill. Needs a re-login after permsets."
+        info "the 2 PSTN toggles are UI-ONLY (no public API — confirmed). Full click-by-click"
+        info "steps + gotchas are in docs/VOICE_SETUP.md (self-contained). Re-login after permsets."
     fi
     info "NOTE: 'gh' + a corporate token are only needed by the maintainer to (re)vendor"
     info "QBrix-6 — end users who clone this repo do NOT need them."
@@ -923,9 +923,10 @@ for line in sys.stdin:
 # ════════════════════════════════════════════════════════════════════════════
 # Voice is heavily UI-gated: the phone number + NativeVoice channel (Communication
 # Channels UI) and the two Agentforce Voice PSTN toggles have NO public API
-# (confirmed — see the voice-agent-demo skill). So this tier scripts what it can
-# (publish/activate the voice agent + the bot-user Apex permset + the NativeCCaaS
-# permsets + the telephony toggle) and marks the rest as gates the skill conducts.
+# (confirmed). So this tier scripts what it can (publish/activate the voice agent +
+# the bot-user Apex permset + the NativeCCaaS permsets + the telephony toggle) and
+# marks the rest as gates — full click-by-click steps + gotchas are in the
+# self-contained docs/VOICE_SETUP.md (no external skill required).
 # The voice metadata (Skywave_Voice_Agent bundle, Skywave_VoiceCallResolver +
 # trigger, skywave_routing queue/routing-config, VoiceCall flexipage) already
 # deploys with the Tier-1 blanket force-app deploy.
@@ -980,8 +981,7 @@ PYEOF
         warn "[GATE] Claim a phone number + create a NativeVoice channel in Setup →"
         info "Communication Channels (UI-only — no API). CRITICAL: do this AFTER §6.1's"
         info "permsets + re-login, or the channel create fails and the number is stuck."
-        info "The skill conducts this via the voice-agent-demo skill (Stage 3); set the"
-        info "channel's Call Routing to a voice queue, then mark §6.3 done + --resume."
+        info "Full click-by-click steps + gotchas: docs/VOICE_SETUP.md §6.3. Then --resume."
         return 0
     fi
 
@@ -990,13 +990,14 @@ PYEOF
         say "6.4 PSTN toggles + agent routing"
         warn "[GATE] Setup → Agentforce Voice Setup → PSTN tab: enable BOTH 'Connect"
         info "Related Voice Calls' + 'Record Voice Calls' (off by default, no API — without"
-        info "them the rep sees an empty transcript). Then point the channel's routing at"
-        info "${VOICE_AGENT_API_NAME} (Omni-Flow) + the skywave_routing queue (LeastActive,"
-        info "already deployed). Caller-id→Contact resolution runs via Skywave_VoiceCallResolve."
+        info "them the rep sees an empty transcript). Then bind the channel routing to"
+        info "${VOICE_AGENT_API_NAME} (Omni-Flow = Skywave_Route_to_Voice_Agent) + voice queue."
+        info "Full steps + troubleshooting: docs/VOICE_SETUP.md §6.4. Then --resume."
         return 0
     fi
     say "Tier 6 complete — voice agent"
     info "Call the claimed number; ${VOICE_AGENT_API_NAME} answers and can transfer to a human."
+    info "Verify the call + transcript per docs/VOICE_SETUP.md §6.5."
 }
 
 # ════════════════════════════════════════════════════════════════════════════

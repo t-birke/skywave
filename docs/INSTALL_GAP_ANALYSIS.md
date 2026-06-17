@@ -34,10 +34,10 @@ artifact but is not the install default.) No change to the installer.
 (`--with-voice`, in `--all`). Scripts the automatable parts (publish + activate
 the voice agent with the bot-user permset + BotUser patch; assign the 3
 NativeCCaaS permsets + PSG) and GATES the UI-only parts (phone number +
-NativeVoice channel; the 2 PSTN toggles) — no public API for those (confirmed via
-the `voice-agent-demo` skill, which the conductor delegates to). The voice
-metadata (resolver trigger, queue, routing config, VoiceCall page) already
-deploys with Tier 1.
+NativeVoice channel; the 2 PSTN toggles) — no public API for those. Those gates
+are now documented self-contained in `docs/VOICE_SETUP.md` (repo-local; the install
+no longer depends on an external skill being present). The voice metadata (resolver
+trigger, queue, routing config, VoiceCall page) already deploys with Tier 1.
 
 ### ✅ Sub-finding (caught during Gap 3) — agent-user not portable  → FIXED
 All 3 `.agent` bundles hardcoded si's agent-user hash as `default_agent_user`, and
