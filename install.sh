@@ -754,16 +754,19 @@ tier2_observability() {
     fi
 
     # ── 2.6 Data-kit instantiation ─────────────────────────────[GATE]────────
-    # CumulusCI did this via `data_cloud deploy_data_kit_components`, a Data
-    # Cloud API call (not a metadata deploy). install.sh cannot run the MCP /
-    # API; the Claude skill owns this gate (data360 MCP d360_datakit_deploy,
-    # or Setup → Data Kits → SDO_Agentforce_Observability → deploy the 3
-    # bundles: SDO_AFO_STDM, SDO_AFO_Optimization, SDO_AFO_Extra).
+    # Instantiate the SDO_ASA_Observability_Data bundle (the 11 SDO_Analytics_AIAgent*_v2
+    # STDM streams) from the SDO_Agentforce_Observability kit. The data360 MCP CANNOT
+    # do this — verified live (si2, 2026-06): d360_datakit_deploy is DMO-level only
+    # (CI/SEGMENT/SDM), and the update-components endpoint rejects DataStreamBundle
+    # payloads. So the Setup → Data Cloud → Data Kits UI 'Deploy' is canonical. (Skip
+    # SDO_SDR_Observability_Data — SDR cadence data, not needed for Skywave.) The skill
+    # (G4) conducts this. Verify with: SELECT Name FROM DataStream WHERE Name LIKE
+    # 'SDO_Analytics_%'  (or the __dll via Data Cloud SQL).
     if section 2.6; then
         say "2.6 Data-kit instantiation"
-        echo "DATA_KIT_INSTANTIATION_GATE kit=SDO_Agentforce_Observability bundles=SDO_AFO_STDM,SDO_AFO_Optimization,SDO_AFO_Extra"
-        warn "[GATE] Instantiate the 3 data-stream bundles from the kit. The skill runs this via the data360 MCP, with a Setup → Data Kits UI fallback."
-        info "Mark this section done once the bundles show live data streams, then --resume."
+        echo "DATA_KIT_INSTANTIATION_GATE kit=SDO_Agentforce_Observability bundle=SDO_ASA_Observability_Data"
+        warn "[GATE] Instantiate SDO_ASA_Observability_Data via Setup → Data Cloud → Data Kits → SDO Agentforce Observability → Components → Deploy. (MCP can't instantiate bundles — see skill G4.)"
+        info "Mark this section done once the 11 SDO_Analytics_* data streams exist, then --resume."
         return 0
     fi
 

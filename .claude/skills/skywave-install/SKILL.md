@@ -99,26 +99,34 @@ blocking. When you (or the user) come back:
 - If not, just re-poll in a few minutes — it's frequently fast. Don't declare
   failure early; streams can sit provisioning with no visible progress.
 
-### G4 — Data-kit instantiation  (§2.6)  ← the one to validate live
-The 3 data-stream bundles (`SDO_AFO_STDM`, `SDO_AFO_Optimization`, `SDO_AFO_Extra`)
-in the `SDO_Agentforce_Observability` data kit ship un-instantiated. `install.sh`
-prints `DATA_KIT_INSTANTIATION_GATE …` and pauses — **you** instantiate them:
+### G4 — Data-kit instantiation  (§2.6)  ← UI is canonical (MCP can't do bundles)
+The `SDO_Agentforce_Observability` data kit has **2 DataStreamBundle components**
+(verified live on si2 2026-06-17 — the old `SDO_AFO_STDM/Optimization/Extra` names
+are stale):
+- **`SDO_ASA_Observability_Data`** — the 11 `SDO_Analytics_AIAgent*_v2` STDM streams
+  the dashboards + seeder need. **This is the one to instantiate.**
+- `SDO_SDR_Observability_Data` — SDR sales-cadence streams (`ActionCadence*`). **Not
+  needed** for Skywave's agent demo; skip it.
 
-- **Preferred (automated):** use the **data360 MCP**. First check the user has
-  Data Cloud integration creds in `.secrets/dc.env` (the MCP uses
-  `client_credentials`, no JWT). Then: search the MCP for the data-kit family →
-  list kits to find `SDO_Agentforce_Observability` → list its components →
-  `deploy` each of the 3 bundles that aren't already instantiated. Pre-check
-  components so you skip already-live bundles (instantiating twice can error).
-- **Fallback (UI):** Setup → **Data Kits** → `SDO Agentforce Observability` →
-  Components → click **Deploy** on each of the 3 bundles.
+`install.sh` prints `DATA_KIT_INSTANTIATION_GATE …` and pauses.
 
-Once the bundles show live data streams, mark §2.6 done in
-`.deploy-tmp/install-state.env` (`DONE_2_6=1`) and `--resume`.
+**The data360 MCP CANNOT instantiate a DataStreamBundle** (confirmed empirically,
+resolving the old maintainer TODO): `d360_datakit_deploy`'s own example only
+supports `CI`/`SEGMENT`/`SDM` component types, and the `/ssot/data-kits/
+update-components` endpoint rejects every `DataStreamBundle` payload shape
+(`JSON_PARSER_ERROR: Missing property 'config' for external type id 'type'`). The
+MCP deploy is DMO-level only. NOTE: `d360_datakit_component_status` reporting a
+bundle `ACTIVE` is misleading — it means "published in the kit / deployable", NOT
+"streams instantiated". Verify instantiation by querying a stream's DLO via
+`d360_query_sql` (`SELECT COUNT(*) FROM SDO_Analytics_AIAgentSession_v2__dll`) or
+`sf data query -q "SELECT Name FROM DataStream WHERE Name LIKE 'SDO_Analytics_%'"` —
+if the table/stream doesn't exist, it's NOT instantiated.
 
-> Note for the maintainer: confirm on a live org whether the MCP `deploy` actually
-> instantiates `DataStreamBundle` components. If it only touches DMO-level
-> components, treat the UI as the canonical path and update this section.
+**Canonical path = UI:** Setup → **Data Cloud → Data Kits** → `SDO Agentforce
+Observability` → Components → click **Deploy** (or **Install**) on
+`SDO_ASA_Observability_Data`. That creates all 11 `SDO_Analytics_*` data streams at
+once. Re-check with the query above; once they exist, mark §2.6 done
+(`DONE_2_6=1`) and `--resume`.
 
 ### G5 — Refresh the data streams  (§2.8, §2.9)
 SalesforceDotCom streams refresh only from an **interactive browser session**, not
