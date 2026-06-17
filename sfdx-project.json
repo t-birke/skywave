@@ -41,6 +41,16 @@
             "replaceWithEnv": "SF_SKYWAVE_FLOW_QUEUE_ID"
         },
         {
+            "filename": "force-app/main/default/flows/Skywave_Route_to_Voice_Agent.flow-meta.xml",
+            "stringToReplace": "%%SKYWAVE_VOICE_QUEUE_ID%%",
+            "replaceWithEnv": "SKYWAVE_VOICE_QUEUE_ID"
+        },
+        {
+            "filename": "force-app/main/default/flows/Skywave_Route_Voice_to_Queue.flow-meta.xml",
+            "stringToReplace": "%%SKYWAVE_VOICE_QUEUE_ID%%",
+            "replaceWithEnv": "SKYWAVE_VOICE_QUEUE_ID"
+        },
+        {
             "filename": "force-app/main/default/sites/ESA_Deployment.site-meta.xml",
             "stringToReplace": "%%SCRATCH_ORG_SITE_HOST%%",
             "replaceWithEnv": "SCRATCH_ORG_SITE_HOST"

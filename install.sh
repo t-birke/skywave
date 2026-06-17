@@ -263,6 +263,24 @@ PYEOF
     # if the var is unset (same trap as AGENT_USER). So SKYWAVE_HEROKU_ORIGIN must
     # always be exported, even on a core-only install before Heroku exists.
     resolve_heroku_origin
+    # Same trap: the two voice routing flows carry %%SKYWAVE_VOICE_QUEUE_ID%%
+    # (replaceWithEnv) — must always be exported even on a core-only deploy.
+    resolve_voice_queue_id
+}
+
+# Resolve the voice queue Id into SKYWAVE_VOICE_QUEUE_ID. The voice routing flows
+# (Skywave_Route_to_Voice_Agent inbound, Skywave_Route_Voice_to_Queue escalation)
+# route to the org's standard SDO_Service_Voice_Call queue — but its Id is re-minted
+# per org (si's 00Gg…  is dead on any other org), so resolve it by the stable
+# DeveloperName at deploy time. Harmless placeholder if the queue isn't present yet
+# (e.g. a non-voice org) so replaceWithEnv never errors; §6 re-resolves + the channel
+# binding uses the live id.
+resolve_voice_queue_id() {
+    local q=""
+    q="$(sfq "SELECT Id FROM Group WHERE Type='Queue' AND DeveloperName='SDO_Service_Voice_Call'" 2>/dev/null)"
+    [ -n "$q" ] || q="000000000000000AAA"   # placeholder (valid 15-char-ish) so deploys don't fail pre-voice
+    SKYWAVE_VOICE_QUEUE_ID="$q"
+    export SKYWAVE_VOICE_QUEUE_ID
 }
 
 # Resolve the Heroku relay origin into SKYWAVE_HEROKU_ORIGIN (https, no trailing
@@ -985,14 +1003,52 @@ PYEOF
         return 0
     fi
 
-    # ── 6.4 PSTN toggles + routing to the agent (UI GATE) ────────────────────
+    # ── 6.4 Bind channel routing to the inbound flow + queue (SCRIPTED) ───────
+    # The skill called this "UI-only" — it is NOT. Verified on a live voice channel:
+    # MessagingChannel is updateable and SessionHandlerId (the inbound FlowDefinition
+    # = "Omni-Flow"), FallbackQueueId, and IsActive are all API-writable (PATCH→204).
+    # So once the PstnVoice channel exists (the §6.3 number/channel claim, which IS
+    # UI-only), we bind + activate it via the REST API — no manual routing config.
     if section 6.4; then
-        say "6.4 PSTN toggles + agent routing"
-        warn "[GATE] Setup → Agentforce Voice Setup → PSTN tab: enable BOTH 'Connect"
-        info "Related Voice Calls' + 'Record Voice Calls' (off by default, no API — without"
-        info "them the rep sees an empty transcript). Then bind the channel routing to"
-        info "${VOICE_AGENT_API_NAME} (Omni-Flow = Skywave_Route_to_Voice_Agent) + voice queue."
-        info "Full steps + troubleshooting: docs/VOICE_SETUP.md §6.4. Then --resume."
+        say "6.4 Bind voice channel routing (Omni-Flow + queue)"
+        local chan_id flow_def queue_id token inst
+        chan_id="$(sfq "SELECT Id FROM MessagingChannel WHERE MessageType='PstnVoice' ORDER BY CreatedDate DESC LIMIT 1")"
+        if [ -z "$chan_id" ]; then
+            warn "[GATE] No PstnVoice channel yet — claim the number + create the NativeVoice"
+            info "channel first (UI-only — docs/VOICE_SETUP.md §6.3), then --resume."
+            return 0
+        fi
+        # SessionHandlerId wants the inbound flow's FlowDefinition id (300… prefix).
+        flow_def="$(sfqt "SELECT Id FROM FlowDefinition WHERE DeveloperName='Skywave_Route_to_Voice_Agent'")"
+        resolve_voice_queue_id; queue_id="$SKYWAVE_VOICE_QUEUE_ID"
+        [ -n "$flow_def" ] || { warn "inbound FlowDefinition Skywave_Route_to_Voice_Agent not found — was Tier 1 deployed?"; return 0; }
+        token="$(org_access_token)"; inst="${INSTANCE_URL}"
+        local body; body="$(printf '{"SessionHandlerId":"%s","FallbackQueueId":"%s","IsActive":true}' "$flow_def" "$queue_id")"
+        local code; code="$(curl -s -o /dev/null -w '%{http_code}' -X PATCH \
+            -H "Authorization: Bearer $token" -H "Content-Type: application/json" \
+            "${inst}/services/data/v62.0/sobjects/MessagingChannel/${chan_id}" -d "$body" 2>/dev/null)"
+        if [ "$code" = "204" ]; then
+            ok "channel ${chan_id} bound to Skywave_Route_to_Voice_Agent (queue ${queue_id}) + activated"
+            # Queue membership is also scriptable (plain GroupMember DML): add the
+            # admin so escalation/human-handoff has a routable target.
+            local admin_uid; admin_uid="$(sfq "SELECT Id FROM User WHERE Username='${ADMIN_USERNAME}'")"
+            [ -n "$admin_uid" ] && [ "$queue_id" != "000000000000000AAA" ] && \
+                sf data create record --target-org "$ORG_ALIAS" -s GroupMember -v "GroupId=${queue_id} UserOrGroupId=${admin_uid}" >/dev/null 2>&1 \
+                && ok "admin added to voice queue (human-handoff target)" || true
+            done_mark 6.4
+        else
+            warn "channel routing PATCH returned HTTP ${code} — set it manually per docs/VOICE_SETUP.md §6.4, then --resume"
+            return 0
+        fi
+    fi
+
+    # ── 6.5 PSTN toggles (UI GATE — genuinely no API) ────────────────────────
+    if section 6.5; then
+        say "6.5 PSTN toggles (transcript + recording)"
+        warn "[GATE] Setup → Agentforce Voice Setup → PSTN tab: enable BOTH 'Connect Related"
+        info "Voice Calls' + 'Record Voice Calls'. These two are genuinely UI-only (verified:"
+        info "not in any writable settings object, not SOQL-queryable). Without them the rep"
+        info "sees an empty transcript after transfer. See docs/VOICE_SETUP.md §6.4a."
         return 0
     fi
     say "Tier 6 complete — voice agent"

@@ -93,7 +93,7 @@
         <inputParameters>
             <name>queueId</name>
             <value>
-                <stringValue>00Gg8000002y2KUEAY</stringValue>
+                <stringValue>%%SKYWAVE_VOICE_QUEUE_ID%%</stringValue>
             </value>
         </inputParameters>
         <inputParameters>

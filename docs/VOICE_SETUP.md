@@ -2,9 +2,22 @@
 
 This is the complete, repo-local guide for standing up Skywave's voice agent
 (`Skywave_Voice_Agent`). **No external skill or tool is required** — every step is
-here. `install.sh --with-voice` scripts what it can (permsets, agent publish/activate);
-the rest is Salesforce UI that has **no public API**, so it's documented click-by-click
-below. install.sh prints a `[GATE]` at each manual step and points here.
+here. `install.sh --with-voice` scripts everything that has an API — permsets, agent
+publish/activate, **the channel routing binding (flow + queue + activate), and queue
+membership**. Only three things genuinely have NO public API (verified field-by-field)
+and remain manual: **Partner Telephony toggle, claiming the phone number + creating the
+NativeVoice channel, and the two PSTN toggles**. install.sh prints a `[GATE]` at each
+of those and points here.
+
+| Step | Who does it |
+|------|-------------|
+| 6.1 NativeCCaaS permsets | scripted (install.sh) |
+| 6.1 re-login + Partner Telephony toggle | **you (UI — toggle is read-only via API)** |
+| 6.2 publish + activate the voice agent | scripted |
+| 6.3 claim number + create NativeVoice channel | **you (UI — vendor-provisioned, no API)** |
+| 6.4 bind channel routing (flow+queue) + activate + queue membership | scripted |
+| 6.5 the two PSTN toggles | **you (UI — not in any writable settings object)** |
+| 6.5 test call | you (a phone) |
 
 > Why a doc and not more script: claiming a phone number, creating the NativeVoice
 > channel, the two PSTN toggles, and binding Omni-Flow routing on the channel are all
@@ -107,31 +120,35 @@ You do **not** build these — they ship in `force-app/` and deploy automaticall
 > `ConversationEntry`/`VoiceCallTranscript` even on a healthy call). The only proof is a
 > real call (Step 6.5). Do NOT create a channel from this page — only flip these toggles.
 
-### 6.4b — Bind the inbound flow + queue to the channel
+### 6.4b — Bind the inbound flow + queue to the channel  *(SCRIPTED — install.sh §6.4)*
 
-Setup → Communication Channels → your voice channel → **Edit** → **Omni-Channel Routing**:
-- **Routing Type:** `Omni-Flow`
-- **Flow Definition:** `Skywave_Route_to_Voice_Agent` (the inbound flow, already deployed)
-- **Fallback Queue:** your voice queue
-- Save → then **Activate** the channel.
+**You don't do this by hand** — `install.sh --with-voice` does it via the REST API
+once the channel exists. (The skill called this "UI-only"; it isn't — verified that
+`MessagingChannel.SessionHandlerId`/`FallbackQueueId`/`IsActive` are all API-writable,
+PATCH→204.) §6.4 finds the PstnVoice channel, resolves the `Skywave_Route_to_Voice_Agent`
+FlowDefinition + the `SDO_Service_Voice_Call` queue (by DeveloperName — Ids are
+per-org), PATCHes the channel, activates it, and adds the admin to the queue.
 
-Verify:
+> Note: there is no `Omni-Flow` value in the `RoutingType` picklist — the "Omni-Flow"
+> binding the UI shows is simply `SessionHandlerId` pointing at the inbound flow's
+> FlowDefinition (a working channel has `RoutingType=null` + `SessionHandlerId` set).
+
+If you ever need to do it manually (e.g. the PATCH failed): Communication Channels →
+your channel → Edit → Omni-Channel Routing → Routing Type `Omni-Flow`, Flow Definition
+`Skywave_Route_to_Voice_Agent`, Fallback Queue your voice queue → Save → Activate.
+
+Verify (scripted or manual):
 ```bash
 sf data query --target-org "$ORG_ALIAS" -q \
   "SELECT Id, IsActive, FallbackQueueId, SessionHandlerId FROM MessagingChannel WHERE MessageType='PstnVoice' AND IsActive=true"
 ```
 Expect `IsActive=true`, `FallbackQueueId` set, `SessionHandlerId` = the inbound flow's FlowDefinition.
 
-### 6.4c — Voice queue membership (so human-handoff has a target)
-
-Add yourself (the admin) to the voice queue so escalation has someone to route to:
-```bash
-ADMIN_ID=$(sf data query --target-org "$ORG_ALIAS" -q "SELECT Id FROM User WHERE Username='<admin>'" --json | jq -r '.result.records[0].Id')
-QUEUE_ID=$(sf data query --target-org "$ORG_ALIAS" -q "SELECT Id FROM Group WHERE Type='Queue' AND DeveloperName='<voice_queue>'" --json | jq -r '.result.records[0].Id')
-sf data create record --target-org "$ORG_ALIAS" --sobject GroupMember --values "GroupId=$QUEUE_ID UserOrGroupId=$ADMIN_ID"
-```
-The queue must support `VoiceCall` as a sObject and its `QueueRoutingConfig.RoutingModel`
-must be `LEAST_ACTIVE`/`MostAvailable` (NOT `ExternalRouting`) — `skywave_routing` already is.
+The two voice routing flows (`Skywave_Route_to_Voice_Agent`, `Skywave_Route_Voice_to_Queue`)
+carry the queue Id as a `%%SKYWAVE_VOICE_QUEUE_ID%%` placeholder that the Tier-1 deploy
+substitutes with the org's real `SDO_Service_Voice_Call` queue Id (it's re-minted per
+org — a hardcoded Id from another org would break escalation). The queue ships supporting
+`VoiceCall` with `LEAST_ACTIVE` routing (`skywave_routing`), so no manual queue config.
 
 ---
 
