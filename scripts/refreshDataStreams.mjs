@@ -65,7 +65,10 @@ function sf(args) {
 async function main() {
     console.log('→ Resolving org…');
     const org = sf(['org', 'display', '--json']).result;
-    const { accessToken, instanceUrl } = org;
+    const { instanceUrl } = org;
+    // Newer sf CLI redacts accessToken from `org display`; fetch it from the
+    // supported command (--no-prompt skips its interactive security warning).
+    const accessToken = sf(['org', 'auth', 'show-access-token', '--no-prompt', '--json']).result.accessToken;
 
     console.log('→ Querying observability data streams…');
     const where = botOnly

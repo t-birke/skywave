@@ -16,14 +16,20 @@ SITE_NAME="${SITE_NAME:-ESA_Deployment1}"
 ORG_TARGET_ARG=()
 [ -n "${ORG_ALIAS:-}" ] && ORG_TARGET_ARG=(--target-org "$ORG_ALIAS")
 
-ORG_INFO=$(sf org display "${ORG_TARGET_ARG[@]}" --json)
-ACCESS_TOKEN=$(echo "$ORG_INFO" | jq -r '.result.accessToken')
-INSTANCE_URL=$(echo "$ORG_INFO" | jq -r '.result.instanceUrl')
+INSTANCE_URL=$(sf org display "${ORG_TARGET_ARG[@]}" --json | jq -r '.result.instanceUrl')
+# Newer sf CLI REDACTS accessToken from `sf org display --json` (prints
+# "[REDACTED] Use 'sf org auth show-access-token'…"), which would send a bogus
+# Bearer header → INVALID_AUTH_HEADER → a JSON *array* error body that crashes the
+# `.records[0]` jq below. Use the supported token command instead.
+ACCESS_TOKEN=$(sf org auth show-access-token "${ORG_TARGET_ARG[@]}" --no-prompt --json | jq -r '.result.accessToken')
+[ -n "$ACCESS_TOKEN" ] && [ "$ACCESS_TOKEN" != "null" ] || { echo "ERROR: could not obtain an access token for the target org" >&2; exit 1; }
 
-# Skip if already exists.
+# Skip if already exists. `// empty` on BOTH the array index AND a possible error
+# body ([{errorCode:…}] has no .records) so a non-2xx response degrades to "create"
+# instead of aborting the whole installer under `set -e`.
 EXISTING=$(curl -s -H "Authorization: Bearer $ACCESS_TOKEN" \
     "${INSTANCE_URL}/services/data/v66.0/tooling/query?q=SELECT+Id+FROM+EmbeddedServiceConfig+WHERE+DeveloperName='${DEPLOYMENT_NAME}'" \
-    | jq -r '.records[0].Id // ""')
+    | jq -r 'if type=="object" then (.records[0].Id // "") else "" end')
 
 if [ -n "$EXISTING" ]; then
     echo "EmbeddedServiceConfig '$DEPLOYMENT_NAME' already exists ($EXISTING)"

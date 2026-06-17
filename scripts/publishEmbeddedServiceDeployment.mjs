@@ -68,7 +68,12 @@ async function main() {
     const orgArgs = ['org', 'display', '--json'];
     if (targetOrg) orgArgs.push('--target-org', targetOrg);
     const org = sf(orgArgs).result;
-    const { accessToken, instanceUrl } = org;
+    const { instanceUrl } = org;
+    // Newer sf CLI redacts accessToken from `org display`; fetch it from the
+    // supported command (--no-prompt skips its interactive security warning).
+    const tokenArgs = ['org', 'auth', 'show-access-token', '--no-prompt', '--json'];
+    if (targetOrg) tokenArgs.push('--target-org', targetOrg);
+    const accessToken = sf(tokenArgs).result.accessToken;
     const { setupHost } = deriveHosts(instanceUrl);
 
     console.log(`→ Finding EmbeddedServiceConfig "${deploymentName}"…`);

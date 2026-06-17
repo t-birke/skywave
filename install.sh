@@ -48,7 +48,13 @@ cd "$REPO_ROOT"
 # ─── Config (override via env) ──────────────────────────────────────────────
 ORG_ALIAS="${ORG_ALIAS:-si}"            # the SDO alias (memory: `si` = target SDO)
 AGENT_API_NAME="Skywave_Airlines_Agent"
-ESC_NAME="Skywave_MIAW_Deployment"
+# The EmbeddedServiceConfig the demo uses. Ships as force-app metadata
+# (EmbeddedServiceConfig/Skywave_MIAW…) WITH clientVersion=WebV2 + the hidden
+# Session_ID prechat field, deployed by §1.4. (The older Tooling-API create path —
+# scripts/createEmbeddedServiceConfig.sh, named Skywave_MIAW_Deployment — existed
+# only because Metadata API once couldn't set WebV2; it now can, so §1.10 just
+# verifies the metadata ESC instead of creating a colliding one on the same site.)
+ESC_NAME="Skywave_MIAW"
 CUSTOMER_SITE_NAME="skywave website"
 ESW_SITE_NAME="ESA_Deployment"
 HEROKU_APP="${HEROKU_APP:-skywave-app}"
@@ -297,6 +303,15 @@ dc_present() {
     sf data query --target-org "$ORG_ALIAS" -q "SELECT COUNT() FROM DataStream" >/dev/null 2>&1
 }
 
+# Resolve a live access token for the target org. Newer sf CLI REDACTS accessToken
+# from `sf org display --json` (prints a "[REDACTED] Use 'sf org auth
+# show-access-token'…" placeholder), so reading it from there yields a bogus Bearer
+# header. `sf org auth show-access-token` is the supported path (--no-prompt skips
+# its interactive security warning).
+org_access_token() {
+    sf org auth show-access-token --target-org "$ORG_ALIAS" --no-prompt --json 2>/dev/null | jq -r '.result.accessToken // empty'
+}
+
 # Deploy the CRM-tier of the vendored observability metadata (the SDO_Analytics_*
 # custom objects + their Apex/LWC/app/tabs/layouts/flexipages/permsets). These are
 # plain custom objects (no Data Cloud needed) and MUST exist before the force-app
@@ -458,11 +473,17 @@ PYEOF
         ok "ESW site published"; done_mark 1.9
     fi
 
-    # ── 1.10 Create EmbeddedServiceConfig (Tooling API, v2/Enhanced) ─────────
+    # ── 1.10 Verify the EmbeddedServiceConfig (deployed as metadata in §1.4) ──
+    # The ESC ships as force-app metadata (WebV2 + Skywave_Channel + hidden
+    # Session_ID prechat field) and lands in §1.4, so here we just confirm it
+    # exists. (The legacy Tooling-API create path collided on the site once the
+    # metadata ESC deployed; it's retained at scripts/createEmbeddedServiceConfig.sh
+    # only for orgs that predate the WebV2-capable Metadata API.)
     if section 1.10; then
-        say "1.10 Create EmbeddedServiceConfig (v2/Enhanced)"
-        ORG_ALIAS="$ORG_ALIAS" ./scripts/createEmbeddedServiceConfig.sh
-        ok "ESC ensured"; done_mark 1.10
+        say "1.10 Verify EmbeddedServiceConfig '${ESC_NAME}'"
+        local esc_check; esc_check="$(sfqt "SELECT Id FROM EmbeddedServiceConfig WHERE DeveloperName='${ESC_NAME}'")"
+        [ -n "$esc_check" ] || die "EmbeddedServiceConfig '${ESC_NAME}' not found — did §1.4 deploy force-app/main/default/EmbeddedServiceConfig?"
+        ok "ESC present (${esc_check})"; done_mark 1.10
     fi
 
     # ── 1.11 Publish customer LWR site + flip Network Live ───────────────────
@@ -579,7 +600,7 @@ PKG
         # Warm the CDN with one authenticated server-side render so the FIRST
         # anonymous visitor doesn't hit the login screen.
         local token jar="/tmp/skywave-warm-${ORG_ID}.jar"
-        token="$(sf org display --target-org "$ORG_ALIAS" --json | jq -r '.result.accessToken')"
+        token="$(org_access_token)"
         curl -sL -o /dev/null -b "$jar" -c "$jar" \
             "${INSTANCE_URL}/secur/frontdoor.jsp?sid=${token}&retURL=%2Fskywavevforcesite%2F" 2>/dev/null \
             && ok "CDN warmed" || warn "CDN warm-up failed — first guest visit may see login until it propagates"
