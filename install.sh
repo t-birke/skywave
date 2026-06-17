@@ -503,6 +503,12 @@ PYEOF
     # OLD Reservation__c model. The current, re-runnable seeds are these three.
     if section 1.12; then
         say "1.12 Seed demo data (idempotent)"
+        # The seed apex SELECTs/writes custom fields (Aircraft_Type__c, …). FLS hides
+        # no-access fields from SOQL even for a System Administrator, so without the
+        # Skywave_Demo_Admin permset (the one carrying all 60 custom-field grants) the
+        # seed fails with a phantom "No such column". The 'Demo' permset only covers a
+        # handful of fields — assign BOTH to the running user before seeding.
+        sf org assign permset --target-org "$ORG_ALIAS" --name Skywave_Demo_Admin 2>/dev/null || true
         sf org assign permset --target-org "$ORG_ALIAS" --name Demo 2>/dev/null || true
         sf apex run --target-org "$ORG_ALIAS" --file scripts/apex/seedSkywaveBookingData.apex >/dev/null
         sf apex run --target-org "$ORG_ALIAS" --file scripts/apex/seedSkywaveSeatMaps.apex   >/dev/null
