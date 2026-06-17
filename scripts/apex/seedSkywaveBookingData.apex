@@ -221,11 +221,14 @@ for (Map<String, Object> r : routes) {
     f.Operates_Friday__c    = days.contains('Friday');
     f.Operates_Saturday__c  = days.contains('Saturday');
     f.Operates_Sunday__c    = days.contains('Sunday');
-    Decimal basic = (Decimal) r.get('priceBasic');
-    f.Base_Price_Basic__c            = basic;
-    f.Base_Price_Choice__c           = (basic * 1.3).setScale(2);
-    f.Base_Price_Choice_Preferred__c = (basic * 1.8).setScale(2);
-    f.Base_Price_Choice_Extra__c     = (basic * 2.5).setScale(2);
+    // Cabin-class pricing (the Basic/Choice fare-bundle fields were removed in the
+    // Phase 4 booking overhaul). `priceBasic` is the Economy floor; the multipliers
+    // match scripts/apex/seedSkywaveRouteNetwork.apex so both seeders price alike.
+    Decimal eco = (Decimal) r.get('priceBasic');
+    f.Base_Price_Economy__c         = eco;
+    f.Base_Price_Premium_Economy__c = (eco * 1.6).setScale(2);
+    f.Base_Price_Business__c        = (eco * 2.8).setScale(2);
+    f.Base_Price_First__c           = (eco * 4.2).setScale(2);
     flightsToInsert.add(f);
 }
 if (!flightsToInsert.isEmpty()) insert flightsToInsert;
