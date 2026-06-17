@@ -306,16 +306,23 @@ class Pipeline:
             src_stem = src[:-5] if src.endswith("__dll") else src
             if src_stem in self._existing_map_sources(m["targetDmo"]):
                 results.append(f"{m['targetDmo']}:exists"); continue
-            body = {"objectSourceTargetMaps": [{
+            # CREATE shape (≠ the GET read shape): a BARE object with the field
+            # array under `fieldMapping` (SINGULAR). The earlier code used the read
+            # shape (`objectSourceTargetMaps` wrapper + `fieldMappings` plural), which
+            # the create endpoint rejects with JSON_PARSER_ERROR → every mapping 400'd
+            # silently (the old `ok` check didn't catch a bare 400, so IR then failed
+            # on "unmapped data lake objects"). Verified against d360_dmo_mapping_create.
+            body = {
                 "sourceEntityDeveloperName": src,
                 "targetEntityDeveloperName": m["targetDmo"],
-                "fieldMappings": m["fieldMappings"]}]}
+                "fieldMapping": m["fieldMappings"]}
             st, resp = self.post(f"/data-model-object-mappings?dataspace={DATASPACE}", body)
             txt = json.dumps(resp)
             ok = st in (200, 201) or "DUPLICATE_DLO_TO_DMO_MAPPING" in txt or "already" in txt.lower()
             results.append(f"{m['targetDmo']}:{'ok' if ok else st}")
-        emit("mappings", status="ok", results=results)
-        return True
+        bad = [r for r in results if not (r.endswith(":ok") or r.endswith(":exists"))]
+        emit("mappings", status="error" if bad else "ok", results=results)
+        return not bad
 
     # 8 — IR ruleset ----------------------------------------------------------
     def step_ir(self):
@@ -325,10 +332,86 @@ class Pipeline:
         if any(r.get("label") == ir["label"] for r in existing):
             emit("ir", status="ok", note="ruleset already exists", label=ir["label"])
             return True
+        # The captured payload is org-specific in two ways that must be fixed per org:
+        #   (a) it carries DERIVED fields the create API rejects (linkDmoName,
+        #       unifiedDmoName — the platform re-mints these), and
+        #   (b) it hardcodes the SOURCE org's web-connector DLO names, which carry a
+        #       random 8-hex suffix that differs in every org
+        #       (skywave_app_identity_8D2D3E28 on si → _3F539B36 on si2). Remap by the
+        #       semantic prefix (skywave_app_<thing>_<hex>) to THIS org's actual DLOs.
+        ir = self._localize_ir(ir)
+        # rulesetId is REQUIRED and must be <=4 chars (the SDK's default "${suffix}"
+        # template isn't substituted server-side → "Ruleset ID '${suffix}'…"). Set a
+        # short literal once.
+        ir.setdefault("rulesetId", "swv")
         st, resp = self.post("/identity-resolutions", ir)
-        ok = st in (200, 201)
-        emit("ir", status="ok" if ok else "error", code=st, detail=None if ok else str(resp)[:300])
-        return ok
+        if st in (200, 201):
+            emit("ir", status="ok", id=(resp or {}).get("id"), note="full ruleset")
+            return True
+        # Fallback: the AnonymousId/CookieId match rule (PartyIdentification →
+        # AnonymousId__c, partyType CookieId) reliably gacks this org's IR create with
+        # a server UNKNOWN_EXCEPTION (verified by bisect: email-only succeeds, +anon
+        # gacks). The email match rule is the PRIMARY anonymous→known fusion, so post
+        # WITHOUT the AnonymousId rule rather than fail the tier. (deviceId stitching
+        # still happens via the websdk Individual; the email rule fuses web↔CRM.)
+        email_only = [m for m in ir.get("matchRules", [])
+                      if "anonymous" not in str(m.get("label", "")).lower()
+                      and not any((c.get("partyIdentificationInfo") or {}).get("partyType") == "CookieId"
+                                  for c in m.get("criteria", []))]
+        if email_only and len(email_only) != len(ir.get("matchRules", [])):
+            ir["matchRules"] = email_only
+            st2, resp2 = self.post("/identity-resolutions", ir)
+            if st2 in (200, 201):
+                emit("ir", status="ok", id=(resp2 or {}).get("id"),
+                     note="email-only (AnonymousId rule dropped — gacks this org's IR API)")
+                return True
+            emit("ir", status="error", code=st2, detail=str(resp2)[:300]); return False
+        emit("ir", status="error", code=st, detail=str(resp)[:300])
+        return False
+
+    def _localize_ir(self, ir):
+        import re
+        # 1) Build prefix → this-org DLO-name map from the live web-connector streams.
+        #    Stream/DLO names look like skywave_app_identity_3F539B36 ; key on the part
+        #    before the trailing _<8 hex>.
+        here = {}
+        for s in self._all_streams():
+            nm = s.get("name", "")
+            m = re.match(r"(skywave_app_[A-Za-z]+)_[0-9A-Fa-f]{8}$", nm)
+            if m:
+                here[m.group(1)] = nm
+        # 2) Walk the payload: drop derived fields, rewrite any skywave_app_<x>_<hex>
+        #    token to this org's DLO (preserving a trailing __dll if present).
+        DROP = {"linkDmoName", "unifiedDmoName"}
+        tok = re.compile(r"(skywave_app_[A-Za-z]+)_[0-9A-Fa-f]{8}(__dll)?")
+        def fix_str(v):
+            def sub(m):
+                pref, dll = m.group(1), m.group(2) or ""
+                return (here.get(pref, m.group(0).replace(dll, "")) + dll) if pref in here else m.group(0)
+            return tok.sub(sub, v)
+        def walk(o):
+            if isinstance(o, dict):
+                return {k: walk(val) for k, val in o.items() if k not in DROP}
+            if isinstance(o, list):
+                return [walk(x) for x in o]
+            if isinstance(o, str):
+                return fix_str(o)
+            return o
+        out = walk(ir)
+        # 3) Drop reconciliation rules with NO sources — the captured payload carried
+        #    si leftovers for ssot__ContactPointPhone/Address (ruleType "lastupdated",
+        #    empty sources, DMOs no Skywave web DLO feeds). Posting them gacks the
+        #    create with a server UNKNOWN_EXCEPTION (the schema warns: lastupdated needs
+        #    ssot__LastModifiedDate__c mapped). Keep only rules that resolved to a real
+        #    source DLO on this org.
+        before = len(out.get("reconciliationRules", []))
+        out["reconciliationRules"] = [r for r in out.get("reconciliationRules", [])
+                                      if r.get("sources")]
+        dropped = before - len(out["reconciliationRules"])
+        if dropped:
+            out["_localized_dropped_recon"] = dropped  # surfaced via emit detail if needed
+            out.pop("_localized_dropped_recon", None)
+        return out
 
     # 9 — data graph ----------------------------------------------------------
     def step_data_graph(self):
