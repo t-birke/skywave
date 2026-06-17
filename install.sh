@@ -273,7 +273,10 @@ resolve_heroku_origin() {
     state_load
     local origin=""
     if command -v heroku >/dev/null 2>&1 && heroku auth:whoami >/dev/null 2>&1; then
-        origin="$(heroku apps:info -a "$HEROKU_APP" --json 2>/dev/null | jq -r '.app.web_url // empty' 2>/dev/null)"
+        # apps:info exits non-zero when the app doesn't exist yet (first run for a
+        # new HEROKU_APP) — with `set -euo pipefail` that non-zero would abort the
+        # whole script, so swallow it with `|| true`. Empty origin → placeholder below.
+        origin="$(heroku apps:info -a "$HEROKU_APP" --json 2>/dev/null | jq -r '.app.web_url // empty' 2>/dev/null || true)"
         origin="${origin%/}"   # strip trailing slash heroku adds
     fi
     [ -z "$origin" ] && origin="${SKYWAVE_HEROKU_ORIGIN:-}"
@@ -1042,7 +1045,13 @@ tier3_heroku() {
             heroku create "$HEROKU_APP" && ok "app created" \
                 || die "heroku create failed (name '${HEROKU_APP}' taken on another account? set HEROKU_APP=<unique>)"
         fi
-        git remote get-url heroku >/dev/null 2>&1 || heroku git:remote -a "$HEROKU_APP"
+        # Always (re)point the 'heroku' git remote at THIS app — never trust a
+        # pre-existing remote, which may still target another org's app (e.g. a
+        # shared account where 'skywave-app' belongs to a different demo org). A
+        # create-if-absent check would silently push §3.4 to the wrong dyno.
+        heroku git:remote -a "$HEROKU_APP" >/dev/null
+        local _rem; _rem="$(git remote get-url heroku 2>/dev/null)"
+        ok "heroku git remote → ${_rem}"
         resolve_heroku_origin   # now picks up the live web_url
         ok "relay origin: ${SKYWAVE_HEROKU_ORIGIN}"
         done_mark 3.2
@@ -1091,6 +1100,19 @@ tier3_heroku() {
         ok "derived config vars set"
         # Secret-bearing vars (only if the local secret exists; never echoed).
         [ -f secrets/jwt.key ] && heroku config:set -a "$HEROKU_APP" SF_JWT_PRIVATE_KEY="$(cat secrets/jwt.key)" >/dev/null && ok "SF_JWT_PRIVATE_KEY set"
+        # SF_CLIENT_ID = the consolidated Connected App's consumer key. It already
+        # lives in .secrets/dc.env (DC_CONSUMER_KEY) for the client_credentials flow;
+        # reuse it for the relay's JWT flow so no manual entry is needed.
+        if [ -f .secrets/dc.env ]; then
+            local _cid; _cid="$(grep -E '^DC_CONSUMER_KEY=' .secrets/dc.env | head -1 | cut -d= -f2-)"
+            [ -n "$_cid" ] && heroku config:set -a "$HEROKU_APP" SF_CLIENT_ID="$_cid" >/dev/null && ok "SF_CLIENT_ID set (from .secrets/dc.env)"
+        fi
+        # SKYWAVE_PROOF_KEY (HMAC for the deviceId proof cookie) — the relay REFUSES
+        # to boot without it (>=32 chars). Generate + persist one if absent.
+        if [ ! -f .secrets/proof.key ]; then openssl rand -base64 48 > .secrets/proof.key 2>/dev/null && chmod 600 .secrets/proof.key; fi
+        [ -s .secrets/proof.key ] && heroku config:set -a "$HEROKU_APP" SKYWAVE_PROOF_KEY="$(cat .secrets/proof.key)" >/dev/null && ok "SKYWAVE_PROOF_KEY set"
+        # PREFLIGHT_KEY — generate one if absent (presenter go/no-go check auth).
+        [ -f .secrets/preflight.key ] || { openssl rand -hex 24 > .secrets/preflight.key 2>/dev/null && chmod 600 .secrets/preflight.key; }
         if [ -f .secrets/preflight.key ]; then
             local _pfk; _pfk="$(cat .secrets/preflight.key)"
             heroku config:set -a "$HEROKU_APP" PREFLIGHT_KEY="$_pfk" >/dev/null && ok "PREFLIGHT_KEY set on Heroku"
@@ -1104,7 +1126,10 @@ tier3_heroku() {
                 || warn "could not set Preflight_Key__c CMD — preflight relay checks will fail until it matches PREFLIGHT_KEY"
             rm -f "$_pfapex"
         fi
-        warn "[GATE] Set remaining secret vars manually if used: SF_CLIENT_ID, SF_MIAW_JWT_*, SKYWAVE_PROOF_KEY, IPINFO_TOKEN, CORS_PROXY_URL (see .env.example / SECRETS.md)."
+        info "[OPTIONAL] These are only needed for specific features and are NOT set"
+        info "automatically: SF_MIAW_JWT_* (+ MIAW JWK keyset upload) for AUTHENTICATED"
+        info "chat (anonymous chat works without); IPINFO_TOKEN for geo pre-fill;"
+        info "CORS_PROXY_URL if a proxy is used. Set per .env.example / SECRETS.md if needed."
         done_mark 3.3
     fi
 
