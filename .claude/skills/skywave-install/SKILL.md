@@ -154,10 +154,13 @@ are now **fully scripted**: Tier 1 §1.3c runs `gen-jwt-keypair.sh` (which auto-
 the public cert into the `Skywave_Heroku_Relay` metadata) and §1.4 deploys the app,
 so the org already trusts `secrets/jwt.crt` — no manual paste. What still needs a
 human (no metadata/API path):
-- **App Manager on `Skywave_Heroku_Relay`** (the one consolidated app): add the
-  `cdp_query_api` + `cdp_ingest_api` scopes, enable **Client Credentials Flow** +
-  a run-as user, and **fetch the consumer secret once** → `.secrets/dc.env` (this
-  is what unblocks G4's MCP path) and `.env`→`SF_CLIENT_ID`.
+- **App Manager on `Skywave_Heroku_Relay`** (the one consolidated app): the CDP
+  scopes (`CDPQuery`/`CDPIngest`), the admin-approved flag, and the
+  Client-Credentials-**enabled** flag are now in the Connected App metadata (verified
+  to round-trip), so they deploy automatically. Two things still have no metadata
+  path: (1) assign the Client Credentials Flow **run-as user** (Edit Policies), and
+  (2) **fetch the consumer key+secret once** (Manage Consumer Details) →
+  `.secrets/dc.env` (unblocks G4's MCP path) + `.env`→`SF_CLIENT_ID`.
 - **MIAW public JWK** uploaded to the **Salesforce Keyset** in Setup (authenticated
   chat fails silently without it).
 - **Secret config vars** the script can't derive (`SF_MIAW_JWT_*`,

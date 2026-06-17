@@ -1014,7 +1014,7 @@ tier3_heroku() {
                 && ok "Connected App deployed with the new cert" \
                 || warn "Connected App redeploy failed — deploy Skywave_Heroku_Relay manually so the org trusts secrets/jwt.crt"
         fi
-        warn "[GATE] MANUAL (no metadata/API path): in App Manager on Skywave_Heroku_Relay add the cdp_query_api + cdp_ingest_api scopes, enable Client Credentials Flow + run-as user, and fetch the consumer secret once (→ .secrets/dc.env). Also upload the MIAW public JWK to the Salesforce Keyset (Setup → Messaging User Verification)."
+        warn "[GATE] MANUAL (no metadata path): on Skywave_Heroku_Relay, (1) assign the Client Credentials Flow RUN-AS USER (App Manager → Edit Policies — the only field with no metadata element), and (2) fetch the consumer key+secret once (App Manager → Manage Consumer Details → .secrets/dc.env + .env SF_CLIENT_ID). The CDP scopes, admin-approved flag, and Client-Credentials-enabled flag are already deployed via the Connected App metadata. Also upload the MIAW public JWK to the Salesforce Keyset (Setup → Messaging User Verification)."
         done_mark 3.1
     fi
 
