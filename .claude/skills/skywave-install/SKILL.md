@@ -142,13 +142,18 @@ Verify success: `sf data query -q "SELECT Name FROM DataStream WHERE Name LIKE
 current-status from a prior bad attempt redeploys fine); once streams exist, §2.6 is
 marked done automatically.
 
-### G5 — Refresh the data streams  (§2.8, §2.9)
-SalesforceDotCom streams refresh only from an **interactive browser session**, not
-the CLI. `install.sh` runs `scripts/refreshDataStreams.mjs` (Playwright, frontdoor
-auth → calls the run endpoint). If it fails, the fallback is the Developer Console
-(browser Execute Anonymous), which has the interactive scope:
-`Skywave_DataStreamRunner.refreshSdoAnalyticsStreams();` then
-`Skywave_DataStreamRunner.refreshBotStreams();`. Then `--resume`.
+### G5 — Refresh the data streams  (§2.8, §2.9)  ← Playwright UI CLICKS (not the API)
+SalesforceDotCom streams refresh only from a real **in-page Lightning action** — the
+`/ssot/data-streams/{id}/actions/run` API rejects ALL token callers (even a
+frontdoor-bridged session) with "Connector type SalesforceDotCom is not allowed to
+run in non-interactive mode". So `scripts/refreshDataStreams.mjs` (run by §2.9) does
+what the QBrix does: frontdoor-auth, then per stream open the DataStream Lightning
+record page and click **Refresh Now → Full Refresh → Refresh Now**. Verified 14/14
+on si2, headless. If it fails, fallbacks: Developer Console Execute Anonymous
+(`Skywave_DataStreamRunner.refreshSdoAnalyticsStreams();` then
+`.refreshBotStreams();`), or Setup → Data Cloud → Data Streams → each → Refresh Now →
+Full Refresh. DMO rows land within a few minutes; verify via
+`SELECT COUNT(*) FROM ssot__AiAgentSession__dlm` on the Data Cloud query API.
 
 ### G6 — Heroku relay config + push  (§3.1, §3.3, §3.4)
 
