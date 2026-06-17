@@ -83,18 +83,21 @@ this must complete before those tiers — `--resume` once it's done.
 ### G2 — Publish the Embedded Service Deployment  (§1.13)
 `install.sh` clicks Publish headlessly via `scripts/publishEmbeddedServiceDeployment.mjs`.
 If that fails (Playwright/auth issue), the script prints a Setup deep-link — open it,
-have the user click **Publish** on the `Skywave_MIAW_Deployment` deployment, then
+have the user click **Publish** on the `Skywave_MIAW` deployment, then
 `--resume`. Without this, the chat widget never renders on the site.
 
-### G3 — Data Cloud STDM provisioning wait  (§2.4)  ⏳ ~2–3h
+### G3 — Data Cloud STDM provisioning wait  (§2.4)  ⏳ async (often minutes)
 After enabling Agentforce Session Tracing, the session-tracing data model
-provisions asynchronously for **2–3 hours**. `install.sh` records the start time
-and exits 0 without blocking. Tell the user they can **close the session**. When
-they return:
-- Run `./install.sh --check-stdm` — exit 0 means ready.
+provisions asynchronously. **Timing varies widely**: observed ready in **~7 min**
+on a fresh SDO (si2, 2026-06-17), though Salesforce historically quotes hours —
+so poll, don't assume. `install.sh` records the start time and exits 0 without
+blocking. When you (or the user) come back:
+- Run `./install.sh --check-stdm` — exit 0 means ready (it checks the `%AiAgent%`
+  session-tracing DataStreams exist: the canonical 8 — AiAgentSession,
+  AiAgentInteraction, …Message, …Step, GenerativeAiUsage, Participant, 2 bridges).
 - If ready, `./install.sh --all --resume` continues from §2.5.
-- If not, report the elapsed minutes and ask them to come back later. Do **not**
-  declare failure early — streams can sit provisioning with no visible progress.
+- If not, just re-poll in a few minutes — it's frequently fast. Don't declare
+  failure early; streams can sit provisioning with no visible progress.
 
 ### G4 — Data-kit instantiation  (§2.6)  ← the one to validate live
 The 3 data-stream bundles (`SDO_AFO_STDM`, `SDO_AFO_Optimization`, `SDO_AFO_Extra`)

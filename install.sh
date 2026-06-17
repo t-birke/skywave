@@ -30,7 +30,8 @@
 # STATE FILE: progress + derived values are written to
 #   .deploy-tmp/install-state.env   (gitignored)
 # after each completed section, so --resume can continue after the long Data
-# Cloud STDM provisioning wait (~2-3h) without re-deriving anything.
+# Cloud STDM provisioning wait without re-deriving anything. (Observed as fast as
+# ~7 min on a fresh SDO once Session Tracing is on; allow up to a few hours.)
 #
 # Prior gotchas preserved from orgInit.sh (the scratch-org predecessor):
 #   - channel deployed as metadata, activated via Apex (IsActive read-only in MDAPI)
@@ -699,15 +700,19 @@ tier2_observability() {
         done_mark 2.3
     fi
 
-    # ── 2.4 STDM provisioning wait (~2-3h) — NON-BLOCKING ─────[GATE/ASYNC]────
+    # ── 2.4 STDM provisioning wait — NON-BLOCKING ────────────[GATE/ASYNC]────
+    # Timing varies: observed as fast as ~7 min on a fresh SDO (si2, 2026-06) once
+    # Session Tracing is enabled, but Salesforce historically quotes hours — so this
+    # is non-blocking and pollable rather than a fixed sleep.
     if section 2.4; then
         say "2.4 STDM provisioning"
         if stdm_ready; then
             ok "STDM already provisioned"; done_mark 2.4
         else
             state_set STDM_WAIT_STARTED_AT "$(date +%s 2>/dev/null || echo 0)"
-            warn "STDM (session-tracing data model) provisioning takes ~2-3h."
-            info "This step does NOT block. Come back later and run:"
+            warn "STDM (session-tracing data model) provisioning is async — often"
+            warn "minutes (seen ~7 min) but can take longer. It does NOT block."
+            info "Come back (or just re-poll) and run:"
             info "    ./install.sh --check-stdm     # is it ready?"
             info "    ./install.sh --all --resume   # continue once ready"
             return 0
@@ -1178,8 +1183,8 @@ case "$MODE" in
         else
             state_load
             if [ -n "${STDM_WAIT_STARTED_AT:-}" ] && [ "${STDM_WAIT_STARTED_AT}" != "0" ]; then
-                info "STDM not ready yet. Elapsed: ~$(( ( $(date +%s 2>/dev/null || echo 0) - STDM_WAIT_STARTED_AT ) / 60 )) min (expect 120-180)."
-            else info "STDM not ready yet (expect 2-3h after enabling session tracing)."; fi
+                info "STDM not ready yet. Elapsed: ~$(( ( $(date +%s 2>/dev/null || echo 0) - STDM_WAIT_STARTED_AT ) / 60 )) min (often ready within minutes; can take longer)."
+            else info "STDM not ready yet (usually minutes after enabling session tracing; allow longer if needed)."; fi
             exit 1
         fi ;;
     install)

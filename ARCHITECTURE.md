@@ -765,7 +765,8 @@ custom objects, no Data Cloud needed.) `install.sh --with-observability` (Tier 2
 then: enable Data Cloud → deploy the **DC layer** (§2.2b — stream templates, DMO
 field maps; §2.2's CRM tier is skipped when §1.3b already ran) → assign analytics
 permsets + enable
-Session Tracing → **wait ~2–3h for STDM provisioning** (non-blocking; resume with
+Session Tracing → **wait for STDM provisioning** (async — often minutes, seen
+~7 min on a fresh SDO, but allow longer; non-blocking; resume with
 `--check-stdm` / `--resume`) → **instantiate the 3 data-kit bundles** (`SDO_AFO_
 STDM`/`Optimization`/`Extra` — a Data Cloud API step the Claude skill runs via the
 data360 MCP, with a Setup → Data Kits UI fallback) → seed 400 branded sessions

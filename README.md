@@ -48,7 +48,7 @@ git config core.hooksPath .githooks   # ARCHITECTURE.md drift reminder on commit
 
 ```sh
 ./install.sh                       # Tier 1: core demo (agent, MIAW chat, sites, data)
-./install.sh --with-observability  # + Data Cloud session-tracing dashboards (adds a ~2–3h wait)
+./install.sh --with-observability  # + Data Cloud session-tracing dashboards (adds an async STDM wait — often minutes)
 ./install.sh --with-heroku         # + preflight relay + consumer-site backend
 ./install.sh --with-globe          # + 3D globe demo-monitor UIBundle (needs the relay; app domain enabled in Setup)
 ./install.sh --with-tracking       # + Interaction-SDK + Data Cloud customer tracking (needs Data Cloud)
@@ -60,11 +60,11 @@ git config core.hooksPath .githooks   # ARCHITECTURE.md drift reminder on commit
 **Tier 1 (core)** recreates nothing destructively — it find-or-creates the agent
 user, the `skywave website` LWR site, deploys all metadata (vendored ESW
 bootstrap site, MessagingChannel, Apex/LWC/objects/flows/agent bundle, CSP/CORS),
-publishes + activates the agent (patching `BotUserId`), creates the
-`Skywave_MIAW_Deployment` Embedded Service config via the Tooling API
-(`clientVersion=WebV2`, no "Switch to v2" click), seeds idempotent booking /
-seatmap / route data, publishes the ESD (Playwright), bakes the ESW config into
-the homepage LWC, and enables guest access. When it finishes it prints the
+publishes + activates the agent (patching `BotUserId`), deploys the
+`Skywave_MIAW` Embedded Service config as metadata (`clientVersion=WebV2`, no
+"Switch to v2" click), seeds idempotent booking / seatmap / route data, publishes
+the ESD (Playwright), bakes the ESW config into the homepage LWC, and enables
+guest access. When it finishes it prints the
 customer-site URL — hard-refresh (Cmd+Shift+R) to clear the LWR bundle cache; the
 chat widget appears bottom-right and routes to `Skywave_Airlines_Agent`.
 
@@ -79,8 +79,9 @@ one, re-run with `--resume`:
   "Publish" button ([PLATFORM_FEEDBACK.md #10](PLATFORM_FEEDBACK.md)), so it's
   clicked headlessly via `scripts/publishEmbeddedServiceDeployment.mjs`; falls
   back to a Setup deep-link.
-- **STDM provisioning wait** (observability) — ~2–3h async; the script exits and
-  you resume with `--check-stdm` / `--resume`.
+- **STDM provisioning wait** (observability) — async; often ready within minutes
+  (seen ~7 min on a fresh SDO) but can take longer. The script exits and you
+  resume with `--check-stdm` / `--resume`.
 - **Data-kit instantiation** (observability) — the skill runs it via the data360
   MCP, with a Setup → Data Kits UI fallback.
 - **Stream Full Refresh** (observability) — `scripts/refreshDataStreams.mjs`, with
