@@ -46,6 +46,7 @@ node_modules/
 # after) to deploy the whole set. Keep these four lines together as one block
 # ended by a blank line — Tier 4's strip keys on the comment + the blank line.
 **/uiBundles/SkywaveGlobe/**
+**/uiBundles/SkywaveGlobe
 **/applications/Skywave_Globe.app-meta.xml
 **/permissionsets/Skywave_Globe_App.permissionset-meta.xml
 **/cspTrustedSites/Skywave_Globe_Relay_Wss.cspTrustedSite-meta.xml
