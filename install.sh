@@ -753,21 +753,28 @@ tier2_observability() {
         done_mark 2.5
     fi
 
-    # ── 2.6 Data-kit instantiation ─────────────────────────────[GATE]────────
-    # Instantiate the SDO_ASA_Observability_Data bundle (the 11 SDO_Analytics_AIAgent*_v2
-    # STDM streams) from the SDO_Agentforce_Observability kit. The data360 MCP CANNOT
-    # do this — verified live (si2, 2026-06): d360_datakit_deploy is DMO-level only
-    # (CI/SEGMENT/SDM), and the update-components endpoint rejects DataStreamBundle
-    # payloads. So the Setup → Data Cloud → Data Kits UI 'Deploy' is canonical. (Skip
-    # SDO_SDR_Observability_Data — SDR cadence data, not needed for Skywave.) The skill
-    # (G4) conducts this. Verify with: SELECT Name FROM DataStream WHERE Name LIKE
-    # 'SDO_Analytics_%'  (or the __dll via Data Cloud SQL).
+    # ── 2.6 Data-kit instantiation ────────────────────────────[SCRIPTED]─────
+    # Instantiate the 3 SDO_AFO_* bundles (STDM/Optimization/Extra) from the
+    # SDO_Agentforce_Observability kit into live SDO_Analytics_* data streams. This
+    # IS programmatic — the exact SSOT REST contract the QBrix used (qx
+    # QbrixCustomDataKitDeploy): POST /ssot/data-kits/{kit}?asyncMode=true + poll
+    # BackgroundOperation. The data360 MCP can't express it (DMO-level only), so
+    # deploy_data_kit_bundles.sh calls the API directly with the .secrets/dc.env
+    # client_credentials token. PRECONDITION: a CRM/SalesforceCRM Data Cloud
+    # connection keyed by the org id (standard on QBrix orgs; on a bare SDO connect
+    # the Salesforce CRM home connection in DC Setup first or the job errors "No CRM
+    # Connection exists"). Needs the consolidated Connected App's client_credentials
+    # set up (run-as user + cdp scopes + consumer secret in .secrets/dc.env).
     if section 2.6; then
         say "2.6 Data-kit instantiation"
-        echo "DATA_KIT_INSTANTIATION_GATE kit=SDO_Agentforce_Observability bundle=SDO_ASA_Observability_Data"
-        warn "[GATE] Instantiate SDO_ASA_Observability_Data via Setup → Data Cloud → Data Kits → SDO Agentforce Observability → Components → Deploy. (MCP can't instantiate bundles — see skill G4.)"
-        info "Mark this section done once the 11 SDO_Analytics_* data streams exist, then --resume."
-        return 0
+        if [ -f .secrets/dc.env ] && ORG_ALIAS="$ORG_ALIAS" ./scripts/datacloud/deploy_data_kit_bundles.sh; then
+            ok "data-kit bundles instantiated (SDO_Analytics_* streams created)"; done_mark 2.6
+        else
+            echo "DATA_KIT_INSTANTIATION_GATE kit=SDO_Agentforce_Observability bundles=SDO_AFO_STDM,SDO_AFO_Optimization,SDO_AFO_Extra"
+            warn "[GATE] Auto data-kit deploy didn't complete (missing .secrets/dc.env, or the CRM connection / client-credentials precondition). Fix per skill G4, or instantiate via Setup → Data Cloud → Data Kits → SDO Agentforce Observability → Components → Deploy."
+            info "Mark §2.6 done once the SDO_Analytics_* data streams exist (SELECT Name FROM DataStream WHERE Name LIKE 'SDO_Analytics_%'), then --resume."
+            return 0
+        fi
     fi
 
     # ── 2.7 Seed Skywave-branded synthetic sessions (Apex) ────────[ASYNC]─────

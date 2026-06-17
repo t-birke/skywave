@@ -99,34 +99,44 @@ blocking. When you (or the user) come back:
 - If not, just re-poll in a few minutes — it's frequently fast. Don't declare
   failure early; streams can sit provisioning with no visible progress.
 
-### G4 — Data-kit instantiation  (§2.6)  ← UI is canonical (MCP can't do bundles)
-The `SDO_Agentforce_Observability` data kit has **2 DataStreamBundle components**
-(verified live on si2 2026-06-17 — the old `SDO_AFO_STDM/Optimization/Extra` names
-are stale):
-- **`SDO_ASA_Observability_Data`** — the 11 `SDO_Analytics_AIAgent*_v2` STDM streams
-  the dashboards + seeder need. **This is the one to instantiate.**
-- `SDO_SDR_Observability_Data` — SDR sales-cadence streams (`ActionCadence*`). **Not
-  needed** for Skywave's agent demo; skip it.
+### G4 — Data-kit instantiation  (§2.6)  ← SCRIPTED (raw SSOT API; not the MCP)
+The `SDO_Agentforce_Observability` kit has **3 DataStreamBundles**:
+`SDO_AFO_STDM` / `SDO_AFO_Optimization` / `SDO_AFO_Extra` (these ARE the right
+names — recovered from the source brix flow `data_cloud / deploy_data_kit_components`).
+`install.sh` §2.6 now instantiates them **programmatically** via
+`scripts/datacloud/deploy_data_kit_bundles.sh`, the exact contract the QBrix used
+(`qx` `QbrixCustomDataKitDeploy.synchronous_data_bundle_deploy`):
+```
+POST {instance}/services/data/v66.0/ssot/data-kits/SDO_Agentforce_Observability?asyncMode=true&dataspace=default
+  {"components":[{"type":"DataStreamBundle","config":{"connectorType":"CRM",
+    "bundleName":"SDO_AFO_STDM","forceNoRefresh":true,"bundleConfig":{"orgId":"<id>"}}}]}
+→ {"jobId":...}  then poll  SELECT Status FROM BackgroundOperation WHERE Id='<jobId>'  until Complete.
+```
+Status check: `GET .../data-kits/{kit}/components/{bundle}/deployment-status`
+(`componentDetails:[]` ⇒ not deployed). Uses the `.secrets/dc.env`
+client_credentials token (so G6's run-as user + cdp scopes + consumer secret must
+be set first).
 
-`install.sh` prints `DATA_KIT_INSTANTIATION_GATE …` and pauses.
+**The data360 MCP CANNOT do this** (verified): `d360_datakit_deploy` is DMO-level
+(CI/SEGMENT/SDM) and rejects the DataStreamBundle `config`. Call the raw API
+(the script does).
 
-**The data360 MCP CANNOT instantiate a DataStreamBundle** (confirmed empirically,
-resolving the old maintainer TODO): `d360_datakit_deploy`'s own example only
-supports `CI`/`SEGMENT`/`SDM` component types, and the `/ssot/data-kits/
-update-components` endpoint rejects every `DataStreamBundle` payload shape
-(`JSON_PARSER_ERROR: Missing property 'config' for external type id 'type'`). The
-MCP deploy is DMO-level only. NOTE: `d360_datakit_component_status` reporting a
-bundle `ACTIVE` is misleading — it means "published in the kit / deployable", NOT
-"streams instantiated". Verify instantiation by querying a stream's DLO via
-`d360_query_sql` (`SELECT COUNT(*) FROM SDO_Analytics_AIAgentSession_v2__dll`) or
-`sf data query -q "SELECT Name FROM DataStream WHERE Name LIKE 'SDO_Analytics_%'"` —
-if the table/stream doesn't exist, it's NOT instantiated.
+**Two traps that cost real time — heed them:**
+1. **MCP org-mismatch:** the data360 MCP reads creds from `~/.claude.json` at
+   **startup**. If you edit that file mid-session the running MCP still hits the OLD
+   org — so MCP results can silently describe the wrong org (it showed si's kit as
+   `SDO_ASA/SDR_Observability_Data` while si2's real bundles are `SDO_AFO_*`). Verify
+   via a connection's `organizationId`, or just use the direct REST API + dc.env token.
+2. **CRM-connection precondition:** the CRM bundles bind to a Data Cloud connection
+   of connector type **CRM/`SalesforceCRM`** keyed by the org id. A bare SDO with only
+   a `SalesforceDotCom_Home` connection fails each job with
+   `Error: No CRM Connection exists for externalRecordId: <orgId>`. Establish the
+   Salesforce CRM home connection in Data Cloud Setup (it's standard on QBrix orgs)
+   before the deploy succeeds.
 
-**Canonical path = UI:** Setup → **Data Cloud → Data Kits** → `SDO Agentforce
-Observability` → Components → click **Deploy** (or **Install**) on
-`SDO_ASA_Observability_Data`. That creates all 11 `SDO_Analytics_*` data streams at
-once. Re-check with the query above; once they exist, mark §2.6 done
-(`DONE_2_6=1`) and `--resume`.
+Verify success: `sf data query -q "SELECT Name FROM DataStream WHERE Name LIKE
+'SDO_Analytics_%'"` (or the `__dll` via Data Cloud SQL). The script is idempotent
+(skips ACTIVE bundles); once streams exist, §2.6 is marked done automatically.
 
 ### G5 — Refresh the data streams  (§2.8, §2.9)
 SalesforceDotCom streams refresh only from an **interactive browser session**, not
