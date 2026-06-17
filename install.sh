@@ -147,9 +147,9 @@ check_prereqs() {
         fi
     fi
     if [ "$WITH_OBS" = "1" ]; then
-        info "observability tier: the data-kit instantiation step (G4) is run by the"
-        info "Claude skill via the data360 MCP (creds in .secrets/dc.env) or a Setup UI"
-        info "click — install.sh marks the gate and continues; see SKILL.md."
+        info "observability tier: the data-kit instantiation (G4 / §2.6) is SCRIPTED via"
+        info "the SSOT REST API (scripts/datacloud/deploy_data_kit_bundles.sh, using the"
+        info ".secrets/dc.env client-credentials token) — no MCP needed; Setup-UI fallback."
     fi
     if [ "$WITH_GLOBE" = "1" ]; then
         need npm "globe UIBundle build" "ships with Node"

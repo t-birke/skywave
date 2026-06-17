@@ -82,8 +82,9 @@ one, re-run with `--resume`:
 - **STDM provisioning wait** (observability) — async; often ready within minutes
   (seen ~7 min on a fresh SDO) but can take longer. The script exits and you
   resume with `--check-stdm` / `--resume`.
-- **Data-kit instantiation** (observability) — the skill runs it via the data360
-  MCP, with a Setup → Data Kits UI fallback.
+- **Data-kit instantiation** (observability) — scripted via the SSOT REST API
+  (`scripts/datacloud/deploy_data_kit_bundles.sh`, using the `.secrets/dc.env`
+  client-credentials token), with a Setup → Data Kits UI fallback. No MCP required.
 - **Stream Full Refresh** (observability) — `scripts/refreshDataStreams.mjs`, with
   a Dev Console Apex fallback.
 - **Heroku keys** — the Connected App cert + MIAW JWK upload are manual Setup steps.

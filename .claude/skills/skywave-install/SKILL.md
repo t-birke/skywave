@@ -16,7 +16,7 @@ Standing up the **Skywave Interactive** demo from a clean clone into a Salesforc
 Demo Org. You are a **conductor**, not a script author: the repo's `install.sh` is
 the single source of truth for every command. Your job is to run it, read its
 output, and handle the handful of **gates** where a human or a Claude-only tool
-(an MCP call, a headless browser, a Setup click) is required. The script is
+(a headless browser, a Setup click) is required. The script is
 idempotent and resumable, so you never have to reconstruct state by hand.
 
 **Do not reimplement install.sh's commands in chat.** If a step needs doing, run
@@ -182,7 +182,7 @@ human (no metadata/API path):
   to round-trip), so they deploy automatically. Two things still have no metadata
   path: (1) assign the Client Credentials Flow **run-as user** (Edit Policies), and
   (2) **fetch the consumer key+secret once** (Manage Consumer Details) →
-  `.secrets/dc.env` (unblocks G4's MCP path) + `.env`→`SF_CLIENT_ID`.
+  `.secrets/dc.env` (unblocks G4's raw-API deploy) + `.env`→`SF_CLIENT_ID`.
 - **MIAW public JWK** uploaded to the **Salesforce Keyset** in Setup (authenticated
   chat fails silently without it).
 - **Secret config vars** the script can't derive (`SF_MIAW_JWT_*`,

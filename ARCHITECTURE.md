@@ -768,8 +768,10 @@ permsets + enable
 Session Tracing → **wait for STDM provisioning** (async — often minutes, seen
 ~7 min on a fresh SDO, but allow longer; non-blocking; resume with
 `--check-stdm` / `--resume`) → **instantiate the 3 data-kit bundles** (`SDO_AFO_
-STDM`/`Optimization`/`Extra` — a Data Cloud API step the Claude skill runs via the
-data360 MCP, with a Setup → Data Kits UI fallback) → seed 400 branded sessions
+STDM`/`Optimization`/`Extra` — scripted via the SSOT REST API,
+`scripts/datacloud/deploy_data_kit_bundles.sh` POSTing to `/ssot/data-kits/…` +
+polling `BackgroundOperation` with the `.secrets/dc.env` client-credentials token;
+no MCP, Setup → Data Kits UI fallback) → seed 400 branded sessions
 (scoped wipe then `Skywave_ObservabilitySeeder.SeedJob(400)`) → **Full-Refresh the
 streams** (`scripts/refreshDataStreams.mjs`: frontdoor-auth a browser session and
 call the run endpoint — SalesforceDotCom streams reject non-interactive tokens,
