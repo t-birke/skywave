@@ -970,11 +970,24 @@ tier3_heroku() {
     command -v heroku >/dev/null 2>&1 || die "heroku CLI not installed"
     heroku auth:whoami >/dev/null 2>&1 || die "not logged into Heroku — run: heroku login"
 
-    # ── 3.1 JWT keypair (idempotent: gen-jwt-keypair.sh refuses to clobber) ──
+    # ── 3.1 JWT keypair + embed cert + (re)deploy the Connected App ──────────
+    # gen-jwt-keypair.sh now AUTO-EMBEDS the public cert into the
+    # Skywave_Heroku_Relay metadata (--no-embed to skip) and refuses to clobber an
+    # existing key without --force. If we generate a fresh key we must redeploy the
+    # app so the org trusts the new cert.
     if section 3.1; then
-        say "3.1 JWT keypair"
-        if [ -f secrets/jwt.key ]; then ok "secrets/jwt.key present"; else ./scripts/gen-jwt-keypair.sh && ok "keypair generated"; fi
-        warn "[GATE] Confirm the public cert (secrets/jwt.crt) is embedded in the Skywave_Heroku_Relay Connected App, and the MIAW public JWK is uploaded to the Salesforce Keyset (Setup) — both are manual."
+        say "3.1 JWT keypair + Connected App cert"
+        if [ -f secrets/jwt.key ]; then
+            ok "secrets/jwt.key present (reusing; cert assumed already embedded + deployed)"
+        else
+            ./scripts/gen-jwt-keypair.sh && ok "keypair generated + cert embedded"
+            sf project deploy start --target-org "$ORG_ALIAS" \
+                --source-dir force-app/main/default/connectedApps/Skywave_Heroku_Relay.connectedApp-meta.xml \
+                --ignore-conflicts --json >/dev/null \
+                && ok "Connected App deployed with the new cert" \
+                || warn "Connected App redeploy failed — deploy Skywave_Heroku_Relay manually so the org trusts secrets/jwt.crt"
+        fi
+        warn "[GATE] MANUAL (no metadata/API path): in App Manager on Skywave_Heroku_Relay add the cdp_query_api + cdp_ingest_api scopes, enable Client Credentials Flow + run-as user, and fetch the consumer secret once (→ .secrets/dc.env). Also upload the MIAW public JWK to the Salesforce Keyset (Setup → Messaging User Verification)."
         done_mark 3.1
     fi
 
