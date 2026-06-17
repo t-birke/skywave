@@ -756,9 +756,15 @@ folded into the `SDO_Agentforce_Analytics` permset, and the internal "NextGen
 Data Tool" data source replaced by our own seeder + `skywave-observability-
 dataset/` CSVs).
 
-**How it gets installed.** `install.sh --with-observability` (Tier 2): enable
-Data Cloud → deploy the vendored metadata (CRM objects first, DC layer second,
-because the field maps reference both) → assign analytics permsets + enable
+**How it gets installed.** The vendored **CRM tier** (the `SDO_Analytics_*`
+objects + their Apex/LWC/app/tabs/layouts/flexipages/permsets) is a **force-app
+compile dependency** — `Skywave_ObservabilitySeeder`/`Skywave_ObservabilityWipe`
+reference those objects via static `new …()` types — so it deploys in **Tier 1
+(§1.3b)**, *before* the blanket force-app deploy, regardless of tier. (It's plain
+custom objects, no Data Cloud needed.) `install.sh --with-observability` (Tier 2)
+then: enable Data Cloud → deploy the **DC layer** (§2.2b — stream templates, DMO
+field maps; §2.2's CRM tier is skipped when §1.3b already ran) → assign analytics
+permsets + enable
 Session Tracing → **wait ~2–3h for STDM provisioning** (non-blocking; resume with
 `--check-stdm` / `--resume`) → **instantiate the 3 data-kit bundles** (`SDO_AFO_
 STDM`/`Optimization`/`Extra` — a Data Cloud API step the Claude skill runs via the

@@ -18,7 +18,7 @@
         </actionParameterMappings>
         <externalParameterName>Session_ID</externalParameterName>
         <masterLabel>Session ID</masterLabel>
-        <maxLength>0</maxLength>
+        <maxLength>255</maxLength>
         <name>Session_ID</name>
         <parameterDataType>String</parameterDataType>
     </customParameters>

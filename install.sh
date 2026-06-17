@@ -297,6 +297,31 @@ dc_present() {
     sf data query --target-org "$ORG_ALIAS" -q "SELECT COUNT() FROM DataStream" >/dev/null 2>&1
 }
 
+# Deploy the CRM-tier of the vendored observability metadata (the SDO_Analytics_*
+# custom objects + their Apex/LWC/app/tabs/layouts/flexipages/permsets). These are
+# plain custom objects (no Data Cloud needed) and MUST exist before the force-app
+# blanket deploy: force-app's Skywave_ObservabilitySeeder / Skywave_ObservabilityWipe
+# reference SDO_Analytics_*_v2__c via STATIC `new ...()` types, so they fail to
+# COMPILE if the objects aren't present (the dynamic-SOQL consumers — DataStreamRunner,
+# SessionInspectorController — compile fine without them, which is why this gap hid
+# until the first true fresh-SDO run). Deployed as ONE unit so the flexipage→LWC and
+# object→record-page action-override refs resolve in-batch (piecemeal deploys roll
+# back). Idempotent (--ignore-conflicts); called from §1.3b (Tier 1 prerequisite) and
+# guarded by the 1.3b done-marker so §2.2 doesn't redeploy it.
+deploy_vendor_obs_crm() {
+    local V="${VENDOR_OBS_DIR}/main/default"
+    sf project deploy start --target-org "$ORG_ALIAS" \
+        --source-dir "$V/objects" \
+        --source-dir "$V/classes" \
+        --source-dir "$V/lwc" \
+        --source-dir "$V/applications" \
+        --source-dir "$V/tabs" \
+        --source-dir "$V/layouts" \
+        --source-dir "$V/flexipages" \
+        --source-dir "$V/permissionsets" \
+        --ignore-conflicts --wait 30 --concise
+}
+
 # ════════════════════════════════════════════════════════════════════════════
 #  TIER 1 — CORE DEMO   (derived from orgInit.sh, made idempotent for an SDO)
 # ════════════════════════════════════════════════════════════════════════════
@@ -340,6 +365,18 @@ tier1_core() {
             ok "customer site provisioned"
         fi
         done_mark 1.3
+    fi
+
+    # ── 1.3b Vendor observability OBJECTS (force-app compile dependency) ──────
+    # force-app's Skywave_ObservabilitySeeder/Wipe statically reference the
+    # SDO_Analytics_*_v2__c objects defined ONLY in vendor/, so those objects must
+    # land before §1.4 or the blanket force-app deploy fails to compile them. These
+    # are plain custom objects (deploy without Data Cloud), so this is safe even on
+    # a core-only install. Tier 2 §2.2 skips this once 1.3b is marked done.
+    if section 1.3b; then
+        say "1.3b Vendor observability objects (force-app compile dependency)"
+        deploy_vendor_obs_crm
+        ok "vendor observability CRM metadata deployed"; done_mark 1.3b
     fi
 
     # ── 1.4 Metadata deploy pass 1 (dummy routing IDs) ───────────────────────
@@ -600,18 +637,17 @@ tier2_observability() {
     # maps reference both the SDO object fields and the DC DMOs, so DC must be
     # active and the objects must exist first).
     if section 2.2; then
-        say "2.2 Deploy vendored observability metadata (CRM tier)"
-        sf project deploy start --target-org "$ORG_ALIAS" \
-            --source-dir "${VENDOR_OBS_DIR}/main/default/objects" \
-            --source-dir "${VENDOR_OBS_DIR}/main/default/classes" \
-            --source-dir "${VENDOR_OBS_DIR}/main/default/lwc" \
-            --source-dir "${VENDOR_OBS_DIR}/main/default/applications" \
-            --source-dir "${VENDOR_OBS_DIR}/main/default/tabs" \
-            --source-dir "${VENDOR_OBS_DIR}/main/default/layouts" \
-            --source-dir "${VENDOR_OBS_DIR}/main/default/flexipages" \
-            --source-dir "${VENDOR_OBS_DIR}/main/default/permissionsets" \
-            --ignore-conflicts --wait 30 --concise
-        ok "CRM observability metadata deployed"
+        # CRM tier (objects/classes/lwc/app/tabs/layouts/flexipages/permsets) is a
+        # force-app compile dependency, so Tier 1 §1.3b already deploys it. Redeploy
+        # here only if 1.3b didn't run (e.g. someone runs Tier 2 against an org whose
+        # Tier 1 predates this ordering fix). Idempotent either way.
+        if is_done 1.3b; then
+            ok "2.2 CRM observability metadata already deployed in §1.3b — skipping"
+        else
+            say "2.2 Deploy vendored observability metadata (CRM tier)"
+            deploy_vendor_obs_crm
+            ok "CRM observability metadata deployed"
+        fi
         say "2.2b Deploy vendored observability metadata (Data Cloud tier)"
         sf project deploy start --target-org "$ORG_ALIAS" \
             --source-dir "${VENDOR_OBS_DIR}/main/default/dataStreamTemplates" \

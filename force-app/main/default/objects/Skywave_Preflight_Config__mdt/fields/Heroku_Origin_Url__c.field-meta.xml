@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Heroku_Origin_Url__c</fullName>
-    <description>HTTPS origin of the Heroku skywave-app dyno (no trailing slash), e.g. https://skywave-app-<hash>.herokuapp.com. Set by install.sh once provisioned; read via Skywave_HerokuConfig. Apex appends /api/preflight.</description>
+    <description>HTTPS origin of the Heroku skywave-app dyno (no trailing slash), e.g. https://skywave-app-&lt;hash&gt;.herokuapp.com. Set by install.sh once provisioned; read via Skywave_HerokuConfig. Apex appends /api/preflight.</description>
     <label>Heroku Origin URL</label>
     <length>255</length>
     <required>false</required>
