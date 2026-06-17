@@ -304,6 +304,22 @@ dc_present() {
     sf data query --target-org "$ORG_ALIAS" -q "SELECT COUNT() FROM DataStream" >/dev/null 2>&1
 }
 
+# Ensure the JWT keypair exists AND its public cert is embedded in the
+# Skywave_Heroku_Relay Connected App metadata. The one app + one keypair backs
+# BOTH Tier 3 (Heroku relay JWT) and Tier 5 (Data Cloud / tracking JWT via
+# SF_CLIENT_ID + secrets/jwt.key), so this must run before either — and before
+# §1.4 deploys the Connected App, so the org trusts a cert whose private key we
+# actually hold locally (a stale committed cert would otherwise be deployed with
+# no matching key). gen-jwt-keypair.sh is idempotent (won't clobber an existing
+# key) and auto-embeds the cert; safe to call every run.
+ensure_jwt_keypair() {
+    if [ -f secrets/jwt.key ]; then
+        ok "secrets/jwt.key present (cert assumed embedded)"
+    else
+        ./scripts/gen-jwt-keypair.sh && ok "JWT keypair generated + cert embedded in Connected App"
+    fi
+}
+
 # Resolve a live access token for the target org. Newer sf CLI REDACTS accessToken
 # from `sf org display --json` (prints a "[REDACTED] Use 'sf org auth
 # show-access-token'…" placeholder), so reading it from there yields a bogus Bearer
@@ -393,6 +409,17 @@ tier1_core() {
         say "1.3b Vendor observability objects (force-app compile dependency)"
         deploy_vendor_obs_crm
         ok "vendor observability CRM metadata deployed"; done_mark 1.3b
+    fi
+
+    # ── 1.3c JWT keypair + embed cert (before §1.4 deploys the Connected App) ─
+    # The Connected App ships in force-app and deploys in §1.4. Generate the
+    # keypair + embed its cert FIRST so §1.4 deploys a cert whose private key we
+    # actually hold (a stale committed cert would otherwise be trusted by the org
+    # with no matching local key). Backs both Tier 3 and Tier 5 JWT auth.
+    if section 1.3c; then
+        say "1.3c JWT keypair + Connected App cert"
+        ensure_jwt_keypair
+        done_mark 1.3c
     fi
 
     # ── 1.4 Metadata deploy pass 1 (dummy routing IDs) ───────────────────────
@@ -970,17 +997,17 @@ tier3_heroku() {
     command -v heroku >/dev/null 2>&1 || die "heroku CLI not installed"
     heroku auth:whoami >/dev/null 2>&1 || die "not logged into Heroku — run: heroku login"
 
-    # ── 3.1 JWT keypair + embed cert + (re)deploy the Connected App ──────────
-    # gen-jwt-keypair.sh now AUTO-EMBEDS the public cert into the
-    # Skywave_Heroku_Relay metadata (--no-embed to skip) and refuses to clobber an
-    # existing key without --force. If we generate a fresh key we must redeploy the
-    # app so the org trusts the new cert.
+    # ── 3.1 JWT keypair + Connected App cert ─────────────────────────────────
+    # Tier 1 §1.3c already generates the keypair + embeds the cert, and §1.4
+    # deploys the Connected App. This re-ensures it for the case where someone
+    # runs Tier 3 against an org whose Tier 1 predates §1.3c (no key yet) — then
+    # redeploys the app so the org trusts the freshly embedded cert.
     if section 3.1; then
         say "3.1 JWT keypair + Connected App cert"
         if [ -f secrets/jwt.key ]; then
-            ok "secrets/jwt.key present (reusing; cert assumed already embedded + deployed)"
+            ok "secrets/jwt.key present (embedded + deployed in Tier 1 §1.3c/§1.4)"
         else
-            ./scripts/gen-jwt-keypair.sh && ok "keypair generated + cert embedded"
+            ensure_jwt_keypair
             sf project deploy start --target-org "$ORG_ALIAS" \
                 --source-dir force-app/main/default/connectedApps/Skywave_Heroku_Relay.connectedApp-meta.xml \
                 --ignore-conflicts --json >/dev/null \

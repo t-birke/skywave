@@ -149,14 +149,20 @@ Stuck? **#heroku-support-global** (Heroku support), **#heroku-access-help**
 `./install.sh --with-heroku --resume`.
 
 Once the CLI is authed, `install.sh` creates/attaches the app, sets the config
-vars it can derive (ESW values, org id, etc.), and pushes. Two manual pieces
-remain:
-- **Keys:** confirm the public cert (`secrets/jwt.crt`) is embedded in the
-  `Skywave_Heroku_Relay` Connected App, and the **MIAW public JWK is uploaded to
-  the Salesforce Keyset** in Setup (authenticated chat fails silently without it).
-- **Secret config vars** the script can't derive (`SF_CLIENT_ID`,
-  `SF_MIAW_JWT_*`, `SKYWAVE_PROOF_KEY`, `IPINFO_TOKEN`, `CORS_PROXY_URL`): set them
-  from the user's values per `.env.example` / `SECRETS.md`. Never echo secrets.
+vars it can derive (ESW values, org id, etc.), and pushes. The JWT keypair + cert
+are now **fully scripted**: Tier 1 §1.3c runs `gen-jwt-keypair.sh` (which auto-embeds
+the public cert into the `Skywave_Heroku_Relay` metadata) and §1.4 deploys the app,
+so the org already trusts `secrets/jwt.crt` — no manual paste. What still needs a
+human (no metadata/API path):
+- **App Manager on `Skywave_Heroku_Relay`** (the one consolidated app): add the
+  `cdp_query_api` + `cdp_ingest_api` scopes, enable **Client Credentials Flow** +
+  a run-as user, and **fetch the consumer secret once** → `.secrets/dc.env` (this
+  is what unblocks G4's MCP path) and `.env`→`SF_CLIENT_ID`.
+- **MIAW public JWK** uploaded to the **Salesforce Keyset** in Setup (authenticated
+  chat fails silently without it).
+- **Secret config vars** the script can't derive (`SF_MIAW_JWT_*`,
+  `SKYWAVE_PROOF_KEY`, `IPINFO_TOKEN`, `CORS_PROXY_URL`): set them from the user's
+  values per `.env.example` / `SECRETS.md`. Never echo secrets.
 
 ### G7 — Globe app domain  (Tier 4, §4.0)
 The globe UIBundle serves from `*.salesforce.app`. That **Multi-Framework UIBundle
