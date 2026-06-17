@@ -64,13 +64,21 @@ Progress + derived values persist to `.deploy-tmp/install-state.env`, so
 
 ## The gates (the only places you inject judgment)
 
-### G1 — SDO provisioning / auth  (§0.1)
+### G1 — SDO provisioning / auth / Data Cloud + Agentforce enablement  (§0.1)
 If `install.sh` exits with the "no usable org aliased 'si'" banner, the user must
-provision a **Salesforce Demo Org with Data Cloud** (an SDO, *not* a scratch org)
-from their demo-org portal, then authenticate it:
-`sf org login web --alias si --set-default`. You cannot do the portal step for
-them — wait for them to confirm, then re-run. (To target a different alias, set
-`ORG_ALIAS=<alias>` in the environment.)
+provision a **Salesforce Demo Org** (an SDO, *not* a scratch org) from their
+demo-org portal, then authenticate it: `sf org login web --alias si --set-default`.
+You cannot do the portal step for them — wait, then re-run. (Different alias →
+set `ORG_ALIAS=<alias>`.)
+
+**Data Cloud + Agentforce enablement (do NOT script this):** on first login the
+SDO shows a **"Set up your demo org"** dialogue. Tell the user to toggle ON **Data
+Cloud** and **Agentforce**, click **"Apply selections"**, and let it finish
+(async — a few min up to ~an hour; it also provisions the Genie permsets + default
+data space). This is the supported one-click path; the installer deliberately does
+NOT enable Data Cloud itself. If they clicked "Skip for now", it re-opens from the
+Q Home setup card. Tiers 2 and 5 gate on Data Cloud being active (`dc_present`), so
+this must complete before those tiers — `--resume` once it's done.
 
 ### G2 — Publish the Embedded Service Deployment  (§1.13)
 `install.sh` clicks Publish headlessly via `scripts/publishEmbeddedServiceDeployment.mjs`.

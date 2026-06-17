@@ -86,9 +86,11 @@ These are documented here + flagged by the skill's gates; they are not bugs.
   `.env.example` / `SECRETS.md`.
 - **Voice UI gates (Tier 6):** phone number + channel, the 2 PSTN toggles, re-login.
 - **Multi-Framework app domain (Tier 4):** enable `*.salesforce.app` in Setup.
-- **Data Cloud enable + Session Tracing + data-kit (Tier 2):** the DC-active gate,
-  the session-tracing toggle, and (on a fresh org) the data-kit instantiation +
-  the `Skywave_Customers` data-graph build.
+- **Data Cloud + Agentforce enablement:** done via the SDO's first-login "Set up
+  your demo org" dialogue (toggle both ON → Apply selections) — the supported
+  one-click path; the installer does NOT enable Data Cloud (Tiers 2/5 gate on it).
+  Plus, in Tier 2: the Session Tracing toggle, and (on a fresh org) the data-kit
+  instantiation + the `Skywave_Customers` data-graph build.
 
 ---
 

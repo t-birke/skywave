@@ -28,7 +28,9 @@ Copied verbatim from QBrix-6 (`unpackaged/pre/default/` + `force-app/main/defaul
   `SessionAudio`, `SyntheticSessionSearch`) + 4 matching LWCs, the
   `SDO_Agentforce_Observability_Demo` Lightning app, 13 tabs, 12 layouts,
   2 flexipages, and the `SDO_Agentforce_Analytics` permission set.
-- **Data Cloud tier** — `CustomerDataPlatform.settings` (enables Data Cloud),
+- **Data Cloud tier** — `CustomerDataPlatform.settings` (NOTE: NOT deployed by
+  install.sh — Data Cloud is enabled by the SDO's first-login "Set up your demo
+  org" dialogue, the supported path; this file is kept for reference only),
   1 `dataPackageKitDefinition` (`SDO_Agentforce_Observability`, ships
   `isDeployed=false`/`isEnabled=false`), 15 `DataPackageKitObjects`,
   12 `dataStreamTemplates`, 144 `dataSrcDataModelFieldMaps`, 12 `dataSourceObjects`,

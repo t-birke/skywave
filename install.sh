@@ -177,12 +177,18 @@ cat >&2 <<BANNER
 
 ════════════════════════════════════════════════════════════════════
   No usable org is aliased '${ORG_ALIAS}'. Skywave Interactive needs a
-  Salesforce Demo Org (SDO) with Data Cloud — NOT a scratch org.
+  Salesforce Demo Org (SDO) — NOT a scratch org.
 
-    1. Provision an SDO from your demo-org portal (include Data Cloud).
-    2. Authenticate + alias:
+    1. Provision an SDO from your demo-org portal.
+    2. FIRST LOGIN: the SDO shows a "Set up your demo org" dialogue —
+       toggle ON **Data Cloud** and **Agentforce**, click "Apply
+       selections", and let it finish (provisioning runs async, a few
+       min to ~an hour). This is how Data Cloud gets enabled — the
+       installer does NOT provision it. (If you clicked "Skip for now",
+       re-open it from the Q Home setup card.)
+    3. Authenticate + alias:
          sf org login web --alias ${ORG_ALIAS} --set-default
-    3. Re-run:
+    4. Re-run:
          ./install.sh ${*:-}
 ════════════════════════════════════════════════════════════════════
 
@@ -570,15 +576,20 @@ tier2_observability() {
 
     # ── 2.1 Enable Data Cloud (fire-and-forget; SDOs usually have it) ────────
     if section 2.1; then
-        say "2.1 Ensure Data Cloud is provisioned"
+        say "2.1 Ensure Data Cloud is enabled"
         if dc_present; then
-            ok "Data Cloud already provisioned"
+            ok "Data Cloud already enabled"
         else
-            info "deploying CustomerDataPlatform settings to start provisioning…"
-            sf project deploy start --target-org "$ORG_ALIAS" \
-                --source-dir "${VENDOR_OBS_DIR}/main/default/settings" --ignore-conflicts --json >/dev/null \
-                || warn "settings deploy returned non-zero (may already be enabling)"
-            warn "Data Cloud provisioning is async (~20 min on a fresh org). Re-run --resume once it's active (check Setup → Data Cloud Setup Home)."
+            # Data Cloud is enabled by the SDO's first-login "Set up your demo
+            # org" dialogue (toggle Data Cloud + Agentforce → Apply selections),
+            # NOT by this installer — that's the supported, one-click path and it
+            # also provisions the Genie permsets + data space. We don't deploy
+            # CustomerDataPlatform settings or assign Genie permsets here.
+            warn "[GATE] Data Cloud is not enabled on '${ORG_ALIAS}'."
+            info "Open the SDO's 'Set up your demo org' dialogue (first login, or the"
+            info "Q Home setup card), toggle ON **Data Cloud** + **Agentforce**, click"
+            info "'Apply selections', and wait for it to finish (async, a few min to"
+            info "~an hour). Then: ./install.sh --with-observability --resume"
             done_mark 2.1; return 0
         fi
         done_mark 2.1

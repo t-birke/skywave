@@ -23,8 +23,11 @@ and say **"install Skywave"** — the skill takes over.
 ### Prerequisites
 
 - [Salesforce CLI (`sf`)](https://developer.salesforce.com/tools/salesforcecli) — v2, not `sfdx`
-- An **SDO with Data Cloud**, authenticated and aliased `si`:
-  `sf org login web --alias si --set-default`
+- An **SDO**, authenticated and aliased `si`:
+  `sf org login web --alias si --set-default`. On first login the SDO shows a
+  **"Set up your demo org"** dialogue — toggle ON **Data Cloud** + **Agentforce**
+  and click "Apply selections" (this enables Data Cloud, needed for the
+  observability + tracking tiers; the installer doesn't enable it for you).
 - [`jq`](https://jqlang.github.io/jq/) and `python3` on your PATH (`brew install jq`; python3 ships with macOS)
 - Node.js 18+/20, then `npm install && npx playwright install chromium`
   (Playwright drives the two headless-browser gates: ESD Publish + Data Cloud
