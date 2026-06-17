@@ -993,14 +993,22 @@ PYEOF
         done_mark 6.2
     fi
 
-    # ── 6.3 Phone number + NativeVoice channel (UI GATE) ─────────────────────
+    # ── 6.3 Phone number + NativeVoice channel (UI GATE — auto-advances) ─────
     if section 6.3; then
         say "6.3 Phone number + voice channel"
-        warn "[GATE] Claim a phone number + create a NativeVoice channel in Setup →"
-        info "Communication Channels (UI-only — no API). CRITICAL: do this AFTER §6.1's"
-        info "permsets + re-login, or the channel create fails and the number is stuck."
-        info "Full click-by-click steps + gotchas: docs/VOICE_SETUP.md §6.3. Then --resume."
-        return 0
+        # Auto-detect: once a PstnVoice channel exists (the UI claim is done), mark
+        # the gate done and fall through to the scripted §6.4 binding on this same run
+        # — don't make the user re-resume just to clear a gate they've satisfied.
+        if [ -n "$(sfq "SELECT Id FROM MessagingChannel WHERE MessageType='PstnVoice' LIMIT 1")" ]; then
+            ok "PstnVoice channel present — proceeding to scripted routing bind (§6.4)"
+            done_mark 6.3
+        else
+            warn "[GATE] Claim a phone number + create a NativeVoice channel in Setup →"
+            info "Communication Channels (UI-only — no API). CRITICAL: do this AFTER §6.1's"
+            info "permsets + re-login, or the channel create fails and the number is stuck."
+            info "Full click-by-click steps + gotchas: docs/VOICE_SETUP.md §6.3. Then --resume."
+            return 0
+        fi
     fi
 
     # ── 6.4 Bind channel routing to the inbound flow + queue (SCRIPTED) ───────
