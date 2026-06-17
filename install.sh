@@ -1186,15 +1186,19 @@ tier4_globe() {
     say "TIER 4 — globe demo monitor"
     command -v node >/dev/null 2>&1 || die "node not installed (needed to build the globe UIBundle)"
 
-    # ── 4.0 App-domain prerequisite (Setup-only) ───────────────────[GATE]────
+    # ── 4.0 Multi-Framework feature prerequisite (Setup-only) ──────[GATE]─────
     if section 4.0; then
-        say "4.0 Multi-Framework app domain"
-        warn "[GATE] The UIBundle serves from *.salesforce.app. Enable the Multi-Framework"
-        info  "UIBundle app domain in Setup (one-time, org-side — can't be scripted) BEFORE"
-        info  "the bundle will load. The skill confirms this; mark 4.0 done + --resume."
-        # Don't hard-block: the deploy itself can succeed; the app just won't
-        # render until the domain is on. Continue so a re-run isn't required
-        # solely for this, but the gate is logged for the operator/skill.
+        say "4.0 Multi-Framework / UIBundle feature"
+        warn "[GATE] HARD prerequisite: the UIBundle Metadata API is gated behind the"
+        info  "**Agentforce Vibe for Multi-Framework** feature. If it's OFF, §4.2 FAILS to"
+        info  "deploy with 'UIBundle Metadata API is not enabled because the Agentforce Vibe"
+        info  "for MultiFramework feature gate is disabled' (cascades to the app + permset)."
+        info  "Enable it in Setup (one-time, org-side, can't be scripted), e.g. Setup →"
+        info  "search 'Agentforce Vibe' / Multi-Framework UI, turn it ON; the UIBundle also"
+        info  "serves from *.salesforce.app so confirm that app domain too. Then --resume."
+        # NOT a no-op gate: unlike most, the §4.2 deploy genuinely cannot proceed
+        # until this feature is on. We still continue (build §4.1 is harmless) so a
+        # single --resume finishes once enabled.
         done_mark 4.0
     fi
 
@@ -1223,8 +1227,11 @@ tier4_globe() {
         say "4.2 Deploy globe bundle + app + permset + CSP"
         local fi=".forceignore" fibak; fibak="$(mktemp)"
         cp "$fi" "$fibak"
+        # Restore .forceignore on RETURN *and* EXIT — `die` calls exit (not a
+        # function return), so a RETURN-only trap leaves the globe block stripped
+        # from .forceignore if the deploy fails (it did, before this fix).
         # shellcheck disable=SC2064
-        trap "cp '$fibak' '$fi'; rm -f '$fibak'" RETURN
+        trap "cp '$fibak' '$fi'; rm -f '$fibak'" RETURN EXIT
         FI="$fi" python3 - <<'PYEOF'
 import os
 p = os.environ['FI']; lines = open(p).read().splitlines(); out=[]; skip=False
@@ -1242,8 +1249,8 @@ PYEOF
             --source-dir force-app/main/default/cspTrustedSites/Skywave_Globe_Relay_Wss.cspTrustedSite-meta.xml \
             --ignore-conflicts --wait 30 --concise \
             && ok "globe deployed (bundle + app + permset + CSP)" \
-            || die "globe deploy failed (is the Multi-Framework app domain enabled? see §4.0)"
-        cp "$fibak" "$fi"; rm -f "$fibak"; trap - RETURN
+            || die "globe deploy failed — if it says 'Agentforce Vibe for MultiFramework feature gate is disabled', enable that feature in Setup (§4.0), then --resume."
+        cp "$fibak" "$fi"; rm -f "$fibak"; trap - RETURN EXIT
         done_mark 4.2
     fi
 
