@@ -293,6 +293,37 @@ class Pipeline:
                 out.add(dev.split("_map_")[0])
         return out
 
+    # 6b — custom DMO fields the mappings/IR target (must exist BEFORE mappings) ---
+    def step_dmo_fields(self):
+        # The identity DLO→Individual mapping maps deviceId→AnonymousId__c and the IR
+        # cross-field rule ("Match by AnonymousId", CookieId) targets
+        # ssot__Individual__dlm.AnonymousId__c — but that's a CUSTOM field that does NOT
+        # ship on the stock Individual DMO. It MUST exist before §mappings (else the
+        # platform silently DROPS the deviceId→AnonymousId__c field-map) and before §ir
+        # (else the cross-field rule gacks the create with UNKNOWN_EXCEPTION). And a
+        # mapping, once created, CANNOT be edited/deleted to add the field later — so
+        # ordering is load-bearing: field FIRST. Idempotent (skip if present).
+        # PATCH shape: {"fields":[{"name","label","dataType"}]} — NOT the GET read shape
+        # (which uses "type"/"creationType"); those are rejected on write.
+        want = [("AnonymousId__c", "Anonymous Id", "Text")]
+        dmo = "ssot__Individual__dlm"
+        st, got = self.c.req("GET", f"{self.base}/data-model-objects/{dmo}?dataspace={DATASPACE}")
+        have = {f.get("name") for f in (got.get("fields", []) if isinstance(got, dict) else [])}
+        todo = [(n, l, t) for (n, l, t) in want if n not in have]
+        if not todo:
+            emit("dmo-fields", status="ok", note="custom fields already present", dmo=dmo)
+            return True
+        body = {"fields": [{"name": n, "label": l, "dataType": t} for (n, l, t) in todo]}
+        st, resp = self.c.req("PATCH", f"{self.base}/data-model-objects/{dmo}?dataspace={DATASPACE}", body)
+        # re-GET to confirm the field landed in the definition (PATCH echoes the DMO).
+        _, chk = self.c.req("GET", f"{self.base}/data-model-objects/{dmo}?dataspace={DATASPACE}")
+        now = {f.get("name") for f in (chk.get("fields", []) if isinstance(chk, dict) else [])}
+        ok = all(n in now for (n, _, _) in todo)
+        emit("dmo-fields", status="ok" if ok else "error",
+             added=[n for (n, _, _) in todo if n in now],
+             detail=None if ok else str(resp)[:200])
+        return ok
+
     def step_mappings(self):
         spec = pj("mappings.json")["mappings"]
         results = []
@@ -349,11 +380,15 @@ class Pipeline:
             emit("ir", status="ok", id=(resp or {}).get("id"), note="full ruleset")
             return True
         # Fallback: the AnonymousId/CookieId match rule (PartyIdentification →
-        # AnonymousId__c, partyType CookieId) reliably gacks this org's IR create with
-        # a server UNKNOWN_EXCEPTION (verified by bisect: email-only succeeds, +anon
-        # gacks). The email match rule is the PRIMARY anonymous→known fusion, so post
-        # WITHOUT the AnonymousId rule rather than fail the tier. (deviceId stitching
-        # still happens via the websdk Individual; the email rule fuses web↔CRM.)
+        # Individual.AnonymousId__c, partyType CookieId) gacks the IR create with a
+        # server UNKNOWN_EXCEPTION *unless* AnonymousId__c exists on the Individual DMO
+        # AND the identity DLO→Individual mapping populates it. The step order
+        # (dmo-fields → mappings → ir) ensures that on a CLEAN org, so the full ruleset
+        # succeeds above. This fallback only fires on an org where that ordering was
+        # broken (e.g. the mapping was created 9-field before AnonymousId__c existed and
+        # is now locked — can't be edited/deleted, the exact situation that forced si's
+        # ruleset RECREATE, hence its Swv2 id). Email is the PRIMARY anonymous→known
+        # fusion, so post WITHOUT the AnonymousId rule rather than fail the tier.
         email_only = [m for m in ir.get("matchRules", [])
                       if "anonymous" not in str(m.get("label", "")).lower()
                       and not any((c.get("partyIdentificationInfo") or {}).get("partyType") == "CookieId"
@@ -450,7 +485,7 @@ class Pipeline:
 
 
 STEPS = ["connector", "schema", "sitemap", "streams", "survey-dmo",
-         "relationship", "mappings", "ir", "data-graph"]
+         "relationship", "dmo-fields", "mappings", "ir", "data-graph"]
 
 
 def main():
@@ -482,7 +517,8 @@ def main():
 
     fn = {"connector": p.step_connector, "schema": p.step_schema, "sitemap": p.step_sitemap,
           "streams": p.step_streams, "survey-dmo": p.step_survey_dmo,
-          "relationship": p.step_relationship, "mappings": p.step_mappings,
+          "relationship": p.step_relationship, "dmo-fields": p.step_dmo_fields,
+          "mappings": p.step_mappings,
           "ir": p.step_ir, "data-graph": p.step_data_graph}
     gates = []
     for s in run:
