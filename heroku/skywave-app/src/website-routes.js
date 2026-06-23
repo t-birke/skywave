@@ -51,7 +51,9 @@ export function buildWebsiteRouter({ allowedOrigin }) {
     // a privacy smell and noise in CRM/Data Cloud. Now Contact mints only
     // on consent (via /session/init), and page load only peeks.
     const peekSchema = z.object({
-        deviceId: z.string().optional()
+        deviceId: z.string().optional(),
+        // Multi-tenant tenant key (Demo_Session Id) from the presenter's QR.
+        ds: z.string().optional()
     });
     router.post('/session/peek', validate(peekSchema), async (req, res) => {
         const { readProofCookie } = await import('./proof-cookie.js');
@@ -71,7 +73,8 @@ export function buildWebsiteRouter({ allowedOrigin }) {
             const data = await apexInvoke('POST', '/skywave/website/resolve', {
                 deviceId,
                 trackingStatus: 'websdk',
-                mintIfMissing: false
+                mintIfMissing: false,
+                ds: req.body.ds || undefined
             });
             // If the proof cookie was valid, refresh its expiry so a returning
             // visitor's session doesn't lapse. Don't mint a new cookie for a
@@ -119,7 +122,9 @@ export function buildWebsiteRouter({ allowedOrigin }) {
     // instead so we don't mint placeholders for every drive-by visitor.
     const initSchema = z.object({
         deviceId: z.string().optional(),
-        optedOut: z.boolean().optional()
+        optedOut: z.boolean().optional(),
+        // Multi-tenant tenant key (Demo_Session Id) from the presenter's QR.
+        ds: z.string().optional()
     });
     router.post('/session/init', validate(initSchema), async (req, res) => {
         const { readProofCookie } = await import('./proof-cookie.js');
@@ -141,7 +146,9 @@ export function buildWebsiteRouter({ allowedOrigin }) {
         try {
             const contact = await apexInvoke('POST', '/skywave/website/resolve', {
                 deviceId,
-                trackingStatus: trackingStatus || 'synthetic'
+                trackingStatus: trackingStatus || 'synthetic',
+                // Stamp the visitor's Contact with the presenter's session.
+                ds: req.body.ds || undefined
             });
             setProofCookie(res, deviceId);
             // Don't return the deviceId in the response body — the cookie is

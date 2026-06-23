@@ -426,9 +426,20 @@ async function loadInteractionsSdk() {
     return true;
 }
 
+// Multi-tenant tenant key: the presenter's QR encodes ...?ds=<Demo_Session Id>.
+// We read it once and seed state.demoSessionId so every call this phone makes
+// (session/init, session/start, survey/answer) is scoped to that presenter's
+// session. session/start later echoes the server-resolved id back into
+// state.demoSessionId (same value when ds was valid; the global-active fallback
+// otherwise).
+const DS_PARAM = (() => {
+    try { return new URLSearchParams(window.location.search).get('ds') || null; }
+    catch (e) { return null; }
+})();
+
 let state = {
     sessionId: null,
-    demoSessionId: null,
+    demoSessionId: DS_PARAM,
     // Visitor has gone through (or has previously consented via the
     // WebSDK) the consent screen. Drives chat-button eligibility (Phase
     // 5: chat button shows whenever consented && modal not on screen)
@@ -720,7 +731,7 @@ async function handleConsent() {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ deviceId: sdkId || undefined })
+            body: JSON.stringify({ deviceId: sdkId || undefined, ds: state.demoSessionId || undefined })
         });
         state.sessionReady = true;
     } catch (e) {
@@ -749,7 +760,7 @@ async function handleConsent() {
         // parallel with consent; might be ready or not). If absent, the
         // session_started event still publishes — the monitor will get
         // geo on the later survey_complete event instead.
-        const startBody = { userAgent: navigator.userAgent, sessionId: sdkId };
+        const startBody = { userAgent: navigator.userAgent, sessionId: sdkId, ds: state.demoSessionId || undefined };
         if (state.geo) {
             if (state.geo.lat != null) startBody.geoLat = state.geo.lat;
             if (state.geo.lon != null) startBody.geoLon = state.geo.lon;
@@ -970,6 +981,7 @@ async function handleAnswer(event) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 sessionId:    state.sessionId,
+                ds:           state.demoSessionId || undefined,
                 questionKey,
                 answerKey,
                 questionText,
@@ -1142,7 +1154,7 @@ async function resumeSession({ sdkId, surveyAlreadyComplete }) {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ deviceId: sdkId || undefined })
+            body: JSON.stringify({ deviceId: sdkId || undefined, ds: state.demoSessionId || undefined })
         });
         state.sessionReady = true;
     } catch (e) {
@@ -1150,7 +1162,7 @@ async function resumeSession({ sdkId, surveyAlreadyComplete }) {
     }
 
     try {
-        const startBody = { userAgent: navigator.userAgent, sessionId: sdkId };
+        const startBody = { userAgent: navigator.userAgent, sessionId: sdkId, ds: state.demoSessionId || undefined };
         if (state.geo) {
             if (state.geo.lat != null) startBody.geoLat = state.geo.lat;
             if (state.geo.lon != null) startBody.geoLon = state.geo.lon;
@@ -1224,7 +1236,7 @@ async function resumeSession({ sdkId, surveyAlreadyComplete }) {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ deviceId: sdkId || undefined })
+            body: JSON.stringify({ deviceId: sdkId || undefined, ds: state.demoSessionId || undefined })
         });
         if (r.ok) peek = await r.json();
     } catch (e) {
