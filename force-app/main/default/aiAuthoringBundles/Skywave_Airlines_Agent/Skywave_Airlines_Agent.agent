@@ -169,6 +169,7 @@ start_agent agent_router:
             # no reload: the next user turn re-reads the active Demo_Session__c stage.
             if @variables.seat_enabled is False and @variables.active_booking_count > 0:
                 run @actions.check_seat_enabled
+                    with contactId = @variables.resolved_contact_id
                     set @variables.seat_enabled = @outputs.enabled
 
             if @variables.booking_step == "profile" or @variables.booking_step == "payment" or @variables.booking_step == "confirm":

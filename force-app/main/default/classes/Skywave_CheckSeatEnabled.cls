@@ -1,46 +1,39 @@
 /**
  * Agent action: is seat-change enabled right now?
  *
- * Reads the active Demo_Session__c (one row per presenter run, resolved the
- * same way as Skywave_SessionStart / Skywave_DemoMonitorController:
- * Active__c=true, newest Started__c). Seat change is enabled once the
- * presenter has advanced the demo to the `agent_seat_pass` stage.
+ * Multi-tenant: reads the VISITOR'S OWN demo session, not a global one. The
+ * router has already resolved the visitor's Contact (resolved_contact_id);
+ * we follow Contact.Demo_Session__c → State__c and enable seat change once
+ * THAT session reaches `agent_seat_pass`. So two presenters running at once
+ * stay independent — presenter A flipping their stage never enables seat
+ * change for presenter B's visitors. Falls back to the global active session
+ * when no contact is supplied (studio preview / unresolved visitor) so the
+ * gate never hard-fails.
  *
  * Called from the router each turn (gated so it only runs while still
  * disabled AND the visitor actually has a booking) so a mid-conversation
  * stage flip reaches the open chat session on the visitor's next message —
- * no reload, no agent re-version. The whole point: the demo can switch the
- * agent's capability live by advancing one Demo_Session__c picklist the
- * monitor already drives.
+ * no reload, no agent re-version.
  */
 public with sharing class Skywave_CheckSeatEnabled {
 
+    private static final String SEAT_ON = 'agent_seat_pass';
+    // Skywave_ResolveSession's "no real contact" sentinel.
+    private static final String CONTACT_SENTINEL = '003000000000000';
+
     @InvocableMethod(
         label='Skywave: Check seat-change enabled'
-        description='Returns true when the active demo session is at the agent_seat_pass stage.'
+        description='Returns true when the visitor\'s own demo session is at the agent_seat_pass stage.'
         category='Skywave'
     )
     public static List<Output> check(List<Input> inputs) {
-        // Resolve once; the action is invoked per-conversation, batch size 1.
-        Boolean enabled = false;
-        List<Demo_Session__c> active = [
-            SELECT State__c FROM Demo_Session__c
-            WHERE Active__c = true
-            ORDER BY Started__c DESC NULLS LAST
-            LIMIT 1
-        ];
-        if (!active.isEmpty()) {
-            enabled = (active[0].State__c == 'agent_seat_pass');
-        }
+        // Invoked per-conversation, batch size 1.
+        String contactId = (inputs != null && !inputs.isEmpty()) ? inputs[0].contactId : null;
+        Boolean enabled = resolveEnabled(contactId);
 
         List<Output> outs = new List<Output>();
-        for (Integer i = 0; i < inputs.size(); i++) {
-            Output o = new Output();
-            o.enabled = enabled;
-            o.success = true;
-            outs.add(o);
-        }
-        if (outs.isEmpty()) {
+        Integer n = (inputs == null || inputs.isEmpty()) ? 1 : inputs.size();
+        for (Integer i = 0; i < n; i++) {
             Output o = new Output();
             o.enabled = enabled;
             o.success = true;
@@ -49,11 +42,38 @@ public with sharing class Skywave_CheckSeatEnabled {
         return outs;
     }
 
+    private static Boolean resolveEnabled(String contactId) {
+        // 1. Preferred: the visitor's OWN session via their Contact.
+        if (String.isNotBlank(contactId) && contactId != CONTACT_SENTINEL) {
+            try {
+                Id cid = Id.valueOf(contactId);
+                List<Contact> cs = [
+                    SELECT Demo_Session__c, Demo_Session__r.State__c
+                    FROM Contact WHERE Id = :cid LIMIT 1
+                ];
+                if (!cs.isEmpty() && cs[0].Demo_Session__c != null) {
+                    return cs[0].Demo_Session__r.State__c == SEAT_ON;
+                }
+            } catch (Exception e) {
+                // Malformed id or no access — fall through to the global fallback.
+            }
+        }
+        // 2. Fallback: global active session (preview / unresolved visitor).
+        List<Demo_Session__c> active = [
+            SELECT State__c FROM Demo_Session__c
+            WHERE Active__c = true
+            ORDER BY Started__c DESC NULLS LAST
+            LIMIT 1
+        ];
+        return !active.isEmpty() && active[0].State__c == SEAT_ON;
+    }
+
     public class Input {
-        // No inputs needed — the active session is resolved server-side.
-        // A placeholder keeps the invocable contract stable for the agent.
-        @InvocableVariable(label='Ignored' description='Unused; the active demo session is resolved server-side.')
-        public String ignored;
+        @InvocableVariable(
+            label='Contact Id'
+            description='The resolved visitor Contact Id (resolved_contact_id). The visitor\'s own Demo_Session__c.State__c is read from it so the seat gate is per-presenter. Optional — falls back to the global active session.'
+        )
+        public String contactId;
     }
 
     public class Output {
