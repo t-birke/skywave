@@ -74,6 +74,12 @@ public with sharing class Skywave_CheckSeatEnabled {
             description='The resolved visitor Contact Id (resolved_contact_id). The visitor\'s own Demo_Session__c.State__c is read from it so the seat gate is per-presenter. Optional — falls back to the global active session.'
         )
         public String contactId;
+
+        // Deprecated. Retained ONLY so agent publish can evolve the existing
+        // check_seat_enabled function schema additively — the publisher rejects
+        // removing a previously-published property. Unused at runtime.
+        @InvocableVariable(label='Ignored (deprecated)' description='Deprecated; unused. Kept for backward-compatible schema evolution.')
+        public String ignored;
     }
 
     public class Output {
