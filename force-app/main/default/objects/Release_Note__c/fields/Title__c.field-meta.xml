@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Title__c</fullName>
+    <label>Title</label>
+    <description>Optional release headline (the GitHub Release name/title). Shown above the notes in the changelog panel.</description>
+    <type>Text</type>
+    <length>255</length>
+    <required>false</required>
+</CustomField>

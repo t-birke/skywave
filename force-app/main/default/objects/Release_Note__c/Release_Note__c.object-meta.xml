@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Release Note</label>
+    <pluralLabel>Release Notes</pluralLabel>
+    <description>One row per Skywave Interactive release (a git tag / GitHub Release). Populated by the release-notes GitHub Action (upsert by Version__c). The Demo Home changelog panel lists the most recent rows.</description>
+    <nameField>
+        <label>Release Note Number</label>
+        <type>AutoNumber</type>
+        <displayFormat>RN-{0000}</displayFormat>
+        <startingNumber>1</startingNumber>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ReadWrite</sharingModel>
+    <visibility>Public</visibility>
+    <enableSearch>true</enableSearch>
+    <enableReports>true</enableReports>
+    <enableActivities>false</enableActivities>
+    <enableHistory>false</enableHistory>
+</CustomObject>

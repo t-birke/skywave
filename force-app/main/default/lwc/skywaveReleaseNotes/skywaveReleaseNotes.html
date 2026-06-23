@@ -1,0 +1,44 @@
+<template>
+    <lightning-card title="What's New" icon-name="utility:summarydetail">
+        <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+            <template lwc:if={error}>
+                <div class="slds-text-color_error slds-p-vertical_x-small">{error}</div>
+            </template>
+
+            <template lwc:if={hasReleases}>
+                <template for:each={releases} for:item="r">
+                    <div key={r.key} class="slds-box slds-box_x-small slds-m-bottom_x-small">
+                        <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center">
+                            <span class="slds-badge slds-badge_lightest slds-text-title_bold">v{r.version}</span>
+                            <template lwc:if={r.releaseDate}>
+                                <lightning-formatted-date-time
+                                    value={r.releaseDate}
+                                    year="numeric" month="short" day="2-digit"
+                                    class="slds-text-body_small slds-text-color_weak">
+                                </lightning-formatted-date-time>
+                            </template>
+                        </div>
+                        <template lwc:if={r.title}>
+                            <div class="slds-text-body_regular slds-text-color_default slds-m-top_xx-small">
+                                <b>{r.title}</b>
+                            </div>
+                        </template>
+                        <template lwc:if={r.notes}>
+                            <pre class="slds-text-body_small slds-m-top_xx-small skywave-rn-notes">{r.notes}</pre>
+                        </template>
+                        <template lwc:if={r.hasUrl}>
+                            <a href={r.url} target="_blank" rel="noopener noreferrer"
+                               class="slds-text-body_small">View on GitHub</a>
+                        </template>
+                    </div>
+                </template>
+            </template>
+
+            <template lwc:if={showEmpty}>
+                <div class="slds-p-vertical_small slds-text-align_center slds-text-color_weak">
+                    No releases yet. Notes appear here when a GitHub Release is published.
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+</template>

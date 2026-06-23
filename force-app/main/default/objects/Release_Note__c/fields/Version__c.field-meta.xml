@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Version__c</fullName>
+    <label>Version</label>
+    <description>The release version, e.g. 1.3.0 (the git tag without a leading v). External Id + Unique so the release-notes GitHub Action can idempotently upsert by version.</description>
+    <type>Text</type>
+    <length>40</length>
+    <unique>true</unique>
+    <externalId>true</externalId>
+    <caseSensitive>false</caseSensitive>
+    <required>true</required>
+</CustomField>

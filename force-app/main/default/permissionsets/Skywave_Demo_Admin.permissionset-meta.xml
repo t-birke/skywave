@@ -43,6 +43,10 @@
         <apexClass>Skywave_PreflightController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_ReleaseNotesController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
     <applicationVisibilities>
         <application>Skywave_Demo_Management</application>
         <visible>true</visible>
@@ -76,6 +80,15 @@
     </objectPermissions>
     <objectPermissions>
         <object>Flight__c</object>
+        <allowCreate>true</allowCreate>
+        <allowDelete>true</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>true</modifyAllRecords>
+        <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <object>Release_Note__c</object>
         <allowCreate>true</allowCreate>
         <allowDelete>true</allowDelete>
         <allowEdit>true</allowEdit>
@@ -338,6 +351,26 @@
     <fieldPermissions>
         <editable>true</editable>
         <field>Flight__c.Operates_Wednesday__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Release_Note__c.GitHub_Url__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Release_Note__c.Notes__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Release_Note__c.Release_Date__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Release_Note__c.Title__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>

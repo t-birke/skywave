@@ -797,10 +797,13 @@ install` skill conducts the gates; `install.sh` owns the scripted steps.
 
 The **Demo Home** tab in the *Skywave Demo Management* app (LWC `skywaveDemoHome`,
 the app's landing tab — replaces the old standalone Preflight tab) is the
-per-presenter control surface: create your own `Demo_Session__c`, select exactly
-one as active (owner-scoped), and run preflight. It **embeds** the `skywavePreflight`
-LWC, so the same **Check Demo** button surfaces silent-config-drift risks that
-`git status` cannot show. That button drives a single Apex orchestrator
+per-presenter control surface, split into two halves: the left half creates your
+own `Demo_Session__c` and selects exactly one as active (owner-scoped); the right
+half is the **changelog** (LWC `skywaveReleaseNotes` → `Skywave_ReleaseNotesController`
+→ `Release_Note__c`), listing the most recent releases newest-first. Below both it
+**embeds** the `skywavePreflight` LWC, so the same **Check Demo** button surfaces
+silent-config-drift risks that `git status` cannot show. `Release_Note__c` rows are
+written by the `release-notes` GitHub Action on each GitHub Release (§ below). That button drives a single Apex orchestrator
 (`Skywave_PreflightController.runPreflight`) that fans out across three planes:
 
 - **Org** — SOQL only: active Demo_Session present + reset to `idle`, survey

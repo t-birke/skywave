@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Notes__c</fullName>
+    <label>Notes</label>
+    <description>The major changes in this release — feat/fix/etc. commit subjects grouped, generated from commits since the previous tag. Plain text with line breaks; the changelog panel preserves them.</description>
+    <type>LongTextArea</type>
+    <length>32768</length>
+    <visibleLines>10</visibleLines>
+    <required>false</required>
+</CustomField>
