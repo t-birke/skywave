@@ -223,6 +223,10 @@ export default class SkywaveDemoMonitor extends LightningElement {
             this.currentState = 'idle';
             this.pickerInputValue = '';
         }
+        // The QR encodes the active session as the `?ds=` tenant key, so it
+        // must be (re)rendered whenever the active session changes — initial
+        // load, picker switch, or clearing.
+        this.renderQRCode();
     }
 
     async openPicker() {
@@ -419,15 +423,25 @@ export default class SkywaveDemoMonitor extends LightningElement {
     renderQRCode() {
         if (!this._qrLibLoaded) return;
         if (!this.consumerSiteUrl) return; // origin not resolved yet; re-rendered once it is
+        // Multi-tenant: no active session → no QR (the template shows a
+        // "create/activate one in Demo Home" prompt instead).
+        if (!this.activeId) {
+            this.qrCodeGenerated = false;
+            return;
+        }
         const container = this.template.querySelector('.qrcodecontainer');
         if (!container) {
             setTimeout(() => this.renderQRCode(), 100);
             return;
         }
         container.innerHTML = '';
+        // consumerSiteUrl already ends with '/'; stamp the Demo_Session Id as
+        // the `ds` tenant key so every call from this phone is scoped to the
+        // presenter's session.
+        const qrUrl = this.consumerSiteUrl + '?ds=' + encodeURIComponent(this.activeId);
         // eslint-disable-next-line no-undef, new-cap
         new QRCode(container, {
-            text: this.consumerSiteUrl,
+            text: qrUrl,
             width: 512,
             height: 512,
             colorDark: '#0b1d3a',

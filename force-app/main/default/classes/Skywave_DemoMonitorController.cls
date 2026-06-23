@@ -10,6 +10,7 @@ public with sharing class Skywave_DemoMonitorController {
         @AuraEnabled public String customer { get; set; }
         @AuraEnabled public Date demoDate { get; set; }
         @AuraEnabled public Integer contactCount { get; set; }
+        @AuraEnabled public Boolean active { get; set; }
     }
 
     @AuraEnabled(cacheable=false)
@@ -52,6 +53,29 @@ public with sharing class Skywave_DemoMonitorController {
         }
         List<ActiveDemoSession> out = new List<ActiveDemoSession>();
         for (Demo_Session__c d : rows) out.add(toWrapperSkipCount(d));
+        return out;
+    }
+
+    /**
+     * Demo Home: the caller's own sessions (active first, then newest), with
+     * the `active` flag set. Non-cacheable so the list refreshes immediately
+     * after createSession / setActive (an imperative call to the cacheable
+     * searchSessions would return a stale client cache after a mutation).
+     */
+    @AuraEnabled(cacheable=false)
+    public static List<ActiveDemoSession> listMySessions() {
+        List<ActiveDemoSession> out = new List<ActiveDemoSession>();
+        for (Demo_Session__c d : [
+            SELECT Id, Name, State__c, Customer__c, Demo_Date__c, Active__c
+            FROM Demo_Session__c
+            WHERE OwnerId = :UserInfo.getUserId()
+            ORDER BY Active__c DESC, Started__c DESC NULLS LAST
+            LIMIT 25
+        ]) {
+            ActiveDemoSession w = toWrapperSkipCount(d);
+            w.active = d.Active__c;
+            out.add(w);
+        }
         return out;
     }
 

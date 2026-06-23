@@ -1,0 +1,74 @@
+<template>
+    <lightning-card title="Demo Home" icon-name="standard:service_appointment">
+        <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+
+            <!-- Create a new session — also the empty-state call to action -->
+            <div class="slds-box slds-box_xx-small slds-m-bottom_medium slds-grid slds-grid_vertical-align-end slds-gutters_x-small">
+                <div class="slds-col slds-grow">
+                    <lightning-input
+                        label="New demo session (audience / customer)"
+                        placeholder="e.g. Acme Airlines — Tuesday keynote"
+                        value={newCustomer}
+                        onchange={handleCustomerChange}
+                        disabled={busy}>
+                    </lightning-input>
+                </div>
+                <div class="slds-col slds-no-flex">
+                    <lightning-button
+                        variant="brand"
+                        label="Create &amp; activate"
+                        icon-name="utility:add"
+                        onclick={handleCreate}
+                        disabled={busy}>
+                    </lightning-button>
+                </div>
+            </div>
+
+            <template lwc:if={loading}>
+                <lightning-spinner alternative-text="Loading your sessions" size="small"></lightning-spinner>
+            </template>
+
+            <template lwc:if={hasSessions}>
+                <p class="slds-text-title_caps slds-m-bottom_x-small">Your demo sessions</p>
+                <template for:each={sessions} for:item="s">
+                    <div key={s.id} class={s.rowClass}>
+                        <div class="slds-grid slds-grid_vertical-align-center slds-gutters_x-small">
+                            <div class="slds-col slds-grow">
+                                <span class="slds-text-body_regular slds-text-color_default">
+                                    <b>{s.name}</b>
+                                    <template lwc:if={s.customer}> — {s.customer}</template>
+                                </span>
+                                <div class="slds-text-body_small slds-text-color_weak">
+                                    stage: {s.stateLabel}
+                                </div>
+                            </div>
+                            <div class="slds-col slds-no-flex">
+                                <lightning-button
+                                    data-id={s.id}
+                                    variant={s.activateVariant}
+                                    label={s.activateLabel}
+                                    disabled={s.activateDisabled}
+                                    onclick={handleActivate}>
+                                </lightning-button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </template>
+
+            <template lwc:if={loading}></template>
+            <template lwc:elseif={hasSessions}></template>
+            <template lwc:else>
+                <div class="slds-illustration slds-illustration_small slds-p-around_medium slds-text-align_center slds-text-color_weak">
+                    You don't have a demo session yet. Name your audience above and hit
+                    <b>Create &amp; activate</b> to begin — the QR on the Demo Monitor will point everyone at your session.
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+
+    <!-- Embedded readiness checklist (replaces the standalone Preflight tab) -->
+    <div class="slds-m-top_medium">
+        <c-skywave-preflight></c-skywave-preflight>
+    </div>
+</template>

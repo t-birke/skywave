@@ -3,14 +3,14 @@
     <flexiPageRegions>
         <itemInstances>
             <componentInstance>
-                <componentName>c:skywavePreflight</componentName>
-                <identifier>skywavePreflight</identifier>
+                <componentName>c:skywaveDemoHome</componentName>
+                <identifier>skywaveDemoHome</identifier>
             </componentInstance>
         </itemInstances>
         <name>main</name>
         <type>Region</type>
     </flexiPageRegions>
-    <masterLabel>Skywave Preflight</masterLabel>
+    <masterLabel>Skywave Demo Home</masterLabel>
     <template>
         <name>flexipage:defaultAppHomeTemplate</name>
     </template>

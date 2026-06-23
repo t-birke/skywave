@@ -104,11 +104,18 @@
 
     <template lwc:if={qrCodeVisible}>
         <div class={qrcodeClass} onclick={toggleenlarge}>
-            <template lwc:if={qrCodeGenerated}></template>
-            <template lwc:else>
-                <lightning-spinner alternative-text="Loading" size="small" variant="base"></lightning-spinner>
+            <template lwc:if={activeId}>
+                <template lwc:if={qrCodeGenerated}></template>
+                <template lwc:else>
+                    <lightning-spinner alternative-text="Loading" size="small" variant="base"></lightning-spinner>
+                </template>
+                <div class="qrcodecontainer slds-p-around_medium"></div>
             </template>
-            <div class="qrcodecontainer slds-p-around_medium"></div>
+            <template lwc:else>
+                <div class="slds-p-around_medium slds-text-align_center slds-text-color_weak">
+                    No active demo session — create or activate one in <b>Demo Home</b> to generate a join QR code.
+                </div>
+            </template>
         </div>
     </template>
 </template>

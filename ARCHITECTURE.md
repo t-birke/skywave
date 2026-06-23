@@ -795,10 +795,13 @@ install` skill conducts the gates; `install.sh` owns the scripted steps.
 
 ### 3g. Preflight check (presenter pre-demo go/no-go)
 
-A **Skywave Preflight** tab in the *Skywave Demo Management* app surfaces the
-silent-config-drift risks that `git status` cannot show. One **Check Demo**
-button drives a single Apex orchestrator (`Skywave_PreflightController.run‑
-Preflight`) that fans out across three planes:
+The **Demo Home** tab in the *Skywave Demo Management* app (LWC `skywaveDemoHome`,
+the app's landing tab — replaces the old standalone Preflight tab) is the
+per-presenter control surface: create your own `Demo_Session__c`, select exactly
+one as active (owner-scoped), and run preflight. It **embeds** the `skywavePreflight`
+LWC, so the same **Check Demo** button surfaces silent-config-drift risks that
+`git status` cannot show. That button drives a single Apex orchestrator
+(`Skywave_PreflightController.runPreflight`) that fans out across three planes:
 
 - **Org** — SOQL only: active Demo_Session present + reset to `idle`, survey
   questions seeded, Flight/Booking/Skywave_Seat_Map row counts non-zero.
