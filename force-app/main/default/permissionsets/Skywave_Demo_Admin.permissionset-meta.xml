@@ -117,11 +117,6 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
-        <field>MessagingSession.Session_ID__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <editable>true</editable>
         <field>Booking__c.Booking_Date__c</field>
         <readable>true</readable>
     </fieldPermissions>
@@ -148,16 +143,6 @@
     <fieldPermissions>
         <editable>true</editable>
         <field>Contact.Demo_Session__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <editable>true</editable>
-        <field>Contact.Geo_City__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <editable>true</editable>
-        <field>Contact.Geo_Country__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
@@ -248,6 +233,11 @@
     <fieldPermissions>
         <editable>true</editable>
         <field>Contact.Tracking_Status__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Demo_Session__c.Active_Owner_Key__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
@@ -393,21 +383,6 @@
     <fieldPermissions>
         <editable>true</editable>
         <field>VoiceCall.Caller_Salutation__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <editable>true</editable>
-        <field>Skywave_Preflight_Config__mdt.Heroku_Origin_Url__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <editable>true</editable>
-        <field>Skywave_Preflight_Config__mdt.Preflight_Key__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <editable>true</editable>
-        <field>Skywave_Preflight_Config__mdt.Statuspage_Base_Url__c</field>
         <readable>true</readable>
     </fieldPermissions>
 </PermissionSet>

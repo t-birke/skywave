@@ -28,23 +28,24 @@ global without sharing class Skywave_SessionStart {
         RestResponse res = RestContext.response;
         res.addHeader('Content-Type', 'application/json');
 
-        // Read the active session and current state in one query — phones
-        // need both to bootstrap their UI without waiting for the next PE.
-        List<Demo_Session__c> active = [
-            SELECT Id, State__c FROM Demo_Session__c
-            WHERE Active__c = true
-            ORDER BY Started__c DESC NULLS LAST
-            LIMIT 1
-        ];
-        if (active.isEmpty()) {
+        Map<String, Object> body = Skywave_RestUtil.parseBody();
+
+        // Multi-tenant: the consumer site carries the tenant key as `ds` (the
+        // Demo_Session Id stamped into the presenter's QR). Resolve to that
+        // session, falling back to the global active one when absent.
+        Id demoSessionId = Skywave_RestUtil.getDemoSessionId(String.valueOf(body.get('ds')));
+        if (demoSessionId == null) {
             res.statusCode = 503;
             res.responseBody = Blob.valueOf('{"error":"no_active_demo_session"}');
             return;
         }
-        Id demoSessionId = active[0].Id;
-        String currentState = active[0].State__c;
+        // Phones need the current state to bootstrap their UI without waiting
+        // for the next PE.
+        Demo_Session__c sessionRow = [
+            SELECT State__c FROM Demo_Session__c WHERE Id = :demoSessionId LIMIT 1
+        ];
+        String currentState = sessionRow.State__c;
 
-        Map<String, Object> body = Skywave_RestUtil.parseBody();
         String userAgent = String.valueOf(body.get('userAgent'));
         // Prefer the Salesforce Interactions SDK's anonymous cookie ID when
         // the consumer site provides it — that ID is what Data Cloud uses to

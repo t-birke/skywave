@@ -35,4 +35,24 @@ private class Skywave_RestUtil_Test {
         Skywave_RestUtil.publishEvent('session_started', 'sess-1', demoSessionId, new Map<String, Object>{'ua'=>'test'});
         Test.stopTest();
     }
+
+    @IsTest
+    static void getDemoSessionId_usesSuppliedDs() {
+        // A second (inactive) session — a valid `ds` must resolve to it directly,
+        // not to the seeded active one.
+        Demo_Session__c other = new Demo_Session__c(State__c='idle', Started__c=System.now());
+        insert other;
+        Id resolved = Skywave_RestUtil.getDemoSessionId(String.valueOf(other.Id));
+        System.assertEquals(other.Id, resolved, 'A valid ds must be used directly');
+    }
+
+    @IsTest
+    static void getDemoSessionId_fallsBackWhenBlankOrGarbage() {
+        Id active = Skywave_RestUtil.getActiveDemoSessionId();
+        System.assertEquals(active, Skywave_RestUtil.getDemoSessionId(null), 'blank ds → active fallback');
+        System.assertEquals(active, Skywave_RestUtil.getDemoSessionId(''), 'empty ds → active fallback');
+        System.assertEquals(active, Skywave_RestUtil.getDemoSessionId('not-an-id'), 'garbage ds → active fallback');
+        // A well-formed Id of the WRONG sobject type must also fall back.
+        System.assertEquals(active, Skywave_RestUtil.getDemoSessionId(UserInfo.getUserId()), 'wrong-type id → active fallback');
+    }
 }

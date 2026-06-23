@@ -50,6 +50,19 @@ that change fans out over WebSocket to every audience phone in real time, and
 each phone reveals the next screen. See `SKYWAVE_INTERACTIVE_DESIGN.md` §5 for
 the stage list and the rationale (it replaced a manual "check state" button).
 
+**Multi-tenancy.** Many presenters can run the demo at once, each isolated.
+The tenant key is the `Demo_Session__c` Id, stamped into the presenter's QR as
+`?ds=` and echoed as the `ds` body field on every REST call
+(`Skywave_RestUtil.getDemoSessionId(ds)` resolves it, falling back to the
+global most-recent-active session when absent). The presenter link is the
+record's standard `OwnerId`; `Demo_Session__c.Active_Owner_Key__c` (unique,
+kept in sync with `OwnerId`+`Active__c` by `Demo_Session_Trigger`) makes
+"one active session per owner" a database invariant — a second active row for
+the same owner fails with `DUPLICATE_VALUE`. Created Contacts separate per
+presenter via `Demo_Session__r.OwnerId`; both monitors filter to the
+presenter's own active session; the live seat/capability gate reads the
+*visitor's* own session per turn.
+
 ---
 
 ## 2. Repository map

@@ -16,14 +16,16 @@ global without sharing class Skywave_SurveyAnswer {
         RestResponse res = RestContext.response;
         res.addHeader('Content-Type', 'application/json');
 
-        Id demoSessionId = Skywave_RestUtil.getActiveDemoSessionId();
+        Map<String, Object> body = Skywave_RestUtil.parseBody();
+        // Multi-tenant: route this event to the presenter's session via the
+        // `ds` tenant key, falling back to the global active session.
+        Id demoSessionId = Skywave_RestUtil.getDemoSessionId(String.valueOf(body.get('ds')));
         if (demoSessionId == null) {
             res.statusCode = 503;
             res.responseBody = Blob.valueOf('{"error":"no_active_demo_session"}');
             return;
         }
 
-        Map<String, Object> body = Skywave_RestUtil.parseBody();
         String sessionId = String.valueOf(body.get('sessionId'));
         String questionKey = String.valueOf(body.get('questionKey'));
         String answerKey = String.valueOf(body.get('answerKey'));

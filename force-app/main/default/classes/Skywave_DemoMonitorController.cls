@@ -14,10 +14,11 @@ public with sharing class Skywave_DemoMonitorController {
 
     @AuraEnabled(cacheable=false)
     public static ActiveDemoSession getActiveDemoSession() {
+        // Multi-tenant: the presenter only ever sees their OWN active session.
         List<Demo_Session__c> rows = [
             SELECT Id, Name, State__c, Customer__c, Demo_Date__c
             FROM Demo_Session__c
-            WHERE Active__c = true
+            WHERE Active__c = true AND OwnerId = :UserInfo.getUserId()
             ORDER BY Started__c DESC NULLS LAST
             LIMIT 1
         ];
@@ -27,12 +28,15 @@ public with sharing class Skywave_DemoMonitorController {
 
     @AuraEnabled(cacheable=true)
     public static List<ActiveDemoSession> searchSessions(String term) {
+        // Multi-tenant: a presenter can only browse / select sessions they own.
+        Id me = UserInfo.getUserId();
         String trimmed = (term == null) ? '' : term.trim();
         List<Demo_Session__c> rows;
         if (trimmed == '') {
             rows = [
                 SELECT Id, Name, State__c, Customer__c, Demo_Date__c
                 FROM Demo_Session__c
+                WHERE OwnerId = :me
                 ORDER BY Started__c DESC NULLS LAST
                 LIMIT 5
             ];
@@ -41,7 +45,7 @@ public with sharing class Skywave_DemoMonitorController {
             rows = [
                 SELECT Id, Name, State__c, Customer__c, Demo_Date__c
                 FROM Demo_Session__c
-                WHERE Customer__c LIKE :pattern OR Name LIKE :pattern
+                WHERE OwnerId = :me AND (Customer__c LIKE :pattern OR Name LIKE :pattern)
                 ORDER BY Started__c DESC NULLS LAST
                 LIMIT 5
             ];
@@ -64,22 +68,55 @@ public with sharing class Skywave_DemoMonitorController {
 
     @AuraEnabled
     public static ActiveDemoSession setActive(Id sessionId) {
-        // Single-tenant: clear Active__c on whatever else has it, then set on the chosen row.
+        Id me = UserInfo.getUserId();
+        Demo_Session__c chosen = [
+            SELECT Id, Name, State__c, Customer__c, Demo_Date__c, Active__c, OwnerId
+            FROM Demo_Session__c WHERE Id = :sessionId LIMIT 1
+        ];
+        // Ownership guard — a presenter can only activate a session they own.
+        if (chosen.OwnerId != me) {
+            throw new AuraHandledException('You can only activate a demo session you own.');
+        }
+        // Multi-tenant: deactivate any OTHER active session THIS presenter owns,
+        // then activate the chosen one — same transaction, so the committed
+        // state holds exactly one active row per owner. Demo_Session_Trigger
+        // keeps Active_Owner_Key__c in sync; its uniqueness makes a stray
+        // double-active impossible to commit.
         List<Demo_Session__c> currentlyActive = [
-            SELECT Id FROM Demo_Session__c WHERE Active__c = true AND Id != :sessionId
+            SELECT Id FROM Demo_Session__c
+            WHERE Active__c = true AND OwnerId = :me AND Id != :sessionId
         ];
         for (Demo_Session__c d : currentlyActive) d.Active__c = false;
         if (!currentlyActive.isEmpty()) update currentlyActive;
 
-        Demo_Session__c chosen = [
-            SELECT Id, Name, State__c, Customer__c, Demo_Date__c, Active__c
-            FROM Demo_Session__c WHERE Id = :sessionId LIMIT 1
-        ];
         if (!chosen.Active__c) {
             chosen.Active__c = true;
             update chosen;
         }
         return toWrapper(chosen);
+    }
+
+    /**
+     * Demo Home empty-state action: create a Demo_Session__c owned by the
+     * caller (OwnerId defaults to the running user). When activate=true it is
+     * immediately made the caller's active session via setActive.
+     */
+    @AuraEnabled
+    public static ActiveDemoSession createSession(String customer, Boolean activateNow) {
+        Demo_Session__c d = new Demo_Session__c(
+            Customer__c = String.isBlank(customer) ? null : customer.trim(),
+            State__c = 'idle',
+            Started__c = System.now()
+        );
+        insert d;   // OwnerId = running user; Active__c stays false until activated
+        if (activateNow == true) {
+            return setActive(d.Id);
+        }
+        Demo_Session__c created = [
+            SELECT Id, Name, State__c, Customer__c, Demo_Date__c
+            FROM Demo_Session__c WHERE Id = :d.Id LIMIT 1
+        ];
+        return toWrapperSkipCount(created);
     }
 
     /**
@@ -130,6 +167,13 @@ public with sharing class Skywave_DemoMonitorController {
 
     @AuraEnabled
     public static String advanceState(Id sessionId, String newState) {
+        // Ownership guard — presenters only drive their own sessions.
+        Demo_Session__c existing = [
+            SELECT OwnerId FROM Demo_Session__c WHERE Id = :sessionId LIMIT 1
+        ];
+        if (existing.OwnerId != UserInfo.getUserId()) {
+            throw new AuraHandledException('You can only advance a demo session you own.');
+        }
         Demo_Session__c d = new Demo_Session__c(Id = sessionId, State__c = newState);
         update d;
         // The trigger publishes Demo_State_Change__e — empApi subscribers

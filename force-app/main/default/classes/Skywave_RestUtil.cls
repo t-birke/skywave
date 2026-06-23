@@ -8,8 +8,9 @@
 public without sharing class Skywave_RestUtil {
 
     /**
-     * Returns the Id of the singleton Active Demo_Session__c, or null if none.
-     * Single-tenant by design (see SKYWAVE_INTERACTIVE_DESIGN.md §13a).
+     * Returns the Id of the most-recent Active Demo_Session__c, or null if none.
+     * This is the multi-tenant fallback used when a request carries no `ds`
+     * tenant key (legacy QR / direct visit / single-tenant install).
      */
     public static Id getActiveDemoSessionId() {
         List<Demo_Session__c> active = [
@@ -19,6 +20,31 @@ public without sharing class Skywave_RestUtil {
             LIMIT 1
         ];
         return active.isEmpty() ? null : active[0].Id;
+    }
+
+    /**
+     * Multi-tenant resolver: returns the Demo_Session__c the caller is scoped
+     * to. The consumer site carries the tenant key as `ds` (the Demo_Session
+     * Id) on every request — stamped into the QR the presenter shows. A valid
+     * `ds` is used directly; otherwise we fall back to the global
+     * most-recent-active session, so legacy QRs / direct visits and
+     * single-tenant installs keep working.
+     */
+    public static Id getDemoSessionId(String suppliedDs) {
+        if (String.isNotBlank(suppliedDs)) {
+            try {
+                Id dsId = Id.valueOf(suppliedDs);
+                if (dsId.getSObjectType() == Demo_Session__c.SObjectType) {
+                    List<Demo_Session__c> rows = [
+                        SELECT Id FROM Demo_Session__c WHERE Id = :dsId LIMIT 1
+                    ];
+                    if (!rows.isEmpty()) return rows[0].Id;
+                }
+            } catch (Exception e) {
+                // Malformed id — fall through to the active-session fallback.
+            }
+        }
+        return getActiveDemoSessionId();
     }
 
     /**

@@ -48,6 +48,10 @@ global with sharing class Skywave_WebsiteResolveSession {
 
         String deviceId = String.valueOf(body.get('deviceId'));
         String trackingStatus = String.valueOf(body.get('trackingStatus'));
+        // Multi-tenant tenant key — the Demo_Session this visitor belongs to.
+        // Threaded from the consumer site (signed into the proof cookie at
+        // /session/init). Falls back to the global active session when absent.
+        String ds = String.valueOf(body.get('ds'));
         Boolean mintIfMissing = body.get('mintIfMissing') == null
             ? true
             : Boolean.valueOf(body.get('mintIfMissing'));
@@ -103,20 +107,13 @@ global with sharing class Skywave_WebsiteResolveSession {
                 res.responseBody = Blob.valueOf(JSON.serialize(peekOut));
                 return;
             }
-            // Stamp the active Demo_Session__c so downstream PE publishes
+            // Stamp the visitor's Demo_Session__c so downstream PE publishes
             // (Skywave_SaveProfile.publishProfileCreatedEvent → both the
             // monitor Demo_Event__e and the targeted Demo_State_Change__e
             // for client_action=profile_created) have a non-null required
             // Demo_Session_Id__c to use. Without it, both publishes bail
             // and the website never gets the WS push to refresh /me.
-            Id activeDemoSessionId = null;
-            List<Demo_Session__c> activeRows = [
-                SELECT Id FROM Demo_Session__c
-                WHERE Active__c = true
-                ORDER BY LastModifiedDate DESC
-                LIMIT 1
-            ];
-            if (!activeRows.isEmpty()) activeDemoSessionId = activeRows[0].Id;
+            Id activeDemoSessionId = Skywave_RestUtil.getDemoSessionId(ds);
 
             c = new Contact(
                 LastName = deviceId,
@@ -141,14 +138,9 @@ global with sharing class Skywave_WebsiteResolveSession {
             // minted before we started stamping it. Without this, the
             // profile_created publishes (monitor + WS push) bail out.
             if (c.Demo_Session__c == null) {
-                List<Demo_Session__c> activeRows = [
-                    SELECT Id FROM Demo_Session__c
-                    WHERE Active__c = true
-                    ORDER BY LastModifiedDate DESC
-                    LIMIT 1
-                ];
-                if (!activeRows.isEmpty()) {
-                    c.Demo_Session__c = activeRows[0].Id;
+                Id backfillDsId = Skywave_RestUtil.getDemoSessionId(ds);
+                if (backfillDsId != null) {
+                    c.Demo_Session__c = backfillDsId;
                     dirty = true;
                 }
             }

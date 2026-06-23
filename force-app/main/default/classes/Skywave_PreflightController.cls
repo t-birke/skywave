@@ -109,18 +109,20 @@ public with sharing class Skywave_PreflightController {
     private static List<CheckResult> checkOrgData() {
         List<CheckResult> rows = new List<CheckResult>();
 
-        // 1a. Active demo session, on stage 1 (idle).
+        // 1a. Active demo session, on stage 1 (idle). Multi-tenant: scope to
+        // THIS presenter's own active session (the unique Active_Owner_Key__c
+        // guarantees at most one per owner).
         List<Demo_Session__c> active = [
             SELECT Id, Name, State__c FROM Demo_Session__c
-            WHERE Active__c = true
+            WHERE Active__c = true AND OwnerId = :UserInfo.getUserId()
             ORDER BY Started__c DESC NULLS LAST
         ];
         CheckResult activeRow = new CheckResult('org.activeSession', GROUP_ORG, GROUP_LABELS.get(GROUP_ORG), 'Active Demo_Session present');
         if (active.isEmpty()) {
-            activeRow.detail = 'No Demo_Session__c with Active__c = true. Create or activate one in the Demo Monitor.';
+            activeRow.detail = 'You have no Demo_Session__c with Active__c = true. Create or activate one in Demo Home.';
         } else if (active.size() > 1) {
             activeRow.status = 'fail';
-            activeRow.detail = active.size() + ' sessions are Active — only one allowed at a time.';
+            activeRow.detail = active.size() + ' of your sessions are Active — only one allowed at a time.';
         } else {
             activeRow.status = 'pass';
             activeRow.detail = active[0].Name + ' (state=' + active[0].State__c + ')';
