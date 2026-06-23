@@ -39,6 +39,26 @@ export function sinceIso(hoursAgo: number, nowMs: number): string {
 }
 
 /**
+ * The running user's 18-char Id, via the OIDC userinfo endpoint (the SDK's
+ * authenticated fetch resolves it against the org). Used to scope the globe to
+ * the presenter's OWN active Demo_Session__c (multi-tenancy). Returns null in
+ * dev (where /services/oauth2 isn't proxied) or on any failure, so callers can
+ * fall back to an unscoped query rather than break.
+ */
+export async function currentUserId(): Promise<string | null> {
+  try {
+    const sdk = await createDataSDK();
+    if (!sdk.fetch) return null;
+    const res = await sdk.fetch('/services/oauth2/userinfo');
+    if (!res.ok) return null;
+    const j = await res.json();
+    return (j && j.user_id) || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Update fields on a record via UI API (`PATCH /ui-api/records/{id}`), through
  * the SDK's fetch so auth + CSRF headers are handled (a raw fetch 401s). This
  * is the supported write path — UI API GraphQL itself is read-only.

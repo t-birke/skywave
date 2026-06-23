@@ -11,7 +11,7 @@
  * Transport: UI API GraphQL read + UI API record PATCH write via the Data SDK
  * (see ./graphql). Works natively in-org and through the official dev proxy.
  */
-import { queryEdges, v, updateRecord } from './graphql';
+import { queryEdges, v, updateRecord, currentUserId } from './graphql';
 
 const SEAT_ON = 'agent_seat_pass';
 const SEAT_OFF = 'agent_seat_fail';
@@ -27,12 +27,19 @@ export interface ActiveSession {
   state: string | null;
 }
 
-/** Resolve the active Demo_Session__c (Active__c=true, newest Started__c). */
+/**
+ * Resolve the presenter's OWN active Demo_Session__c (Active__c=true, newest
+ * Started__c, scoped to the running user). Multi-tenant: two presenters each
+ * see and flip only their own session's seat state. Falls back to an unscoped
+ * query when the running user can't be resolved (e.g. dev proxy).
+ */
 export async function fetchActiveSession(): Promise<ActiveSession | null> {
+  const uid = await currentUserId();
+  const ownerFilter = uid ? `, { OwnerId: { eq: "${uid}" } }` : '';
   const nodes = await queryEdges<ActiveSessionNode>(
     `query {
       uiapi { query {
-        Demo_Session__c(first: 1, where: { Active__c: { eq: true } },
+        Demo_Session__c(first: 1, where: { and: [ { Active__c: { eq: true } }${ownerFilter} ] },
                         orderBy: { Started__c: { order: DESC, nulls: LAST } }) {
           edges { node { Id State__c { value } } }
         }

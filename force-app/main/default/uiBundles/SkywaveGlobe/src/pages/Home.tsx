@@ -32,8 +32,14 @@ export default function Home() {
   const [replayHours, setReplayHours] = useState<number | null>(null);
   const [replayNow, setReplayNow] = useState<number>(0);
 
-  const live = useDemoFeed();
-  const replay = useReplay({ hours: replayHours, nowMs: replayNow });
+  // Multi-tenant: the presenter's OWN active Demo_Session__c. Resolved by the
+  // active-session effect below; until then it is null and the feed/replay
+  // filters are no-ops (fail-open). Once set, both the live feed and replay
+  // scope to this session so only this presenter's visitors render.
+  const [myActiveSessionId, setMyActiveSessionId] = useState<string | null>(null);
+
+  const live = useDemoFeed(myActiveSessionId);
+  const replay = useReplay({ hours: replayHours, nowMs: replayNow, activeDemoSessionId: myActiveSessionId });
 
   const replaying = replayHours != null;
   const visitors = replaying ? replay.visitors : live.visitors;
@@ -59,11 +65,14 @@ export default function Home() {
   // how the old skywaveDemoMonitor LWC read the active session on load.
   const [seededStage, setSeededStage] = useState<string>('idle');
 
-  // One active-session read seeds both the seat indicator and the stage.
+  // One active-session read (owner-scoped) seeds the seat indicator, the
+  // stage, AND the feed/replay scope key — so the globe shows only this
+  // presenter's visitors.
   useEffect(() => {
     fetchActiveSession()
       .then(s => {
         if (!s) return;
+        setMyActiveSessionId(s.id);
         setSeatOn(s.state === SEAT_ON);
         if (s.state) setSeededStage(s.state);
       })
