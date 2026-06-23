@@ -1,0 +1,68 @@
+name: release-notes
+
+# On each published GitHub Release, generate grouped notes from the commits
+# since the previous tag and upsert them into Release_Note__c in the org so
+# the Demo Home changelog panel shows them. JWT-bearer auth via the existing
+# Skywave_Heroku_Relay connected app. Required repo secrets (Settings → Secrets
+# and variables → Actions) — see SECRETS.md:
+#   SF_CONSUMER_KEY   consumer key of the Skywave_Heroku_Relay connected app
+#   SF_JWT_KEY        the PEM private key (contents of secrets/jwt.key)
+#   SF_USERNAME       JWT subject user (needs create access to Release_Note__c)
+#   SF_INSTANCE_URL   optional login URL (default https://login.salesforce.com)
+
+on:
+  release:
+    types: [published]
+
+# Allow a manual re-run against an existing tag if a release sync failed.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to sync (e.g. v1.3.0)'
+        required: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history + tags so the commit range resolves
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Salesforce CLI
+        run: npm install -g @salesforce/cli@latest
+
+      - name: Write JWT key
+        run: printf '%s' "$SF_JWT_KEY" > "$RUNNER_TEMP/jwt.key"
+        env:
+          SF_JWT_KEY: ${{ secrets.SF_JWT_KEY }}
+
+      - name: Authenticate to org (JWT)
+        run: |
+          sf org login jwt \
+            --client-id "$SF_CONSUMER_KEY" \
+            --jwt-key-file "$RUNNER_TEMP/jwt.key" \
+            --username "$SF_USERNAME" \
+            --instance-url "${SF_INSTANCE_URL:-https://login.salesforce.com}" \
+            --alias ci --set-default
+        env:
+          SF_CONSUMER_KEY: ${{ secrets.SF_CONSUMER_KEY }}
+          SF_USERNAME: ${{ secrets.SF_USERNAME }}
+          SF_INSTANCE_URL: ${{ secrets.SF_INSTANCE_URL }}
+
+      - name: Upsert Release_Note__c
+        run: node scripts/sync-release-notes.mjs
+        env:
+          TARGET_ORG: ci
+          RELEASE_TAG: ${{ github.event.release.tag_name || github.event.inputs.tag }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
+          RELEASE_PUBLISHED_AT: ${{ github.event.release.published_at }}
+
+      - name: Cleanup
+        if: always()
+        run: rm -f "$RUNNER_TEMP/jwt.key"

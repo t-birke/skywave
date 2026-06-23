@@ -803,7 +803,10 @@ half is the **changelog** (LWC `skywaveReleaseNotes` → `Skywave_ReleaseNotesCo
 → `Release_Note__c`), listing the most recent releases newest-first. Below both it
 **embeds** the `skywavePreflight` LWC, so the same **Check Demo** button surfaces
 silent-config-drift risks that `git status` cannot show. `Release_Note__c` rows are
-written by the `release-notes` GitHub Action on each GitHub Release (§ below). That button drives a single Apex orchestrator
+written by the `release-notes` GitHub Action (`.github/workflows/release-notes.yml` →
+`scripts/sync-release-notes.mjs`) on each published GitHub Release: it groups the
+commits since the previous tag into notes and JWT-upserts them by `Version__c`
+(secrets in SECRETS.md). That button drives a single Apex orchestrator
 (`Skywave_PreflightController.runPreflight`) that fans out across three planes:
 
 - **Org** — SOQL only: active Demo_Session present + reset to `idle`, survey
