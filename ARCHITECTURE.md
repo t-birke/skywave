@@ -60,8 +60,9 @@ kept in sync with `OwnerId`+`Active__c` by `Demo_Session_Trigger`) makes
 "one active session per owner" a database invariant — a second active row for
 the same owner fails with `DUPLICATE_VALUE`. Created Contacts separate per
 presenter via `Demo_Session__r.OwnerId`; both monitors filter to the
-presenter's own active session; the live seat/capability gate reads the
-*visitor's* own session per turn.
+presenter's own active session; the live seat/capability gate is **per demo
+session** — it reads `Demo_Session__c.State__c` (resolved via the chat visitor's
+Contact), so each presenter's session has its own seat state.
 
 ---
 

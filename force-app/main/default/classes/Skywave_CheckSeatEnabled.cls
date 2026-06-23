@@ -1,14 +1,15 @@
 /**
  * Agent action: is seat-change enabled right now?
  *
- * Multi-tenant: reads the VISITOR'S OWN demo session, not a global one. The
- * router has already resolved the visitor's Contact (resolved_contact_id);
- * we follow Contact.Demo_Session__c → State__c and enable seat change once
- * THAT session reaches `agent_seat_pass`. So two presenters running at once
- * stay independent — presenter A flipping their stage never enables seat
- * change for presenter B's visitors. Falls back to the global active session
- * when no contact is supplied (studio preview / unresolved visitor) so the
- * gate never hard-fails.
+ * Multi-tenant: the gate is PER DEMO SESSION. Seat-change is enabled by the
+ * Demo_Session__c.State__c picklist (every visitor of that session shares the
+ * same result); we just resolve WHICH session to read by following the chat
+ * visitor's Contact (resolved_contact_id) → Contact.Demo_Session__c → State__c,
+ * enabling once THAT session reaches `agent_seat_pass`. So two presenters
+ * running at once stay independent — presenter A advancing their session never
+ * affects presenter B's session's visitors. Falls back to the global active
+ * session when no contact is supplied (studio preview / unresolved visitor) so
+ * the gate never hard-fails.
  *
  * Called from the router each turn (gated so it only runs while still
  * disabled AND the visitor actually has a booking) so a mid-conversation
