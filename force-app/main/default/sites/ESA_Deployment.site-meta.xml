@@ -63,6 +63,19 @@
     <siteIframeWhiteListUrls>
         <url>*.herokuapp.com</url>
     </siteIframeWhiteListUrls>
+    <!-- Custom-domain cutover: the consumer site also serves on
+         app.skywave.flights, which shares the registrable domain skywave.flights
+         with the chat site chat.skywave.flights — so the guest cookie is
+         first-party and the iOS redirect loop is gone. The chat iframe's parent
+         is app.skywave.flights, so its host must be in frame-ancestors here.
+         Both the exact host and the wildcard are listed (the parent postMessage
+         handshake wants the exact host, per the pc-rnd note above). -->
+    <siteIframeWhiteListUrls>
+        <url>app.skywave.flights</url>
+    </siteIframeWhiteListUrls>
+    <siteIframeWhiteListUrls>
+        <url>*.skywave.flights</url>
+    </siteIframeWhiteListUrls>
     <siteType>ChatterNetwork</siteType>
     <urlPathPrefix>ESADeploymentvforce</urlPathPrefix>
 </CustomSite>
