@@ -34,8 +34,14 @@ SalesforceInteractions.setLoggingLevel('trace');
 // queued and dropped (the SDK refuses to ship without consent), which
 // is the right behavior.
 SalesforceInteractions.init({
-  // Single-host on Heroku. No subdomain spread, so a literal host is fine.
-  cookieDomain: 'skywave-app-bb0e8666933b.herokuapp.com'
+  // Custom-domain cutover: the consumer site (app.skywave.flights) and the chat
+  // site (chat.skywave.flights) share the registrable domain skywave.flights.
+  // Pin the cookie to that registrable domain so the _sfid anonymous-id cookie
+  // is valid on both subdomains. A host-literal here makes the browser reject
+  // the cookie on any other host → the SDK can't persist it → the deviceId
+  // (== anonymousId) regenerates on every event. (Re-upload this sitemap in the
+  // Data Cloud Web Connector UI after editing — the live value is the uploaded one.)
+  cookieDomain: 'skywave.flights'
 });
 
 SalesforceInteractions.initSitemap({
