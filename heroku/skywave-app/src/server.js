@@ -55,6 +55,13 @@ app.get('/api/config', (_, res) => {
         // but served from a Heroku Config Var so it stays out of the repo
         // per SECRETS.md. Geolocation is skipped if unset.
         ipinfoToken: process.env.IPINFO_TOKEN || null,
+        // Chat transport selector (Heroku CHAT_CLIENT). 'ecv2' = the official
+        // Embedded Service for Web v2 widget — requires the chat site and this
+        // consumer site to share a registrable domain (chat.skywave.flights +
+        // app.skywave.flights) so the guest cookie is first-party. Anything
+        // else (default) = the custom scrt2 REST client, which needs no shared
+        // domain. Flip to 'ecv2' only after the custom-domain cutover.
+        chatClient: (process.env.CHAT_CLIENT === 'ecv2') ? 'ecv2' : 'miaw',
         esw: {
             orgId:    process.env.SF_ESW_ORG_ID    || null,
             escName:  process.env.SF_ESW_ESC_NAME  || null,

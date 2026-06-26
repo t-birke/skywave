@@ -232,35 +232,129 @@ function postContactUpsert(payload) {
     });
 }
 
-// Boot the custom MIAW chat client (replaces the ECv2 embedded widget).
-//
-// Why custom: the official ECv2 client dies on iOS Safari in a redirect
-// loop — its session cookie is set on *.my.site.com but the host page is
-// *.herokuapp.com (different public-suffix domains), so the cookie is
-// third-party and iOS ITP drops it. We can't share a registrable domain
-// (the demo must stay transferable), so we talk to the scrt2 REST API
-// directly: the auth JWT lives in first-party localStorage on THIS origin
-// and there is nothing for ITP to block. See docs/ecv2-reference/.
-//
-// The function name + signature are kept (loadEswSnippet) so both call
-// sites and the button-visibility logic keep working unchanged.
-//
-// Identity: the custom client generates its own conversation UUID, which
-// the platform exposes as Conversation.ConversationIdentifier. We fire the
-// SAME chat_start POST the ECv2 path used; the existing Contact-update
-// trigger resolves that UUID to the internal MessagingSession.ConversationId
-// and stamps the visitor's Contact so Skywave_ResolveSession matches. No
-// new identity mechanism — verified against the org.
+// Boot the chat client. Two transports, selected by config.chatClient
+// (Heroku CHAT_CLIENT env, default 'miaw'):
+//   - 'ecv2' → the official Embedded Service for Web v2 widget. Works only
+//     when the chat site and this consumer site share a registrable domain
+//     (chat.skywave.flights + app.skywave.flights), so the guest session
+//     cookie is first-party and iOS ITP doesn't drop it (no redirect loop).
+//   - 'miaw' → the custom scrt2 REST client (miaw-client/miaw-ui), which
+//     sidesteps the cookie loop WITHOUT a shared domain. The portable
+//     fallback for installs that can't own a custom domain.
+// Both transports share the FAB-visibility logic (syncEswButtonVisibility)
+// and the same chat_start identity stamp (deviceId -> Contact via the upsert
+// trigger). The name + signature (loadEswSnippet) are unchanged so both call
+// sites keep working.
 async function loadEswSnippet(deviceId) {
-    // Idempotency guard — set SYNCHRONOUSLY before the async mount. There
-    // are two call sites (session-start and resume); without flipping the
-    // flag up front, both can slip past `if (eswReady)` during the await
-    // gap and mount TWO MiawUI instances → two FABs, two message handlers,
-    // every message rendered twice. Flip first; roll back only on failure.
+    // Idempotency guard — checked SYNCHRONOUSLY before any async work. Two
+    // call sites (session-start and resume) can fire near-simultaneously;
+    // without the up-front guard both slip past during the await gap and
+    // double-mount (two FABs / two bootstrap injects).
     if (eswReady || miawUi) return true;
+    return ((config.chatClient || 'miaw') === 'ecv2')
+        ? loadEcv2Snippet(deviceId)
+        : loadMiawClient(deviceId);
+}
+
+// --- 'ecv2' transport: official Embedded Service for Web v2 widget. -------
+// Loads bootstrap.min.js from the published chat site (esw.siteUrl — set via
+// SF_ESW_SITE_URL, which becomes chat.skywave.flights at cutover), passes the
+// deviceId as the Session_ID hidden prechat field, and POSTs chat_start so the
+// existing Contact-upsert trigger resolves the conversation to the visitor's
+// Contact (custom hidden params don't reach the routing flow in ECv2). Button
+// visibility is CSS-driven (body[data-esw-visible]) — ECv2's hideChatButton
+// APIs are platform-broken. See docs/ecv2-reference/.
+async function loadEcv2Snippet(deviceId) {
     const esw = config.esw || {};
-    // siteUrl is the published LWR site; scrt2Url + orgId + escName are what
-    // the REST client needs. escName is the EmbeddedServiceConfig dev name.
+    if (!esw.orgId || !esw.escName || !esw.siteUrl || !esw.scrt2Url) {
+        console.warn('[esw] config incomplete; skipping ECv2 snippet', esw);
+        return false;
+    }
+    eswReady = true;  // claim the slot before any await (prevents double inject)
+
+    await new Promise((resolve) => {
+        const s = document.createElement('script');
+        s.src = `${esw.siteUrl}/assets/js/bootstrap.min.js`;
+        s.async = true;
+        s.onload = () => resolve();
+        s.onerror = () => { console.warn('[esw] bootstrap.min.js failed to load'); resolve(); };
+        document.head.appendChild(s);
+    });
+
+    if (!window.embeddedservice_bootstrap) {
+        console.warn('[esw] embeddedservice_bootstrap undefined after script load');
+        eswReady = false;
+        return false;
+    }
+
+    // Set the Session_ID hidden prechat field on two lifecycle events — ECv2
+    // intermittently fails to pick the field up at conversation start. The
+    // value is a bare string, NOT { value: '...' } (runtime rejects wrapped).
+    const setSessionPrechat = (eventName) => {
+        try {
+            if (deviceId) {
+                window.embeddedservice_bootstrap.prechatAPI.setHiddenPrechatFields({ Session_ID: deviceId });
+                console.log(`[esw] Session_ID prechat set on ${eventName}:`, deviceId);
+            }
+        } catch (e) { console.warn(`[esw] setHiddenPrechatFields failed on ${eventName}`, e); }
+    };
+    window.addEventListener('onEmbeddedMessagingReady', () => setSessionPrechat('Ready'), { once: true });
+
+    // WORKAROUND: ECv2 doesn't propagate custom hidden prechat params to the
+    // session-handler flow (they drop between scrt2 and the routing flow). So
+    // on conversation start we POST deviceId + conversationId to the public
+    // upsert endpoint; the trigger stamps the Contact so Skywave_ResolveSession
+    // matches. Drop this listener once the platform gap closes.
+    window.addEventListener('onEmbeddedMessagingConversationStarted', (e) => {
+        setSessionPrechat('ConversationStarted');
+        const conversationId = e?.detail?.conversationId;
+        if (!conversationId || !deviceId) {
+            console.warn('[esw] no conversationId/deviceId on ConversationStarted; skipping identify');
+            return;
+        }
+        const csPayload = { type: 'chat_start', deviceId, demoSessionId: state.demoSessionId, conversationId };
+        if (state.geo) {
+            if (state.geo.city)        csPayload.geoCity    = state.geo.city;
+            if (state.geo.region)      csPayload.geoRegion  = state.geo.region;
+            if (state.geo.country)     csPayload.geoCountry = state.geo.country;
+            if (state.geo.lat != null) csPayload.geoLat     = state.geo.lat;
+            if (state.geo.lon != null) csPayload.geoLon     = state.geo.lon;
+        }
+        postContactUpsert(csPayload);
+    }, { once: true });
+
+    try {
+        window.embeddedservice_bootstrap.settings.language = 'en_US';
+        window.embeddedservice_bootstrap.settings.hideChatButtonOnLoad = true;
+        window.embeddedservice_bootstrap.init(
+            esw.orgId, esw.escName, esw.siteUrl, { scrt2URL: esw.scrt2Url }
+        );
+    } catch (e) {
+        console.warn('[esw] init failed', e);
+        eswReady = false;
+        return false;
+    }
+
+    // Mount is async; the call-site syncs ran before the platform button
+    // existed. Re-sync now so an already-eligible visitor sees the FAB.
+    syncEswButtonVisibility();
+    return true;
+}
+
+// --- 'miaw' transport: custom scrt2 REST client (portable fallback). ------
+// Why custom: the official ECv2 client dies on iOS Safari in a redirect loop
+// — its session cookie is set on *.my.site.com but the host page is a
+// different registrable domain, so the cookie is third-party and iOS ITP
+// drops it. This client talks to the scrt2 REST API directly: the auth JWT
+// lives in first-party localStorage on THIS origin, nothing for ITP to block.
+// See docs/ecv2-reference/. Identity: it generates its own conversation UUID
+// and fires the SAME chat_start POST as the ECv2 path; the Contact-update
+// trigger resolves that UUID to the internal MessagingSession.ConversationId
+// so Skywave_ResolveSession matches.
+async function loadMiawClient(deviceId) {
+    const esw = config.esw || {};
+    // scrt2Url + orgId + escName are what the REST client needs (no siteUrl).
+    // escName is the EmbeddedServiceConfig dev name.
     if (!esw.orgId || !esw.escName || !esw.scrt2Url) {
         console.warn('[miaw] config incomplete; skipping chat client load', esw);
         return false;

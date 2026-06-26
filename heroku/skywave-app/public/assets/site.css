@@ -230,3 +230,14 @@ body {
  * none otherwise), which overrides this default. No !important — we never
  * want CSS to fight an open panel. */
 .miaw-root { display: none; }
+
+/* ECv2 ('ecv2' transport) only: hide the platform chat BUTTON (rendered in
+ * the host-page DOM, not the iframe) until the visitor is eligible. ECv2's
+ * hideChatButton APIs are platform-broken, so site.js's syncEswButtonVisibility
+ * toggles body[data-esw-visible] and this rule does the hiding. Harmless under
+ * the 'miaw' transport — no #embedded-messaging element exists then. */
+body:not([data-esw-visible="1"]) #embedded-messaging,
+body:not([data-esw-visible="1"]) embedded-messaging {
+    display: none !important;
+    pointer-events: none !important;
+}

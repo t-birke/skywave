@@ -205,11 +205,19 @@ strip the `Swv2` unified-DMO iteration artifact (→ stock `UnifiedIndividual__d
 and per-build hash suffixes. Every step is idempotent (detect + reuse). Ported
 from the internal `build-data360-demo` skill; see memory `skywave-tracking-tier5`.
 
-### 3a''. Chat transport: custom MIAW client (branch `custom-chat-client`)
+### 3a''. Chat transport: dual-path (custom MIAW client + official ECv2)
 
-> Status: on the `custom-chat-client` branch, deployed to the `skywave-app`
-> dyno. `main` still embeds the official ECv2 widget; merge after the live
-> iPhone sign-off.
+> Status: both transports live in the consumer site, selected at runtime by the
+> `CHAT_CLIENT` Heroku env var (`GET /api/config` → `chatClient`), default
+> `miaw`. `site.js` `loadEswSnippet()` is now a dispatcher → `loadMiawClient()`
+> (the custom scrt2 REST client below) or `loadEcv2Snippet()` (the official
+> ECv2 widget, restored from git history). ECv2 is the production endgame, now
+> viable because the chat site and consumer site can share one registrable
+> domain (`chat.skywave.flights` + `app.skywave.flights`) — the guest cookie
+> becomes first-party, killing the iOS loop. Flip `CHAT_CLIENT=ecv2` only AFTER
+> the custom-domain cutover (origin repoint to `app.skywave.flights` + WebSDK
+> `cookieDomain` → `skywave.flights` + ESD republish); until then `miaw` is the
+> portable default. Branch: `ecv2-restore`.
 
 The official ECv2 embedded client dies on **iOS Safari** in a "too many HTTP
 redirects" loop: its session cookie is set on `*.my.site.com` but the host
