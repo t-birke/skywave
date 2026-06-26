@@ -1342,6 +1342,12 @@ async function resumeSession({ sdkId, surveyAlreadyComplete }) {
             'surveyCompleted=' + !!peek?.surveyCompleted +
             ', profileCompleted=' + !!peek?.profileCompleted);
         state.profileAlreadyComplete = !!peek?.profileCompleted;
+        // A verified proof cookie means this device already consented in a
+        // prior session. The resume path skips the consent screen (where the
+        // fresh path sets this), so set it explicitly here — otherwise the chat
+        // FAB gate (state.consented && !modalOpen) never opens for a returning
+        // visitor and the launch button stays hidden no matter the stage.
+        state.consented = true;
         // Signup mode: returning visitor with a valid proof cookie has
         // already consented on this device — skip both the consent gate
         // AND the demo resume. Drop the modal, kick the customer-area
