@@ -325,7 +325,15 @@ async function loadEcv2Snippet(deviceId) {
 
     try {
         window.embeddedservice_bootstrap.settings.language = 'en_US';
-        window.embeddedservice_bootstrap.settings.hideChatButtonOnLoad = true;
+        // Do NOT set hideChatButtonOnLoad. When this code was first written the
+        // setting was Salesforce-broken (ignored), so the FAB showed by default
+        // and our CSS (body[data-esw-visible]) did the hiding. The platform has
+        // since FIXED it: hideChatButtonOnLoad=true now genuinely collapses the
+        // FAB iframe to 0x0 ("initial"), and our CSS can't un-collapse a button
+        // the platform is holding hidden. So leave it unset — the FAB renders
+        // and our CSS hides #embedded-messaging until the visitor is eligible
+        // (consented && modal closed). Verified live on app.skywave.flights:
+        // with it set, the iframe stayed 0x0 even with data-esw-visible="1".
         window.embeddedservice_bootstrap.init(
             esw.orgId, esw.escName, esw.siteUrl, { scrt2URL: esw.scrt2Url }
         );
