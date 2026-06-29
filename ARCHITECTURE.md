@@ -158,11 +158,22 @@ Skywave_Contact_Update_Trigger  (runs in System Mode — guest user has no Conta
 Contact in CRM  (Session_Id__c, Skywave_Conversation_Id__c, survey, geo, airport)
   ▲
   │  agent reads it at conversation start:
-Skywave_ResolveSession  (agent action, keyed on @MessagingSession.ConversationId)
-     → returns survey summary + home-airport hint into the agent's reasoning
+Skywave_ResolveSession  (agent action — PRIMARY: @MessagingEndUser.MessagingPlatformKey
+     uid:<deviceId>; FALLBACK: @MessagingSession.ConversationId; then demo-seed)
+     → returns resolved Contact id + survey summary + home-airport hint
 ```
 
 Key non-obvious points (each is a memory entry):
+- **Identity is verified, not raced.** With MIAW **User Verification** on the
+  channel (`authMode=Auth` + Keyset `Skywave_Identity_Keyset`), the ECv2 widget
+  presents a signed JWT (`sub=deviceId`, minted by the Heroku
+  `/api/website/chat-identity-token` service) via `userVerificationAPI
+  .setIdentityToken`. The platform stamps it as
+  `v2/iamessage/AUTH/Skywave_Identity/uid:<deviceId>` on
+  `MessagingEndUser.MessagingPlatformKey`, and `Skywave_ResolveSession` resolves
+  `Contact.Session_Id__c = deviceId` deterministically — the same key the
+  website uses. The `chat_start` conversationId stamp below is now only a
+  FALLBACK (kept for unauth/anonymous edge cases).
 - The **guest user** that runs the REST endpoint can't touch Contact — that's
   *why* the write goes through a Platform Event into a System-Mode trigger.
 - `chat_start` sends a snippet-generated UUID; the trigger resolves it to the
@@ -218,6 +229,19 @@ from the internal `build-data360-demo` skill; see memory `skywave-tracking-tier5
 > the custom-domain cutover (origin repoint to `app.skywave.flights` + WebSDK
 > `cookieDomain` → `skywave.flights` + ESD republish); until then `miaw` is the
 > portable default. Branch: `ecv2-restore`.
+>
+> **User Verification on ECv2 (`authMode=Auth`).** `Skywave_Channel` carries an
+> `<embeddedConfig>` with `authMode=Auth` + Keyset `Skywave_Identity_Keyset`
+> (`messagingAuthorizations`). `loadEcv2Snippet()` fetches a JWT from the Heroku
+> `/api/website/chat-identity-token` service (`sub=deviceId`, proof-gated) and
+> calls `userVerificationAPI.setIdentityToken({identityTokenType:'JWT', …})` on
+> `onEmbeddedMessagingReady` (re-called on `onEmbeddedMessagingIdentityTokenExpired`).
+> This is the deterministic identity path (§3a). **`authMode` is a single global
+> flag on the channel** — it is fail-closed: a session with no valid token can't
+> start, and the unauth `miaw` custom client cannot share this channel while it's
+> set. Heroku must have `SF_MIAW_JWT_PRIVATE_KEY` (+ `_KID` matching the Keyset
+> JWK, `_ISSUER` matching the auth config). Revert = drop `<embeddedConfig>` from
+> the channel + redeploy (back to unauth, custom client usable again).
 
 The official ECv2 embedded client dies on **iOS Safari** in a "too many HTTP
 redirects" loop: its session cookie is set on `*.my.site.com` but the host

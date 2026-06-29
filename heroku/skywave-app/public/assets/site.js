@@ -300,6 +300,36 @@ async function loadEcv2Snippet(deviceId) {
     };
     window.addEventListener('onEmbeddedMessagingReady', () => setSessionPrechat('Ready'), { once: true });
 
+    // --- User Verification (PRIMARY identity path) -------------------------
+    // Present a signed identity token (JWT, sub=deviceId) so the session is
+    // verified as `v2/iamessage/AUTH/Skywave_Identity/uid:<deviceId>` instead
+    // of an UNAUTH guest with a random uid. Skywave_ResolveSession then resolves
+    // the visitor's Contact by Session_Id__c=deviceId DETERMINISTICALLY (no
+    // dependency on the conversationId stamp race / demo-seed fallback). The JWT
+    // is minted by the Heroku service (/api/website/chat-identity-token, proof-
+    // gated, sub = the proof-cookie deviceId), verified against the org Keyset
+    // `Skywave_Identity_Keyset`. The channel runs authMode=Auth, so this is
+    // REQUIRED: without a token the conversation can't start. setIdentityToken
+    // must be called AFTER onEmbeddedMessagingReady; re-call on token expiry.
+    const setEcv2IdentityToken = async (reason) => {
+        try {
+            const r = await fetch('/api/website/chat-identity-token', { credentials: 'same-origin' });
+            if (!r.ok) { console.warn(`[esw] identity-token fetch ${r.status} (${reason})`); return; }
+            const data = await r.json();
+            if (!data || !data.configured || !data.customerIdentityToken) {
+                console.warn(`[esw] identity token not configured — session stays UNAUTH (${reason})`);
+                return;
+            }
+            window.embeddedservice_bootstrap.userVerificationAPI.setIdentityToken({
+                identityTokenType: 'JWT',
+                identityToken: data.customerIdentityToken
+            });
+            console.log(`[esw] identity token set (${reason})`);
+        } catch (e) { console.warn(`[esw] setIdentityToken failed (${reason})`, e); }
+    };
+    window.addEventListener('onEmbeddedMessagingReady', () => setEcv2IdentityToken('Ready'), { once: true });
+    window.addEventListener('onEmbeddedMessagingIdentityTokenExpired', () => setEcv2IdentityToken('Expired'));
+
     // WORKAROUND: ECv2 doesn't propagate custom hidden prechat params to the
     // session-handler flow (they drop between scrt2 and the routing flow). So
     // on conversation start we POST deviceId + conversationId to the public
