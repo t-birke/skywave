@@ -129,8 +129,10 @@ All paths under `force-app/main/default/uiBundles/SkywaveGlobe/src/`.
 ### UI (`pages/`, `components/`)
 | File | Role |
 |---|---|
-| `pages/Home.tsx` | Top-level: chooses LIVE vs REPLAY, renders `<HoloGlobe>`, the HUD (status dot, stage, visitor count, **LIVE/6H/24H/7D/30D** preset buttons, replay progress bar), loads the option-image map. **Seeds the displayed stage from `Demo_Session__c.State__c`** (one `fetchActiveSession` read, shared with the seat toggle) so the status shows before the first live event; a relay `stage_changed` event overrides it. |
+| `pages/Home.tsx` | Top-level: chooses LIVE vs REPLAY, renders `<HoloGlobe>`, the HUD (status dot, stage, visitor count, **LIVE/6H/24H/7D/30D** preset buttons, replay progress bar), the **join-QR overlay**, and the inconspicuous seat-toggle dot; loads the option-image map. **Seeds the displayed stage from `Demo_Session__c.State__c`** (one `fetchActiveSession` read, shared with the seat toggle + the QR scope) so the status shows before the first live event; a relay `stage_changed` event overrides it. |
 | `components/VisitorPanel.tsx` | The click-detail panel: avatar, name, route/seat, survey-answer thumbnails. Rendered inside the scene (anchored to the avatar) by `HoloGlobe`, so it tracks globe rotation. |
+| `components/QrJoinOverlay.tsx` | The **join QR** — bottom-right corner card that **enlarges** to a centred ~75vh on click and **hides** to an inconspicuous "QR" pill via the ×. Dynamic: encodes `<consumer-site>/?ds=<activeSessionId>` (scoped to the presenter's session), re-rendered when the active session changes. The 3D port of the QR card on the 2D `skywaveDemoMonitor` LWC; renders via `qrcode.react`'s `QRCodeCanvas`. |
+| `lib/consumerSite.ts` | Resolves the consumer-site origin the QR points phones at. Derives it from the build-time `VITE_RELAY_WS_URL` (same Heroku app serves the site + the relay WS) by swapping `wss:`→`https:` and dropping the path; `VITE_CONSUMER_SITE_URL` overrides (e.g. a custom domain). `joinUrl(sessionId)` builds the full `…/?ds=<id>` target. |
 
 ### Config
 | File | Role |

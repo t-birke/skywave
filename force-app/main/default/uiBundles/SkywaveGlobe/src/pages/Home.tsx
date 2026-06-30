@@ -5,6 +5,7 @@ import { useDemoFeed, type FeedStatus } from '@/data/useDemoFeed';
 import { useReplay } from '@/data/useReplay';
 import { loadOptionImageMap, type OptionImageMap } from '@/data/surveyImages';
 import { fetchActiveSession, setSeatEnabled } from '@/data/seatToggle';
+import { QrJoinOverlay } from '@/components/QrJoinOverlay';
 
 const STATUS_COLOR: Record<FeedStatus, string> = {
   connecting: '#e0a000',
@@ -220,6 +221,10 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* Join QR — dynamic (encodes the active session), enlarge-on-click,
+          hide-to-pill. Ported from the 2D skywaveDemoMonitor LWC. */}
+      <QrJoinOverlay sessionId={myActiveSessionId} />
 
       {/* Inconspicuous seat-capability switch — a dim corner dot. Invisible to
           the audience; clickable by the operator to flip seat-change ON/OFF on

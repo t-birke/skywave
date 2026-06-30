@@ -461,6 +461,15 @@ necessity:
                                UI API GraphQL.
 ```
 
+It also carries the operator affordances ported from the 2D monitor: an
+inconspicuous **seat-capability toggle** (the corner dot that flips
+`Demo_Session__c.State__c` live) and a **join-QR overlay**
+(`components/QrJoinOverlay.tsx`) — a corner card that enlarges to centre on
+click and hides to a "QR" pill, encoding `<consumer-site>/?ds=<activeSessionId>`
+so phones join scoped to the presenter's session. The consumer-site origin is
+derived from `VITE_RELAY_WS_URL` (same Heroku app serves the site + relay WS;
+see `lib/consumerSite.ts`), so no extra build env is needed.
+
 Both paths fold through one shared reducer (`visitorReducer.ts`) so live and
 replay look identical. **Reads/writes** (replay, survey images, seat toggle)
 use **UI API GraphQL + the `@salesforce/sdk-data` SDK** — the supported path
