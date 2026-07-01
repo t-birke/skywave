@@ -241,3 +241,45 @@ body:not([data-esw-visible="1"]) embedded-messaging {
     display: none !important;
     pointer-events: none !important;
 }
+
+/* ECv2 pre-warm loading bubble — a FAB look-alike shown while the conversation
+ * warms (agent cold-start) hidden in the background; swapped for the real FAB
+ * when the welcome message arrives (site.js preWarmChat/onWelcomeReady).
+ * Mirrors the ECv2 FAB: fixed bottom-right, 56px, radius 20px, #1A1B1E. If the
+ * real FAB sits at a different offset on your deployment, tweak bottom/right
+ * so the swap doesn't jump. */
+#skywave-chat-warming {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    height: 56px;
+    width: 56px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 20px;
+    background-color: #1A1B1E;   /* matches the ESD chatButton color */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 9998;               /* just under the real ESW FAB */
+    cursor: default;
+}
+#skywave-chat-warming[data-on="1"] { display: flex; }
+#skywave-chat-warming .swc-glyph {
+    width: 26px;
+    height: 26px;
+    color: #fff;
+    opacity: 0.9;
+}
+#skywave-chat-warming .swc-spinner {
+    position: absolute;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.22);
+    border-top-color: #fff;
+    animation: swc-spin 0.9s linear infinite;
+}
+@keyframes swc-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+    #skywave-chat-warming .swc-spinner { animation: none; opacity: 0.5; }
+}

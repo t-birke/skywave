@@ -203,6 +203,15 @@ Key non-obvious points (each is a memory entry):
 - The agent's `@AuraEnabled` calls inside the chat iframe run as the **ESW
   site guest user**, not the messaging end user — see memory
   `reference-ecv2-clt-runtime-context`.
+- **Chat pre-warm (hide the agent cold-start).** Once the session is verified,
+  `site.js` calls `utilAPI.launchChat()` **hidden** (CSS keeps `#embedded-messaging`
+  collapsed) so the Agentforce welcome generates in the background; a FAB-look-alike
+  loading bubble (`#skywave-chat-warming`) covers the wait. The real FAB is revealed
+  the instant the welcome lands, detected via the ECv2 `window` event
+  **`onEmbeddedMessagingFirstBotMessageSent`** (undocumented but dispatched to the
+  host; `onEmbeddedMessagingConversationStarted` fires ~40s too early). `minimizeChat()`
+  runs before the reveal so the visitor gets the FAB, not an auto-opened window; a 90s
+  safety timeout reveals anyway if the event never fires.
 
 ### 3a'''. The tracking pipeline that powers §3a (Tier 5, `scripts/datacloud/`)
 

@@ -127,6 +127,10 @@ const AGENT_STAGES = new Set(['agent_book', 'agent_seat_fail', 'agent_seat_pass'
 let config = { interactionsSdkUrl: null, esw: null };
 let sdkReady = false;
 let eswReady = false;        // custom chat client mounted
+let warmingBubbleEl = null;  // ECv2 pre-warm loading bubble (FAB look-alike)
+let warmSafetyTimer = null;  // reveal-anyway net if the welcome event never fires
+let chatRevealing = false;   // guards the minimize→reveal handoff
+let preWarmRetries = 0;      // bounded retry while the ESW SDK finishes mounting
 let miawUi = null;           // MiawUI instance (custom chat client)
 
 async function loadConfig() {
@@ -324,6 +328,10 @@ async function loadEcv2Snippet(deviceId) {
                 identityToken: data.customerIdentityToken
             });
             console.log(`[esw] identity token set (${reason})`);
+            // Session is now verified — pre-warm the conversation hidden so the
+            // agent's welcome is ready before the visitor opens the chat. Only
+            // on the initial Ready (not on token-expiry re-sets).
+            if (reason === 'Ready') preWarmChat();
         } catch (e) { console.warn(`[esw] setIdentityToken failed (${reason})`, e); }
     };
     window.addEventListener('onEmbeddedMessagingReady', () => setEcv2IdentityToken('Ready'), { once: true });
@@ -515,13 +523,104 @@ async function loadMiawClient(deviceId) {
 function syncEswButtonVisibility() {
     if (typeof document === 'undefined' || !document.body) return;
     const modalOpen = modalRoot && modalRoot.dataset.state === 'open';
-    const visible = state.consented && !modalOpen;
-    document.body.dataset.eswVisible = visible ? '1' : '0';
+    const eligible = state.consented && !modalOpen;
+    // ECv2 pre-warm: once we've kicked off the hidden warm-up, keep the real
+    // FAB hidden and show the loading bubble in its place until the agent's
+    // welcome lands. `gateOnWelcome` is only ever true on the ECv2 path (the
+    // miaw transport never sets chatPreWarmed), so the miaw fallback keeps its
+    // original "show whenever eligible" behaviour.
+    const gateOnWelcome = state.chatPreWarmed && !state.chatWelcomeReady;
+    const showRealFab = eligible && !gateOnWelcome;
+    document.body.dataset.eswVisible = showRealFab ? '1' : '0';
+    if (warmingBubbleEl) {
+        warmingBubbleEl.dataset.on = (eligible && gateOnWelcome) ? '1' : '0';
+    }
     // Drive the actual client root (explicit value — CSS default is none).
     // While the panel is open we keep it visible regardless of stage (the
     // FAB hides itself when open); otherwise show only when eligible.
     if (miawUi && miawUi.root) {
-        miawUi.root.style.display = (visible || miawUi.open) ? 'block' : 'none';
+        miawUi.root.style.display = (showRealFab || miawUi.open) ? 'block' : 'none';
+    }
+}
+
+// Create the FAB-look-alike loading bubble once. It mirrors the ECv2 FAB
+// (fixed bottom-right, 56px, radius 20px, #1A1B1E, the bubble glyph) with a
+// spinner ring, so the swap to the real FAB is visually seamless. Non-
+// interactive — purely a "chat is preparing" affordance.
+const ESW_BUBBLE_GLYPH = 'M10 1.25C14.8325 1.25 18.75 5.16751 18.75 10C18.75 11.3951 18.4213 12.7154 17.8389 13.8877L18.7217 17.5137C18.8042 17.8528 18.7038 18.2103 18.457 18.457C18.2103 18.7038 17.8528 18.8042 17.5137 18.7217L13.8877 17.8389C12.7154 18.4213 11.3951 18.75 10 18.75C5.16751 18.75 1.25 14.8325 1.25 10C1.25 5.16751 5.16751 1.25 10 1.25ZM10 3.25C6.27208 3.25 3.25 6.27208 3.25 10C3.25 13.7279 6.27208 16.75 10 16.75C11.1896 16.75 12.3049 16.4434 13.2734 15.9053L13.3574 15.8633C13.5573 15.7757 13.7814 15.7556 13.9951 15.8076L16.3896 16.3896L15.8076 13.9951C15.7482 13.7508 15.7832 13.4932 15.9053 13.2734C16.4434 12.3049 16.75 11.1896 16.75 10C16.75 6.27208 13.7279 3.25 10 3.25Z';
+function ensureWarmingBubble() {
+    if (warmingBubbleEl) return warmingBubbleEl;
+    if (typeof document === 'undefined' || !document.body) return null;
+    const el = document.createElement('div');
+    el.id = 'skywave-chat-warming';
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-label', 'Preparing chat…');
+    el.dataset.on = '0';
+    el.innerHTML =
+        '<span class="swc-spinner" aria-hidden="true"></span>' +
+        '<svg class="swc-glyph" viewBox="0 0 20 20" aria-hidden="true">' +
+        '<path fill="currentColor" d="' + ESW_BUBBLE_GLYPH + '"/></svg>';
+    document.body.appendChild(el);
+    warmingBubbleEl = el;
+    return el;
+}
+
+// Start the ECv2 conversation in the background (hidden) so the agent's
+// welcome message is already waiting by the time the visitor opens the chat.
+// Fired once, after the session is verified (setIdentityToken). launchChat()
+// always maximizes, but our CSS keeps #embedded-messaging hidden (data-esw-
+// visible="0") throughout the warm-up, so nothing flashes; the loading bubble
+// shows in its place. onWelcomeReady() does the reveal.
+function preWarmChat() {
+    if (state.chatPreWarmed) return;
+    const boot = window.embeddedservice_bootstrap;
+    if (!boot || !boot.utilAPI || typeof boot.utilAPI.launchChat !== 'function') {
+        // SDK still mounting — retry a bounded number of times.
+        if (++preWarmRetries <= 10) setTimeout(preWarmChat, 500);
+        return;
+    }
+    state.chatPreWarmed = true;
+    ensureWarmingBubble();
+    syncEswButtonVisibility();   // show the loading bubble, keep the real FAB hidden
+    // Reveal the real FAB the instant the agent's first (welcome) message
+    // lands. This ECv2 event isn't in the published listener list but is
+    // dispatched to the host (verified live) — it's the only signal that fires
+    // exactly at welcome time (ConversationStarted fires ~40s too early).
+    window.addEventListener('onEmbeddedMessagingFirstBotMessageSent', onWelcomeReady, { once: true });
+    // Safety net: never leave the chat permanently hidden if that event never
+    // fires (agent failure / platform event-name change) — reveal after 90s.
+    warmSafetyTimer = setTimeout(() => {
+        console.warn('[esw] FirstBotMessageSent not seen in 90s — revealing FAB anyway');
+        onWelcomeReady();
+    }, 90000);
+    try {
+        console.log('[esw] pre-warming conversation (hidden)…');
+        boot.utilAPI.launchChat();
+    } catch (e) {
+        console.warn('[esw] launchChat pre-warm failed — revealing FAB', e);
+        onWelcomeReady();
+    }
+}
+
+// Welcome landed (or safety timeout / failure): collapse the hidden window to
+// the FAB, then reveal it — revealing only after it's minimized so the visitor
+// never sees the full window flash open.
+function onWelcomeReady() {
+    if (state.chatWelcomeReady || chatRevealing) return;
+    chatRevealing = true;
+    if (warmSafetyTimer) { clearTimeout(warmSafetyTimer); warmSafetyTimer = null; }
+    const reveal = () => {
+        if (state.chatWelcomeReady) return;
+        state.chatWelcomeReady = true;
+        syncEswButtonVisibility();   // reveals the (now-minimized) FAB, hides the loading bubble
+        console.log('[esw] welcome ready — chat revealed');
+    };
+    try {
+        window.addEventListener('onEmbeddedMessagingWindowMinimized', reveal, { once: true });
+        window.embeddedservice_bootstrap.utilAPI.minimizeChat();
+        setTimeout(reveal, 1500);    // fallback if the minimized event doesn't fire
+    } catch (e) {
+        reveal();
     }
 }
 
@@ -600,6 +699,14 @@ let state = {
     answeredKeys: new Set(), // questionKeys we've already answered (idempotency)
     answers: {},         // questionKey → { questionText, answerText, answerKey }
     surveyComplete: false, // true once we've POSTed the survey summary upstream
+    // ECv2 pre-warm (loading-bubble → real-FAB swap). We start the conversation
+    // hidden as soon as the session is verified so the agent's ~cold-start
+    // welcome is already waiting; a FAB-look-alike spinner covers the gap.
+    //   chatPreWarmed   — the hidden launchChat warm-up has been kicked off.
+    //   chatWelcomeReady — the agent's first (welcome) message has landed
+    //                      (onEmbeddedMessagingFirstBotMessageSent); real FAB revealed.
+    chatPreWarmed: false,
+    chatWelcomeReady: false,
     geo: null            // { city, region, country, lat, lon } from ipinfo.io, or null
 };
 
