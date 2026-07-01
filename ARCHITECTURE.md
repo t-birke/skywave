@@ -143,13 +143,15 @@ who never consent do not produce CRM rows.
 Consumer site (site.js)
   │  1. loadGeo(): ipinfo.io  ──▶ {city, region, country, lat, lon}   (§3d)
   │  2. survey answers collected locally
-  │  3. on survey complete: POST /skywave/contact/upsert
-  ▼      (deviceId = Interactions SDK anonymous id)
-Skywave_ContactUpsert  (guest-callable Apex REST, Force.com Site)
+  │  3. on survey complete: POST /api/website/contact/upsert  (same-origin,
+  ▼      proof-gated — the relay stamps deviceId = the sealed proof-cookie id,
+  │      NEVER a client-supplied id → forwards to Skywave_ContactUpsert)
+Skywave_ContactUpsert  (Apex REST; reached via the proof-gated relay route above,
+  │                     or the guest Force.com Site for legacy/anonymous callers)
   │  publishes ──▶ Skywave_Contact_Update__e   (Platform Event)
   ▼
 Skywave_Contact_Update_Trigger  (runs in System Mode — guest user has no Contact perms)
-  │  • upsert Contact by Session_Id__c = deviceId
+  │  • upsert Contact by Session_Id__c = deviceId  (= sealed proof-cookie id)
   │  • survey_complete → store survey JSON + summary; stamp geo;
   │      derive Home_Airport__c via Skywave_Airports.nearest()  (§3d)
   │  • chat_start    → resolve conversation UUID → SF Conversation Id
@@ -164,6 +166,26 @@ Skywave_ResolveSession  (agent action — PRIMARY: @MessagingEndUser.MessagingPl
 ```
 
 Key non-obvious points (each is a memory entry):
+- **One identity, server-sealed.** Every keyed/persisted identity is the SAME
+  sealed proof-cookie deviceId, never a client-supplied id: `/api/session/start`
+  uses the proof-cookie deviceId as the `sessionId` (so the survey bubble +
+  `Demo_Event__e`s key on it), the survey/`chat_start` upsert goes through the
+  proof-gated `/api/website/contact/upsert` (relay overrides `deviceId` with the
+  cookie), the chat verification JWT `sub` is that deviceId, and the website
+  profile/bookings resolve by it. This closes the split where a returning
+  visitor's live WebSDK anonymous id diverged from the sealed proof-cookie id —
+  the survey then landed under one id while the booked flight (and the survey the
+  agent read) landed under another. The WebSDK id is used ONLY for the Data
+  Cloud `partyIdentification` event (§3a''').
+- **The join-QR origin MUST equal the CORS origin.** The QR encodes the PUBLIC
+  origin — the custom domain when one fronts the dyno (globe: `VITE_CONSUMER_SITE_URL`;
+  LWC monitor: `Skywave_Preflight_Config.Public_Site_Url__c` via
+  `Skywave_HerokuConfig.publicSiteUrl()`) — which must match Heroku's
+  `SKYWAVE_PUBLIC_ORIGIN` (the `strictSameOrigin` gate). If the QR points phones
+  at a different origin (e.g. the raw Heroku host while the gate allows
+  `app.skywave.flights`), every `/api/website/*` **POST** is 403'd (GET reads
+  slip through with no `Origin` header), so `session/peek` fails, a returning
+  visitor is misclassified as new, and the survey re-runs under a fresh identity.
 - **Identity is verified, not raced.** With MIAW **User Verification** on the
   channel (`authMode=Auth` + Keyset `Skywave_Identity_Keyset`), the ECv2 widget
   presents a signed JWT (`sub=deviceId`, minted by the Heroku

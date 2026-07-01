@@ -7,6 +7,10 @@
         <value xsi:type="xsd:string">%%SKYWAVE_HEROKU_ORIGIN%%</value>
     </values>
     <values>
+        <field>Public_Site_Url__c</field>
+        <value xsi:type="xsd:string">%%SKYWAVE_PUBLIC_SITE_URL%%</value>
+    </values>
+    <values>
         <field>Statuspage_Base_Url__c</field>
         <value xsi:type="xsd:string">https://status.heroku.com</value>
     </values>

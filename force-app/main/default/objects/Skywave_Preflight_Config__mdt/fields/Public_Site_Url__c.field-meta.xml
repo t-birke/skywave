@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Public_Site_Url__c</fullName>
+    <description>Public HTTPS origin visitors actually reach the consumer site on (no trailing slash), e.g. https://app.skywave.flights when fronted by a custom domain. This is the value the join-QR must encode so phones land on the SAME origin the Heroku CORS gate (SKYWAVE_PUBLIC_ORIGIN) allows — otherwise POSTs (session/peek, session/init) are 403'd and the visitor is misclassified as new. Read via Skywave_HerokuConfig.publicSiteUrl(); falls back to Heroku_Origin_Url__c when blank (single-origin installs with no custom domain).</description>
+    <label>Public Site URL</label>
+    <length>255</length>
+    <required>false</required>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

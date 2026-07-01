@@ -169,15 +169,6 @@ async function loadGeo() {
 // parameter (`Session_ID`) and immediately hides the chat button until a
 // later stage flip reveals it.
 //
-// POST to the public Skywave_ContactUpsert endpoint (anonymous, exposed
-// via the skywave_api Force.com Site). Routed through the team's CORS
-// proxy because Salesforce Sites' CORS handling for guest-callable
-// Apex is unreliable. Fire-and-forget; a Platform Event trigger handles
-// the actual Contact upsert in System Mode.
-const CONTACT_UPSERT_URL =
-    'https://abc-proxy-2552551e6d2c.herokuapp.com/' +
-    'https://trailsignup-fb3f5426f87c5d.my.salesforce-sites.com/skywave/services/apexrest/skywave/contact/upsert';
-
 // Persist the visitor's mid-funnel exit so a re-open or a follow-up
 // chat still has signal to ground on. Idempotent server-side. Only
 // fires when:
@@ -220,15 +211,23 @@ function maybeSendAbandon(reason) {
     }).catch((e) => console.warn('[skywave] abandon failed', e));
 }
 
+// POST survey_complete / chat_start upserts through the hardened, proof-gated
+// Heroku surface (/api/website/contact/upsert). The server stamps the Contact
+// with the sealed proof-cookie deviceId — NOT any client-supplied id — so the
+// survey identity can't drift from the chat/booking identity (which is the
+// same proof-cookie deviceId, carried as the chat identity-token `sub`).
+// Same-origin with credentials so the proof cookie rides along. Fire-and-forget;
+// a Platform Event trigger does the actual Contact upsert in System Mode.
 function postContactUpsert(payload) {
-    fetch(CONTACT_UPSERT_URL, {
+    fetch('/api/website/contact/upsert', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
     }).then((r) => {
-        console.log(`[skywave] /skywave/contact/upsert (${payload.type}) ${r.status}`);
+        console.log(`[skywave] /api/website/contact/upsert (${payload.type}) ${r.status}`);
     }).catch((err) => {
-        console.warn(`[skywave] /skywave/contact/upsert (${payload.type}) failed`, err);
+        console.warn(`[skywave] /api/website/contact/upsert (${payload.type}) failed`, err);
     });
 }
 
@@ -1208,14 +1207,12 @@ function postSurveyComplete() {
         phrases.push(`${a.questionText} -> ${a.answerText}`);
     }
     const summary = 'The visitor previously answered: ' + phrases.join('; ') + '.';
-    const sdkId = (() => {
-        try { return window.SalesforceInteractions?.getAnonymousId?.() || null; }
-        catch (_) { return null; }
-    })();
-    if (!sdkId) return;
+    // Identity comes from the proof cookie server-side (see postContactUpsert),
+    // NOT the WebSDK id — so survey data lands on the SAME Contact the chat and
+    // booking resolve. No sdkId gate: a consented visitor always has a proof
+    // cookie by survey-complete time, even if the WebSDK never loaded.
     const payload = {
         type: 'survey_complete',
-        deviceId: sdkId,
         demoSessionId: state.demoSessionId,
         responsesJson: JSON.stringify(state.answers),
         summary

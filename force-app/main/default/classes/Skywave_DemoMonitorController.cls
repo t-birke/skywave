@@ -179,13 +179,16 @@ public with sharing class Skywave_DemoMonitorController {
     }
 
     /**
-     * The Heroku consumer-site origin (with trailing slash) the monitor encodes
-     * into its QR code. Read from the single CMD source of truth so it follows
-     * the provisioned dyno without a code change. Empty string if unset.
+     * The PUBLIC consumer-site origin (with trailing slash) the monitor encodes
+     * into its QR code. Prefers the custom domain (Public_Site_Url__c, e.g.
+     * https://app.skywave.flights) so phones land on the SAME origin the Heroku
+     * CORS gate allows; falls back to the raw Heroku origin when no custom
+     * domain is configured. Empty string if neither is set. Kept the name
+     * getHerokuOrigin for the LWC import contract.
      */
     @AuraEnabled(cacheable=true)
     public static String getHerokuOrigin() {
-        String origin = Skywave_HerokuConfig.originUrl();
+        String origin = Skywave_HerokuConfig.publicSiteUrl();
         return String.isBlank(origin) ? '' : origin + '/';
     }
 

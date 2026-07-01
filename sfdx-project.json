@@ -66,6 +66,11 @@
             "replaceWithEnv": "SKYWAVE_HEROKU_ORIGIN"
         },
         {
+            "filename": "force-app/main/default/customMetadata/Skywave_Preflight_Config.Default.md-meta.xml",
+            "stringToReplace": "%%SKYWAVE_PUBLIC_SITE_URL%%",
+            "replaceWithEnv": "SKYWAVE_PUBLIC_SITE_URL"
+        },
+        {
             "filename": "force-app/main/default/remoteSiteSettings/Skywave_Heroku_Relay.remoteSite-meta.xml",
             "stringToReplace": "%%SKYWAVE_HEROKU_ORIGIN%%",
             "replaceWithEnv": "SKYWAVE_HEROKU_ORIGIN"

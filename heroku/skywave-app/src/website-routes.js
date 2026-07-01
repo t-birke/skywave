@@ -574,5 +574,43 @@ export function buildWebsiteRouter({ allowedOrigin }) {
         }
     });
 
+    // ------- POST /contact/upsert: survey_complete / chat_start upsert, keyed
+    // on the proof-cookie deviceId (identity hardening) -------
+    //
+    // Replaces the consumer site's old cross-origin POST to the public Sites
+    // upsert endpoint, which keyed the Contact on the client's WebSDK anonymous
+    // id. That id can diverge from the sealed proof-cookie deviceId the chat
+    // (identity JWT `sub`) and the rest of the website resolve by — splitting
+    // the survey identity from the booking identity (survey bubble under one id,
+    // booked flight + the survey the agent reads under another). Routing through
+    // here forces the persisted Contact to be the SAME deviceId as everything
+    // else: the body-supplied deviceId is IGNORED; req.deviceId (proof cookie)
+    // always wins. Apex (Skywave_ContactUpsert) still enforces per-type required
+    // fields (responsesJson / conversationId) and returns 400 if absent.
+    const contactUpsertSchema = z.object({
+        type:           z.enum(['survey_complete', 'chat_start']),
+        demoSessionId:  z.string().max(40).optional(),
+        responsesJson:  z.string().max(20_000).optional(),
+        summary:        z.string().max(4_000).optional(),
+        conversationId: z.string().max(80).optional(),
+        geoCity:    z.string().max(120).optional(),
+        geoRegion:  z.string().max(120).optional(),
+        geoCountry: z.string().max(120).optional(),
+        geoLat:     z.number().optional(),
+        geoLon:     z.number().optional()
+    });
+    router.post('/contact/upsert', requireProof, validate(contactUpsertSchema), async (req, res) => {
+        try {
+            // deviceId is NEVER trusted from the body — always the verified cookie.
+            const payload = { ...req.body, deviceId: req.deviceId };
+            const data = await apexInvoke('POST', '/skywave/contact/upsert', payload);
+            res.status(202).json(data || { ok: true });
+        } catch (err) {
+            const status = err.response?.status ?? 500;
+            console.error('/contact/upsert failed', status, err.response?.data ?? err.message);
+            res.status(status).json(err.response?.data ?? { error: 'upsert_failed' });
+        }
+    });
+
     return router;
 }

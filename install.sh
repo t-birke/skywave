@@ -263,6 +263,10 @@ PYEOF
     # if the var is unset (same trap as AGENT_USER). So SKYWAVE_HEROKU_ORIGIN must
     # always be exported, even on a core-only install before Heroku exists.
     resolve_heroku_origin
+    # The CMD record also carries %%SKYWAVE_PUBLIC_SITE_URL%% (replaceWithEnv) —
+    # same must-always-be-exported trap. Depends on SKYWAVE_HEROKU_ORIGIN, so
+    # resolve it after resolve_heroku_origin.
+    resolve_public_site_url
     # Same trap: the two voice routing flows carry %%SKYWAVE_VOICE_QUEUE_ID%%
     # (replaceWithEnv) — must always be exported even on a core-only deploy.
     resolve_voice_queue_id
@@ -302,6 +306,29 @@ resolve_heroku_origin() {
     SKYWAVE_HEROKU_ORIGIN="$origin"
     export SKYWAVE_HEROKU_ORIGIN
     state_set SKYWAVE_HEROKU_ORIGIN "$origin"
+}
+
+# Resolve the PUBLIC consumer-site origin into SKYWAVE_PUBLIC_SITE_URL (https, no
+# trailing slash) — the origin visitors actually reach the site on, which the
+# join-QR (globe + LWC monitor) must encode and the CORS gate
+# (SKYWAVE_PUBLIC_ORIGIN) must allow. If they disagree, phones land on the wrong
+# origin and every POST (session/peek, session/init) is 403'd — a returning
+# visitor is then misclassified as new, re-runs the survey, and the survey
+# identity splits from the chat/booking identity.
+# Priority: explicit SKYWAVE_PUBLIC_SITE_URL env (operator points it at a custom
+# domain, e.g. https://app.skywave.flights) > the live dyno's existing
+# SKYWAVE_PUBLIC_ORIGIN config (a domain a prior run set) > the raw Heroku
+# origin. Always exported so replaceWithEnv on the CMD record never errors.
+resolve_public_site_url() {
+    local pub="${SKYWAVE_PUBLIC_SITE_URL:-}"
+    if [ -z "$pub" ] && command -v heroku >/dev/null 2>&1 && heroku auth:whoami >/dev/null 2>&1; then
+        pub="$(heroku config:get SKYWAVE_PUBLIC_ORIGIN -a "$HEROKU_APP" 2>/dev/null || true)"
+    fi
+    pub="${pub%/}"
+    [ -z "$pub" ] && pub="${SKYWAVE_HEROKU_ORIGIN}"
+    SKYWAVE_PUBLIC_SITE_URL="${pub%/}"
+    export SKYWAVE_PUBLIC_SITE_URL
+    state_set SKYWAVE_PUBLIC_SITE_URL "$SKYWAVE_PUBLIC_SITE_URL"
 }
 
 # Seed the survey Q&A content. Substitutes %%SKYWAVE_HEROKU_ORIGIN%% in the apex
@@ -1143,7 +1170,7 @@ tier3_heroku() {
     # by wildcard, so ONLY these two need the concrete value.)
     if section 3.2b; then
         say "3.2b Embed relay URL into the org"
-        state_load; resolve_heroku_origin
+        state_load; resolve_heroku_origin; resolve_public_site_url
         sf project deploy start --target-org "$ORG_ALIAS" \
             --source-dir force-app/main/default/customMetadata/Skywave_Preflight_Config.Default.md-meta.xml \
             --source-dir force-app/main/default/remoteSiteSettings/Skywave_Heroku_Relay.remoteSite-meta.xml \
@@ -1158,14 +1185,14 @@ tier3_heroku() {
             && ok "survey image URLs repointed at ${SKYWAVE_HEROKU_ORIGIN}" \
             || warn "survey image-URL refresh skipped/failed (run scripts/apex/updateSurveyImageUrls.apex)"
         rm -f "$_imgapex"
-        info "globe UIBundle: rebuild with VITE_RELAY_WS_URL=\"${SKYWAVE_HEROKU_ORIGIN/https:/wss:}/ws/monitor\" (see its README)"
+        info "globe UIBundle: rebuild with VITE_RELAY_WS_URL=\"${SKYWAVE_HEROKU_ORIGIN/https:/wss:}/ws/monitor\" VITE_CONSUMER_SITE_URL=\"${SKYWAVE_PUBLIC_SITE_URL}\" (see its README)"
         done_mark 3.2b
     fi
 
     # ── 3.3 Config vars (derived from tier-1 outputs + secrets) ──────────────
     if section 3.3; then
         say "3.3 Set Heroku config vars"
-        state_load; resolve_heroku_origin
+        state_load; resolve_heroku_origin; resolve_public_site_url
         [ -n "${ESW_SITE_URL:-}" ] || warn "ESW_SITE_URL not in state — run tier 1 first (or --resume) so the relay can serve the widget"
         local sets=()
         sets+=("SF_LOGIN_URL=https://login.salesforce.com")
@@ -1174,7 +1201,12 @@ tier3_heroku() {
         sets+=("SF_ESW_ESC_NAME=${ESC_NAME}")
         [ -n "${ESW_SITE_URL:-}" ] && sets+=("SF_ESW_SITE_URL=${ESW_SITE_URL}")
         sets+=("SF_ESW_SCRT2_URL=${SCRT2_URL}")
-        sets+=("SKYWAVE_PUBLIC_ORIGIN=${SKYWAVE_HEROKU_ORIGIN}")
+        # The CORS gate origin = the PUBLIC origin visitors reach the site on
+        # (custom domain if the operator set one, else the Heroku origin). Using
+        # SKYWAVE_PUBLIC_SITE_URL — which reads back an existing custom domain —
+        # means a re-run of §3.3 never clobbers app.skywave.flights back to the
+        # raw dyno (which would 403 every phone POST and re-break the survey rail).
+        sets+=("SKYWAVE_PUBLIC_ORIGIN=${SKYWAVE_PUBLIC_SITE_URL}")
         heroku config:set -a "$HEROKU_APP" "${sets[@]}" >/dev/null
         ok "derived config vars set"
         # Secret-bearing vars (only if the local secret exists; never echoed).
@@ -1270,12 +1302,17 @@ tier4_globe() {
     # ── 4.1 Build the bundle with the relay URL baked in ─────────────────────
     if section 4.1; then
         say "4.1 Build the UIBundle"
-        resolve_heroku_origin
+        resolve_heroku_origin; resolve_public_site_url
         local ws="${SKYWAVE_HEROKU_ORIGIN/https:/wss:}/ws/monitor"
         info "VITE_RELAY_WS_URL=${ws}"
+        # The join-QR must point phones at the PUBLIC origin (custom domain if
+        # one fronts the dyno), NOT the raw Heroku host — else phones land on an
+        # origin the CORS gate rejects and the survey/identity rail breaks. Bake
+        # it in so consumerSite.ts stops falling back to the relay host.
+        info "VITE_CONSUMER_SITE_URL=${SKYWAVE_PUBLIC_SITE_URL}"
         ( cd "$GLOBE_DIR" \
             && { [ -d node_modules ] || npm ci 2>/dev/null || npm install; } \
-            && VITE_RELAY_WS_URL="$ws" npm run build ) \
+            && VITE_RELAY_WS_URL="$ws" VITE_CONSUMER_SITE_URL="$SKYWAVE_PUBLIC_SITE_URL" npm run build ) \
             && ok "bundle built (dist/)" \
             || die "globe build failed — check $GLOBE_DIR (npm install / npm run build)"
         [ -f "$GLOBE_DIR/dist/index.html" ] || die "no dist/index.html after build"

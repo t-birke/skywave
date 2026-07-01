@@ -31,9 +31,21 @@ No live activity? Click **7D**/**30D** in the HUD to replay from records.
 per-install Heroku hash, so there is no hardcoded default. Without it the globe
 loads but the live feed never connects (it logs an error and stays idle).
 
+`VITE_CONSUMER_SITE_URL` sets the origin the **join-QR** encodes. Set it to the
+PUBLIC origin visitors reach the site on — the custom domain (e.g.
+`https://app.skywave.flights`) when one fronts the dyno. **This must match the
+Heroku `SKYWAVE_PUBLIC_ORIGIN` CORS gate.** If it's unset, the QR falls back to
+deriving the raw Heroku host from `VITE_RELAY_WS_URL` — and if a custom domain is
+the CORS origin, phones then land on the wrong origin and every POST
+(`session/peek`, `session/init`) is 403'd: returning visitors are misclassified
+as new, the survey re-runs, and the survey identity splits from the
+chat/booking identity. Omit it only for single-origin installs (no custom domain).
+
 ```bash
-# point at YOUR provisioned relay (see install.sh Tier 3 output / heroku apps:info):
-VITE_RELAY_WS_URL="wss://<your-dyno>.herokuapp.com/ws/monitor" npm run build
+# point at YOUR provisioned relay + the public site origin:
+VITE_RELAY_WS_URL="wss://<your-dyno>.herokuapp.com/ws/monitor" \
+VITE_CONSUMER_SITE_URL="https://app.skywave.flights" \
+  npm run build
 # → dist/ (the deploy payload; gitignored, rebuild before deploy)
 ```
 

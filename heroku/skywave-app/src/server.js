@@ -13,6 +13,7 @@ import { register, registerMonitor, fanOut, fanOutMonitor, activeCount, monitorC
 import { forwardToApex } from './sf-api.js';
 import { buildWebsiteRouter } from './website-routes.js';
 import { buildPreflightRouter } from './preflight.js';
+import { readProofCookie } from './proof-cookie.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -87,7 +88,20 @@ app.use('/api/website', buildWebsiteRouter({ allowedOrigin }));
 // from the Skywave_PreflightController; not exposed to phones.
 app.use('/api/preflight', buildPreflightRouter(express));
 
-app.post('/api/session/start',     (req, res) => forwardToApex('POST', '/skywave/session/start',    req.body, res, 'session/start'));
+// Identity hardening: the survey/session rail MUST key on the same identity the
+// chat + website resolve by — the sealed proof-cookie deviceId — not the client-
+// supplied WebSDK anonymousId. The two can diverge (returning visitor whose
+// WebSDK id changed, a synthetic->real upgrade, or any hit on the wrong origin),
+// and when they do the survey bubble lands under one id while the booked flight
+// (resolved via the identity JWT = proof-cookie deviceId) lands under another,
+// and the agent reads a different Contact's survey. So when a valid proof cookie
+// is present it wins as the sessionId; otherwise we fall back to whatever the
+// client sent (pre-consent / SDK-less), and finally Apex mints one.
+app.post('/api/session/start', (req, res) => {
+    const proofDeviceId = readProofCookie(req);
+    const body = proofDeviceId ? { ...req.body, sessionId: proofDeviceId } : req.body;
+    return forwardToApex('POST', '/skywave/session/start', body, res, 'session/start');
+});
 // Note: /api/session/identify is NOT a Heroku route — phones POST
 // directly to the skywave_api Force.com Site:
 //   https://<orghost>.my.salesforce-sites.com/skywave/services/apexrest/skywave/session/identify
