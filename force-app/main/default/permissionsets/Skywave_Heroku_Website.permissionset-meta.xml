@@ -55,6 +55,13 @@
         <apexClass>Skywave_RestUtil</apexClass>
         <enabled>true</enabled>
     </classAccesses>
+    <classAccesses>
+        <!-- Proof-gated /api/website/contact/upsert forwards to Skywave_ContactUpsert
+             as the integration user, so it needs the class (previously only the
+             site guest user had it) + Create on the event it publishes below. -->
+        <apexClass>Skywave_ContactUpsert</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
     <fieldPermissions>
         <editable>false</editable>
         <field>Contact.ContactCardPicture__c</field>
@@ -159,6 +166,17 @@
         <allowRead>true</allowRead>
         <modifyAllRecords>false</modifyAllRecords>
         <object>Demo_Event__e</object>
+        <viewAllRecords>false</viewAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <!-- Publish the survey_complete / chat_start upsert event (System-Mode
+             trigger does the actual Contact write). -->
+        <allowCreate>true</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>false</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>Skywave_Contact_Update__e</object>
         <viewAllRecords>false</viewAllRecords>
     </objectPermissions>
     <objectPermissions>
