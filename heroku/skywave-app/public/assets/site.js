@@ -130,7 +130,8 @@ let eswReady = false;        // custom chat client mounted
 let warmingBubbleEl = null;  // ECv2 pre-warm loading bubble (FAB look-alike)
 let warmSafetyTimer = null;  // reveal-anyway net if the welcome event never fires
 let chatRevealing = false;   // guards the minimize→reveal handoff
-let preWarmRetries = 0;      // bounded retry while the ESW SDK finishes mounting
+let eswButtonCreated = false; // onEmbeddedMessagingButtonCreated fired — launchChat() usable
+let eswIdentityReady = false; // identity token set — verified session ready for launchChat()
 let miawUi = null;           // MiawUI instance (custom chat client)
 
 async function loadConfig() {
@@ -328,14 +329,20 @@ async function loadEcv2Snippet(deviceId) {
                 identityToken: data.customerIdentityToken
             });
             console.log(`[esw] identity token set (${reason})`);
-            // Session is now verified — pre-warm the conversation hidden so the
-            // agent's welcome is ready before the visitor opens the chat. Only
-            // on the initial Ready (not on token-expiry re-sets).
-            if (reason === 'Ready') preWarmChat();
+            // Session is verified. Pre-warm the conversation hidden so the
+            // agent's welcome is ready before the visitor opens the chat — but
+            // launchChat() isn't usable until onEmbeddedMessagingButtonCreated
+            // fires, so gate on BOTH (maybePreWarm). Only the initial Ready.
+            if (reason === 'Ready') { eswIdentityReady = true; maybePreWarm(); }
         } catch (e) { console.warn(`[esw] setIdentityToken failed (${reason})`, e); }
     };
     window.addEventListener('onEmbeddedMessagingReady', () => setEcv2IdentityToken('Ready'), { once: true });
     window.addEventListener('onEmbeddedMessagingIdentityTokenExpired', () => setEcv2IdentityToken('Expired'));
+    // utilAPI.launchChat()/minimizeChat() throw "API not available before
+    // onEmbeddedMessagingButtonCreated event is fired" until the FAB exists.
+    // That event fires AFTER onEmbeddedMessagingReady — gate the pre-warm on it
+    // (either it or the identity token can land first; maybePreWarm needs both).
+    window.addEventListener('onEmbeddedMessagingButtonCreated', () => { eswButtonCreated = true; maybePreWarm(); }, { once: true });
 
     // WORKAROUND: ECv2 doesn't propagate custom hidden prechat params to the
     // session-handler flow (they drop between scrt2 and the routing flow). So
@@ -571,14 +578,17 @@ function ensureWarmingBubble() {
 // always maximizes, but our CSS keeps #embedded-messaging hidden (data-esw-
 // visible="0") throughout the warm-up, so nothing flashes; the loading bubble
 // shows in its place. onWelcomeReady() does the reveal.
+// Pre-warm only once BOTH gates are met: the FAB is created (launchChat()
+// usable) AND the identity token is set (authMode=Auth needs a verified
+// session to start the conversation). Either event can fire first.
+function maybePreWarm() {
+    if (eswButtonCreated && eswIdentityReady) preWarmChat();
+}
+
 function preWarmChat() {
     if (state.chatPreWarmed) return;
     const boot = window.embeddedservice_bootstrap;
-    if (!boot || !boot.utilAPI || typeof boot.utilAPI.launchChat !== 'function') {
-        // SDK still mounting — retry a bounded number of times.
-        if (++preWarmRetries <= 10) setTimeout(preWarmChat, 500);
-        return;
-    }
+    if (!boot || !boot.utilAPI || typeof boot.utilAPI.launchChat !== 'function') return;
     state.chatPreWarmed = true;
     ensureWarmingBubble();
     syncEswButtonVisibility();   // show the loading bubble, keep the real FAB hidden
@@ -593,13 +603,15 @@ function preWarmChat() {
         console.warn('[esw] FirstBotMessageSent not seen in 90s — revealing FAB anyway');
         onWelcomeReady();
     }, 90000);
-    try {
-        console.log('[esw] pre-warming conversation (hidden)…');
-        boot.utilAPI.launchChat();
-    } catch (e) {
-        console.warn('[esw] launchChat pre-warm failed — revealing FAB', e);
-        onWelcomeReady();
-    }
+    console.log('[esw] pre-warming conversation (hidden)…');
+    // launchChat() returns a Promise; wrap so both a sync throw and an async
+    // rejection are handled (no unhandled rejection) and just reveal the FAB.
+    Promise.resolve()
+        .then(() => boot.utilAPI.launchChat())
+        .catch((e) => {
+            console.warn('[esw] launchChat pre-warm failed — revealing FAB', e);
+            onWelcomeReady();
+        });
 }
 
 // Welcome landed (or safety timeout / failure): collapse the hidden window to
@@ -615,13 +627,13 @@ function onWelcomeReady() {
         syncEswButtonVisibility();   // reveals the (now-minimized) FAB, hides the loading bubble
         console.log('[esw] welcome ready — chat revealed');
     };
-    try {
-        window.addEventListener('onEmbeddedMessagingWindowMinimized', reveal, { once: true });
-        window.embeddedservice_bootstrap.utilAPI.minimizeChat();
-        setTimeout(reveal, 1500);    // fallback if the minimized event doesn't fire
-    } catch (e) {
-        reveal();
-    }
+    window.addEventListener('onEmbeddedMessagingWindowMinimized', reveal, { once: true });
+    setTimeout(reveal, 1500);        // fallback if the minimized event doesn't fire
+    // minimizeChat() also returns a Promise — wrap so a rejection can't go
+    // unhandled; the reveal still fires via the event/timeout above.
+    Promise.resolve()
+        .then(() => window.embeddedservice_bootstrap.utilAPI.minimizeChat())
+        .catch(() => { /* reveal already scheduled */ });
 }
 
 async function loadInteractionsSdk() {
