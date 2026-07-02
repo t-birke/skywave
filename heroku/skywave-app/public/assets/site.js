@@ -372,13 +372,26 @@ async function loadEcv2Snippet(deviceId) {
     }, { once: true });
 
     // Conversation ended → drop the resume breadcrumb so the NEXT visit pre-
-    // warms a fresh conversation (a genuinely new welcome will be sent) rather
-    // than revealing the FAB for a conversation that no longer exists. The
-    // marker's TTL is the backstop if this event name ever changes.
-    window.addEventListener('onEmbeddedMessagingConversationEnded', () => {
+    // warms a FRESH conversation (with a real welcome) instead of revealing the
+    // FAB for a conversation that's over. Two host events cover it — both taken
+    // from the served ECv2 home_view bundle's own event catalog (there is NO
+    // "onEmbeddedMessagingConversationEnded"; that was a bad guess):
+    //   • onEmbeddedMessagingEndSession — the chat header's "End Conversation"
+    //     menu action. In a User-Verified chat (authMode=Auth, our case) that
+    //     button calls util.endSession(), which fires this.
+    //   • onEmbeddedMessagingConversationClosed — the conversation was closed
+    //     (agent-ended / auto-closed).
+    // Clearing is idempotent and safe: after an explicit end we WANT a fresh
+    // start next load, and worst case a still-resumable conversation just gets a
+    // (hidden) fresh pre-warm. The marker TTL is the final backstop. NB: this is
+    // distinct from onEmbeddedMessagingWindowClosed/WindowMinimized (panel UI
+    // only) — we must not clear the marker on those.
+    const clearMarkerOnEnd = (evt) => {
         clearConversationMarker();
-        console.log('[esw] conversation ended — cleared resume marker');
-    });
+        console.log(`[esw] ${evt} — cleared resume marker`);
+    };
+    window.addEventListener('onEmbeddedMessagingEndSession', () => clearMarkerOnEnd('EndSession'));
+    window.addEventListener('onEmbeddedMessagingConversationClosed', () => clearMarkerOnEnd('ConversationClosed'));
 
     try {
         window.embeddedservice_bootstrap.settings.language = 'en_US';

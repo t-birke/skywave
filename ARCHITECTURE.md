@@ -217,9 +217,13 @@ Key non-obvious points (each is a memory entry):
   **Reload:** ECv2 resumes the prior conversation on refresh and sends **no** new
   welcome, so the welcome gate would hang to the safety net. `site.js` writes a
   TTL-bounded `localStorage` breadcrumb (`sw_chat_conv_v1`) when a conversation first
-  starts (`onEmbeddedMessagingConversationStarted`) and clears it on
-  `onEmbeddedMessagingConversationEnded`; a fresh breadcrumb on the next load means
-  "resume → reveal the FAB immediately, skip the pre-warm."
+  starts (`onEmbeddedMessagingConversationStarted`) and clears it when the visitor
+  ends the chat (`onEmbeddedMessagingEndSession` — the "End Conversation" menu action
+  in our authMode=Auth chat — or `onEmbeddedMessagingConversationClosed`); a fresh
+  breadcrumb on the next load means "resume → reveal the FAB immediately, skip the
+  pre-warm." (Event names verified against the served `home_view` bundle's catalog —
+  there is no `onEmbeddedMessagingConversationEnded`. See memory
+  `skywave-ecv2-host-event-catalog`.)
 
 ### 3a'''. The tracking pipeline that powers §3a (Tier 5, `scripts/datacloud/`)
 
@@ -898,14 +902,26 @@ re-ingests — the DMOs are a frozen snapshot, so *no* CRM date change (even the
 self-freshening formulas) reaches the dashboards until the streams re-run.
 **Automated daily:** `.github/workflows/refresh-observability.yml` (cron 09:00
 UTC + `workflow_dispatch`) runs both steps in order on a GitHub-hosted runner —
-JWT-auth (the release-notes secrets) → the freshen Apex → `npm ci` +
-`npx playwright install chromium` → the stream Full-Refresh. It has to run the
-*browser* flow because `SalesforceDotCom` streams reject every non-interactive
-caller (Connect REST run endpoint *and* scheduled Apex alike — the wall
-`Skywave_DataStreamRunner` documents), so there is no headless/in-org path. Its
-JWT subject therefore needs Data Cloud + UI access to the `DataStream` pages
-(heavier than release-notes); a failed run files an `observability-refresh-failure`
-tracking issue.
+JWT-auth → the freshen Apex → `npm ci` + `npx playwright install chromium` → the
+stream Full-Refresh. It has to run the *browser* flow because `SalesforceDotCom`
+streams reject every non-interactive caller (Connect REST run endpoint *and*
+scheduled Apex alike — the wall `Skywave_DataStreamRunner` documents), so there is
+no headless/in-org path. **Its identity is deliberately its own** (not release-notes'):
+the Playwright step bridges the JWT token into a Lightning session via `frontdoor.jsp`,
+which requires a **`Web`-scoped** OAuth session — and the shared `Skywave_Heroku_Relay`
+app grants only `Api`/`RefreshToken`/CDP (no `Web`) on purpose, so a relay JWT session
+bounces straight to the login page. So the workflow authenticates as a **dedicated
+JWT-bearer app `Skywave_CI_Refresh`** (adds `Web`; reuses the relay keypair, so no new
+key material) as a **dedicated automation user `skywave.refresh.bot`** (Standard User +
+the Data Cloud/analytics permsets to open `DataStream` pages & Full-Refresh, plus
+`Skywave_Heroku_Website` to be pre-authorized on the app). The user + permsets are
+provisioned by `scripts/apex/createRefreshAutomationUser.apex`; the app is
+ConnectedApp metadata, but the permset↔app authorization is UI-only (done via an
+Apex `SetupEntityAccess` insert). The freshen step's result is verified by
+`scripts/ci/check_apex_result.py`, **not jq** — `sf apex run --json` embeds
+NUL/control bytes in its debug log that strict JSON parsers reject and bash `$()`
+corrupts, which would otherwise turn a successful run into a daily false failure. A
+failed run files an `observability-refresh-failure` tracking issue.
 
 ### 3g. Preflight check (presenter pre-demo go/no-go)
 
