@@ -1,0 +1,143 @@
+name: refresh-observability
+
+# Keep the Agentforce observability dashboards "today-fresh" without a human.
+#
+# WHY THIS RUNS A BROWSER IN CI (and can't be pure API/Apex)
+# The SalesforceDotCom data streams that feed the STDM DMOs reject EVERY
+# non-interactive caller on their run endpoint ("Connector type SalesforceDotCom
+# is not allowed to run in non-interactive mode") — that blocks the Connect REST
+# run endpoint AND scheduled Apex alike. The only path is a genuine in-page
+# Lightning "Refresh Now" click, which is exactly what scripts/refreshDataStreams.mjs
+# drives via Playwright. Salesforce can't schedule a browser, so the scheduler
+# lives here and we run the same browser flow the human runs.
+#
+# Two steps, in order (the CRM fix is invisible on the dashboards until the
+# streams re-ingest it, so both must run together):
+#   1. scripts/apex/freshenObservabilityDates.apex  — realign the 2 stored
+#      End_Timestamp fields to their TODAY()-relative formula Start (idempotent).
+#   2. scripts/refreshDataStreams.mjs               — Full-Refresh the 13 streams
+#      so Data Cloud re-ingests today's rolling-window values.
+# See ARCHITECTURE.md §3f.
+#
+# Reuses the same JWT-bearer auth + repo secrets as release-notes.yml (SECRETS.md):
+#   SF_CONSUMER_KEY   consumer key of the Skywave_Heroku_Relay connected app
+#   SF_JWT_KEY        the PEM private key (contents of secrets/jwt.key)
+#   SF_USERNAME       JWT subject user
+#   SF_INSTANCE_URL   optional login URL (default https://login.salesforce.com)
+#
+# PERMISSIONS: unlike release-notes (which only needs Release_Note__c create),
+# the SF_USERNAME subject user must be able to (a) open the DataStream Lightning
+# record pages and (b) trigger a Data Cloud Full Refresh. Grant it the Data Cloud
+# admin + SDO analytics permsets, or the refresh clicks will fail and this
+# workflow will file a failure issue (below).
+
+on:
+  # 09:00 UTC daily = ~01:00-02:00 US Pacific/Mountain — off-hours. Adjust as
+  # needed (cron is always UTC). NOTE: GitHub disables scheduled workflows after
+  # 60 days of repo inactivity, and may delay scheduled runs under load.
+  schedule:
+    - cron: '0 9 * * *'
+  # Manual run — use this to freshen on-demand right before a demo.
+  workflow_dispatch:
+
+# github-script needs issues:write to file the failure alert; checkout needs read.
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps + Playwright Chromium
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Install Salesforce CLI
+        run: npm install -g @salesforce/cli@latest
+
+      - name: Write JWT key
+        run: printf '%s' "$SF_JWT_KEY" > "$RUNNER_TEMP/jwt.key"
+        env:
+          SF_JWT_KEY: ${{ secrets.SF_JWT_KEY }}
+
+      - name: Authenticate to org (JWT)
+        run: |
+          sf org login jwt \
+            --client-id "$SF_CONSUMER_KEY" \
+            --jwt-key-file "$RUNNER_TEMP/jwt.key" \
+            --username "$SF_USERNAME" \
+            --instance-url "${SF_INSTANCE_URL:-https://login.salesforce.com}" \
+            --alias ci --set-default
+        env:
+          SF_CONSUMER_KEY: ${{ secrets.SF_CONSUMER_KEY }}
+          SF_USERNAME: ${{ secrets.SF_USERNAME }}
+          SF_INSTANCE_URL: ${{ secrets.SF_INSTANCE_URL }}
+
+      - name: Realign stored End_Timestamp fields (Apex)
+        run: |
+          out=$(sf apex run --target-org ci --file scripts/apex/freshenObservabilityDates.apex --json)
+          echo "$out" | jq -e '.result.compiled and .result.success' >/dev/null \
+            || { echo "$out"; echo "::error::freshenObservabilityDates.apex did not run cleanly"; exit 1; }
+          echo "$out" | jq -r '.result.logs' | grep -i 'freshenObservabilityDates' || true
+
+      - name: Full-Refresh observability data streams (Playwright)
+        run: node scripts/refreshDataStreams.mjs --target-org ci
+
+      - name: Cleanup
+        if: always()
+        run: rm -f "$RUNNER_TEMP/jwt.key"
+
+  # Guaranteed failure alert: file (or comment on) a single tracking issue so a
+  # failed run surfaces regardless of anyone's email-notification settings.
+  notify-failure:
+    needs: refresh
+    if: ${{ failure() }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const runUrl = process.env.RUN_URL;
+            const label = 'observability-refresh-failure';
+            const marker = '<!-- refresh-observability-failure -->';
+            const body = [
+              marker,
+              'The **refresh-observability** workflow failed.',
+              '',
+              `- Run: ${runUrl}`,
+              `- Triggered by: \`${context.eventName}\``,
+              `- Commit: ${context.sha}`,
+              '',
+              'Likely causes: the JWT subject user lacks Data Cloud/UI access to the',
+              'DataStream pages, a Lightning DOM change broke the Playwright selectors,',
+              'or an org/auth issue. Fallback: run the two steps by hand (see the',
+              '`scripts/refreshDataStreams.mjs` header) or Dev Console',
+              '`Skywave_DataStreamRunner.refreshSdoAnalyticsStreams()`.',
+            ].join('\n');
+            // Ensure the label exists (ignore if it already does).
+            try {
+              await github.rest.issues.createLabel({ ...context.repo, name: label, color: 'b60205',
+                description: 'Automated: refresh-observability workflow failed' });
+            } catch (e) { /* already exists */ }
+            // One open tracking issue: comment if present, else create.
+            const existing = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: label, per_page: 1 });
+            if (existing.data.length) {
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: existing.data[0].number, body });
+            } else {
+              await github.rest.issues.create({ ...context.repo,
+                title: 'Observability dashboard refresh failed', labels: [label], body });
+            }

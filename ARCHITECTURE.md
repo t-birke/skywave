@@ -884,6 +884,16 @@ negative session durations. **To re-freshen a stale demo:** run
 **Full-Refresh the streams** (`scripts/refreshDataStreams.mjs`) so Data Cloud
 re-ingests — the DMOs are a frozen snapshot, so *no* CRM date change (even the
 self-freshening formulas) reaches the dashboards until the streams re-run.
+**Automated daily:** `.github/workflows/refresh-observability.yml` (cron 09:00
+UTC + `workflow_dispatch`) runs both steps in order on a GitHub-hosted runner —
+JWT-auth (the release-notes secrets) → the freshen Apex → `npm ci` +
+`npx playwright install chromium` → the stream Full-Refresh. It has to run the
+*browser* flow because `SalesforceDotCom` streams reject every non-interactive
+caller (Connect REST run endpoint *and* scheduled Apex alike — the wall
+`Skywave_DataStreamRunner` documents), so there is no headless/in-org path. Its
+JWT subject therefore needs Data Cloud + UI access to the `DataStream` pages
+(heavier than release-notes); a failed run files an `observability-refresh-failure`
+tracking issue.
 
 ### 3g. Preflight check (presenter pre-demo go/no-go)
 
