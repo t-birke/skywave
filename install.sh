@@ -1197,6 +1197,16 @@ tier3_heroku() {
         local sets=()
         sets+=("SF_LOGIN_URL=https://login.salesforce.com")
         sets+=("SF_USERNAME=${ADMIN_USERNAME}")
+        # /request-access presenter self-provisioning (§3e'') authenticates as a
+        # FULL-license admin — it creates Users + resets passwords, which a
+        # Salesforce Integration license can never do. On a fresh SDO the relay
+        # subject IS the org System Administrator, so reuse it: guaranteed
+        # Manage-Users + all-Apex access, already JWT-authorized on the Connected
+        # App, and portable (no hardcoded provisioner email). Tom's production
+        # deploy instead locks SF_USERNAME down to an Integration user and points
+        # this at the dedicated skywave.provisioner (see Skywave_PresenterProvision
+        # + scripts/apex/createPresenterProvisionerUser.apex).
+        sets+=("SF_PROVISION_USERNAME=${ADMIN_USERNAME}")
         sets+=("SF_ESW_ORG_ID=${ORG_ID_15}")
         sets+=("SF_ESW_ESC_NAME=${ESC_NAME}")
         [ -n "${ESW_SITE_URL:-}" ] && sets+=("SF_ESW_SITE_URL=${ESW_SITE_URL}")

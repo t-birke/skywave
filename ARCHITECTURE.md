@@ -840,6 +840,61 @@ bookings, booking creation/management) with public-demo-grade hardening:
   `Skywave_WebsiteBookings.cls` now surfaces seatNumber + segmentId
   per leg so the bookings list/detail can show "Seat 27D" pills.
 
+### 3e''. Presenter self-provisioning surface (`/request-access`, `/api/onboard/*`)
+
+Self-service account creation so any `@salesforce.com` colleague can spin up
+their own presenter account — enabled by multi-tenancy (each new admin owns
+their own isolated `Demo_Session__c`). Distinct from the consumer `/signup`
+surface: that mints **Contacts** (audience identities); this mints Salesforce
+**Users** (presenters). Four steps, front to back:
+
+1. **Page** — `GET /request-access` serves `public/request-access.html`, a
+   standalone branded page (self-contained inline CSS/JS, `noindex`) with a
+   name + work-email form. Client-side `@salesforce.com` check is a UX hint
+   only; the real gate is server-side.
+2. **Domain gate** — `POST /api/onboard/request` (`src/onboard-routes.js`)
+   re-checks the email is *exactly* `@salesforce.com` via `isSalesforceEmail`
+   (rejects lookalikes like `foo@evilsalesforce.com` and subdomains). 403
+   `invalid_domain` otherwise. Guards: helmet, strict same-origin CORS, audit
+   log, the global IP rate limit, **plus** a dedicated `provisionLimit` (5 per
+   10 min per IP — provisioning is expensive). zod-validated body.
+3. **Provision** — the relay calls Apex REST `POST /skywave/presenter/provision`
+   (`Skywave_PresenterProvision.cls`, `without sharing`). It re-validates the
+   domain (defense in depth), derives the username by **stripping the handle
+   and re-suffixing**: `jane.doe@salesforce.com → jane.doe@skywave.demo`
+   (`USERNAME_SUFFIX`), inserts a **System Administrator** User (welcome email
+   suppressed via `triggerUserEmail=false`), and assigns the
+   **`Skywave_Presenter` permission-set group** in a single
+   `PermissionSetAssignment` (one-assignment bundle = `Skywave_Demo_Admin`
+   custom-field FLS + `Demo` Agentforce/Einstein access; optional tiers layer
+   on separately). Re-request for an existing username/email re-sends the reset
+   mail instead of erroring (`status: resent`).
+4. **Credentials mail** — a `Queueable` (`ResetPasswordJob`) runs
+   `System.resetPassword(userId, true)` in a *separate* transaction (can't
+   reset a password for a user created in the same transaction), which emails
+   the temp-password + change-password link to the `@salesforce.com` inbox.
+   The `@salesforce.com` mailbox delivery *is* the identity proof — no cookie
+   on this surface.
+
+**Why a dedicated admin JWT subject.** Provisioning needs "Manage Users",
+which a Salesforce **Integration** license (the normal relay user,
+`SF_USERNAME`) can *never* hold. So `/api/onboard` authenticates as a separate
+full-license System Administrator, `skywave.provisioner@skywave-interactive.demo`
+(`SF_PROVISION_USERNAME`), created by
+`scripts/apex/createPresenterProvisionerUser.apex`. The relay's JWT auth is now
+**multi-subject**: `getSalesforceToken(subject)` (`src/sf-auth.js`) caches a
+token per subject and `apexInvoke(..., { subject })` (`src/sf-api.js`) selects
+it. Both subjects sign with the same private key and ride the same
+`Skywave_Heroku_Relay` Connected App — the provisioner just carries the
+`Skywave_Heroku_Website` permset that authorizes it on that app. If
+`SF_PROVISION_USERNAME` is unset the route fails loud with 503 `not_configured`
+(never silently falls back to the integration user, which would 403).
+
+The `Skywave_Presenter` PSG is re-included from the blanket-ignored
+`permissionsetgroups/` folder via a `.forceignore` negation, so it ships with
+the Tier-1 deploy. `install.sh --with-heroku` creates the provisioner user and
+sets `SF_PROVISION_USERNAME`.
+
 ### 3f. Observability
 
 Agentforce session traces land in Data Cloud STDM DMOs; `AgentforceOptimize‑
