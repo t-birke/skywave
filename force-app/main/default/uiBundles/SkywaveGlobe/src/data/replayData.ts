@@ -27,7 +27,7 @@ interface ContactRow {
   ContactCardPicture__c: string | null;
   Geo_Latitude__c: number | null;
   Geo_Longitude__c: number | null;
-  Geo_City__c: string | null;
+  MailingCity: string | null;
   Session_Id__c: string | null;
   Demo_Session__c: string | null;
   Skywave_Survey_Json__c: string | null;
@@ -53,7 +53,7 @@ interface ContactNode {
   ContactCardPicture__c: { value: string | null } | null;
   Geo_Latitude__c: { value: number | null } | null;
   Geo_Longitude__c: { value: number | null } | null;
-  Geo_City__c: { value: string | null } | null;
+  MailingCity: { value: string | null } | null;
   Session_Id__c: { value: string | null } | null;
   Demo_Session__c: { value: string | null } | null;
   Skywave_Survey_Json__c: { value: string | null } | null;
@@ -105,7 +105,7 @@ export async function fetchReplayTimeline(
                 orderBy: { CreatedDate: { order: ASC } }) {
           edges { node {
             FirstName { value } LastName { value } ContactCardPicture__c { value }
-            Geo_Latitude__c { value } Geo_Longitude__c { value } Geo_City__c { value }
+            Geo_Latitude__c { value } Geo_Longitude__c { value } MailingCity { value }
             Session_Id__c { value } Demo_Session__c { value }
             Skywave_Survey_Json__c { value } CreatedDate { value }
           } }
@@ -120,7 +120,7 @@ export async function fetchReplayTimeline(
     ContactCardPicture__c: v(n.ContactCardPicture__c),
     Geo_Latitude__c: v(n.Geo_Latitude__c),
     Geo_Longitude__c: v(n.Geo_Longitude__c),
-    Geo_City__c: v(n.Geo_City__c),
+    MailingCity: v(n.MailingCity),
     Session_Id__c: v(n.Session_Id__c),
     Demo_Session__c: v(n.Demo_Session__c),
     Skywave_Survey_Json__c: v(n.Skywave_Survey_Json__c),
@@ -177,7 +177,7 @@ export async function fetchReplayTimeline(
           Payload_Json__c: JSON.stringify({
             lat: c.Geo_Latitude__c,
             lon: c.Geo_Longitude__c,
-            city: c.Geo_City__c ?? undefined,
+            city: c.MailingCity ?? undefined,
           }),
         },
       });
