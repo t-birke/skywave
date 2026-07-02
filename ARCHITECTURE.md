@@ -866,6 +866,25 @@ call the run endpoint — SalesforceDotCom streams reject non-interactive tokens
 the same wall `Skywave_DataStreamRunner` documents). The `.claude/skills/skywave-
 install` skill conducts the gates; `install.sh` owns the scripted steps.
 
+**Dates are a rolling window — they mostly self-freshen.** The seed data is *not*
+stored as absolute dates. Every `SDO_Analytics_*` row carries a fixed relative
+day-offset (`Start_Days__c`/`End_Days__c`/`Created_Days__c`/`Message_Sent_Days__c`,
+a static `-14..-1`) plus an `HH:mm:ss` `*_Time__c` string, and the timestamp the
+STDM DMOs actually read is a **`TODAY()`-relative formula** —
+`Start_Timestamp__c = DATETIMEVALUE(TEXT(TODAY() + Start_Days__c) + " " + Start_Time__c)`.
+So the whole dataset rolls forward on its own; N days after seeding it still reads
+as "the last two weeks." **Two exceptions** are written as *stored* absolute
+instants by `Skywave_ObservabilitySeeder` and therefore freeze at seed time:
+`SDO_Analytics_AIAgentSession_v2__c.End_Timestamp__c` and
+`…AIAgentSessionParticipa_v2__c.End_Timestamp__c` (both mapped to DMO
+`EndTimestamp`). Left alone they drift behind their auto-freshened Start and yield
+negative session durations. **To re-freshen a stale demo:** run
+`scripts/apex/freshenObservabilityDates.apex` (idempotent — re-aligns each stored
+`End_Timestamp` to its formula `Start_Timestamp` day; a no-op once aligned), then
+**Full-Refresh the streams** (`scripts/refreshDataStreams.mjs`) so Data Cloud
+re-ingests — the DMOs are a frozen snapshot, so *no* CRM date change (even the
+self-freshening formulas) reaches the dashboards until the streams re-run.
+
 ### 3g. Preflight check (presenter pre-demo go/no-go)
 
 The **Demo Home** tab in the *Skywave Demo Management* app (LWC `skywaveDemoHome`,
