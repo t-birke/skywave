@@ -900,10 +900,19 @@ negative session durations. **To re-freshen a stale demo:** run
 **Full-Refresh the streams** (`scripts/refreshDataStreams.mjs`) so Data Cloud
 re-ingests — the DMOs are a frozen snapshot, so *no* CRM date change (even the
 self-freshening formulas) reaches the dashboards until the streams re-run.
-**Automated daily:** `.github/workflows/refresh-observability.yml` (cron 09:00
-UTC + `workflow_dispatch`) runs both steps in order on a GitHub-hosted runner —
-JWT-auth → the freshen Apex → `npm ci` + `npx playwright install chromium` → the
-stream Full-Refresh. It has to run the *browser* flow because `SalesforceDotCom`
+**Automated daily:** `.github/workflows/refresh-observability.yml` runs both steps
+in order on a GitHub-hosted runner — JWT-auth → the freshen Apex → `npm ci` +
+`npx playwright install chromium` → the stream Full-Refresh. **The daily schedule
+does not run in *this* repo:** the `sfdc-qbranch-emu` org enforces a GitHub IP
+allow list that blocks GitHub-hosted runners (their egress IPs are dynamic), so a
+scheduled run here 403s at `actions/checkout` (and `notify-failure` can't even file
+its alert — it 403s too). The scheduled run therefore lives in a personal-account
+**mirror, `t-birke/skywave-observability-refresh`** (cron 09:00 UTC), which has no
+org allow list; the job only ever talks to Salesforce (JWT + Playwright), never the
+source org's GitHub, so the allow list is irrelevant there. The three scripts + the
+workflow are copied verbatim into the mirror — keep them in sync — and this repo's
+copy is `workflow_dispatch`-only (usable manually from an allow-listed context, e.g.
+a future self-hosted runner). The secrets (§SECRETS.md) are set on both repos. It has to run the *browser* flow because `SalesforceDotCom`
 streams reject every non-interactive caller (Connect REST run endpoint *and*
 scheduled Apex alike — the wall `Skywave_DataStreamRunner` documents), so there is
 no headless/in-org path. **Its identity is deliberately its own** (not release-notes'):
@@ -921,7 +930,8 @@ Apex `SetupEntityAccess` insert). The freshen step's result is verified by
 `scripts/ci/check_apex_result.py`, **not jq** — `sf apex run --json` embeds
 NUL/control bytes in its debug log that strict JSON parsers reject and bash `$()`
 corrupts, which would otherwise turn a successful run into a daily false failure. A
-failed run files an `observability-refresh-failure` tracking issue.
+failed run files an `observability-refresh-failure` tracking issue (in whichever repo
+ran it — normally the mirror).
 
 ### 3g. Preflight check (presenter pre-demo go/no-go)
 

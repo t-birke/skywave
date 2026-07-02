@@ -2,6 +2,14 @@ name: refresh-observability
 
 # Keep the Agentforce observability dashboards "today-fresh" without a human.
 #
+# ┌─ WHERE THE DAILY JOB ACTUALLY RUNS ─────────────────────────────────────────┐
+# │ NOT here on a schedule. This org's GitHub IP allow list blocks hosted        │
+# │ runners, so the scheduled run lives in a personal-account mirror:            │
+# │     github.com/t-birke/skywave-observability-refresh  (identical workflow)   │
+# │ This file is the canonical source of the scripts + design and is             │
+# │ dispatch-only here. See the `on:` block below and SECRETS.md.                │
+# └──────────────────────────────────────────────────────────────────────────────┘
+#
 # WHY THIS RUNS A BROWSER IN CI (and can't be pure API/Apex)
 # The SalesforceDotCom data streams that feed the STDM DMOs reject EVERY
 # non-interactive caller on their run endpoint ("Connector type SalesforceDotCom
@@ -38,12 +46,15 @@ name: refresh-observability
 # or a Lightning DOM change), this workflow files a failure issue (below).
 
 on:
-  # 09:00 UTC daily = ~01:00-02:00 US Pacific/Mountain — off-hours. Adjust as
-  # needed (cron is always UTC). NOTE: GitHub disables scheduled workflows after
-  # 60 days of repo inactivity, and may delay scheduled runs under load.
-  schedule:
-    - cron: '0 9 * * *'
-  # Manual run — use this to freshen on-demand right before a demo.
+  # NO schedule here on purpose. This org (sfdc-qbranch-emu) enforces a GitHub IP
+  # allow list that blocks GitHub-hosted runners (dynamic IPs) — a scheduled run
+  # here fails at `actions/checkout` with a 403, and notify-failure can't even
+  # file its alert (it 403s on checkout too). The DAILY scheduled job therefore
+  # lives in a personal-account mirror with no org allow list:
+  #     t-birke/skywave-observability-refresh  (cron '0 9 * * *')
+  # This copy is kept as the canonical source of the scripts + design. It's
+  # dispatch-only: use it manually if/when run from an allow-listed context
+  # (e.g. a future self-hosted runner). Keep the mirror's copies in sync.
   workflow_dispatch:
 
 # github-script needs issues:write to file the failure alert; checkout needs read.
