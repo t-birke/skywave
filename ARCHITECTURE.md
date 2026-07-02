@@ -867,8 +867,10 @@ surface: that mints **Contacts** (audience identities); this mints Salesforce
    **`Skywave_Presenter` permission-set group** in a single
    `PermissionSetAssignment` (one-assignment bundle = `Skywave_Demo_Admin`
    custom-field FLS + `Demo` Agentforce/Einstein access; optional tiers layer
-   on separately). Re-request for an existing username/email re-sends the reset
-   mail instead of erroring (`status: resent`).
+   on separately). Idempotency keys on the **derived username only** (never on
+   Email — infra users reuse a placeholder corp address, which would false-match
+   and reset the wrong user's password): a re-request re-sends the reset mail
+   instead of erroring (`status: resent`).
 4. **Credentials mail** — a `Queueable` (`ResetPasswordJob`) runs
    `System.resetPassword(userId, true)` in a *separate* transaction (can't
    reset a password for a user created in the same transaction), which emails
