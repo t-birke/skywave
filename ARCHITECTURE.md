@@ -866,8 +866,13 @@ surface: that mints **Contacts** (audience identities); this mints Salesforce
    suppressed via `triggerUserEmail=false`), and assigns the
    **`Skywave_Presenter` permission-set group** in a single
    `PermissionSetAssignment` (one-assignment bundle = `Skywave_Demo_Admin`
-   custom-field FLS + `Demo` Agentforce/Einstein access; optional tiers layer
-   on separately). Idempotency keys on the **derived username only** (never on
+   custom-field FLS + `Demo` Agentforce/Einstein access). It then best-effort
+   assigns any **optional-tier permset that exists in the org** (currently
+   `Skywave_Globe_App` — App Launcher visibility for the 3D globe monitor);
+   these are kept OUT of the PSG because they're `.forceignore`d on installs
+   without that tier, so a PSG referencing them would fail to deploy there —
+   assigning them directly at provision time stays portable (skips silently
+   where the tier is absent). Idempotency keys on the **derived username only** (never on
    Email — infra users reuse a placeholder corp address, which would false-match
    and reset the wrong user's password): a re-request re-sends the reset mail
    instead of erroring (`status: resent`).

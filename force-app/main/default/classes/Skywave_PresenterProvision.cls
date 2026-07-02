@@ -38,6 +38,14 @@ global without sharing class Skywave_PresenterProvision {
     @TestVisible private static final String USERNAME_SUFFIX  = '@skywave.demo';
     @TestVisible private static final String PROFILE_NAME     = 'System Administrator';
     @TestVisible private static final String PSG_DEVNAME      = 'Skywave_Presenter';
+    // Optional-tier permsets granted best-effort — assigned only when the tier
+    // is installed (the permset exists), skipped silently otherwise. These are
+    // deliberately NOT in the Skywave_Presenter PSG: they're .forceignored on
+    // installs without that tier, so a PSG referencing them would fail to deploy
+    // there. Presenters run the whole demo, so grant every tier they can use.
+    @TestVisible private static final Set<String> OPTIONAL_PERMSETS = new Set<String>{
+        'Skywave_Globe_App'   // App Launcher visibility for the 3D globe monitor
+    };
 
     @HttpPost
     global static void post() {
@@ -121,10 +129,15 @@ global without sharing class Skywave_PresenterProvision {
         PermissionSetGroup psg = [
             SELECT Id FROM PermissionSetGroup WHERE DeveloperName = :PSG_DEVNAME LIMIT 1
         ];
-        insert new PermissionSetAssignment(
-            AssigneeId = u.Id,
-            PermissionSetGroupId = psg.Id
-        );
+        List<PermissionSetAssignment> grants = new List<PermissionSetAssignment>{
+            new PermissionSetAssignment(AssigneeId = u.Id, PermissionSetGroupId = psg.Id)
+        };
+        // Layer on any optional-tier permsets that exist in this org (globe, …).
+        for (PermissionSet ps : [
+                SELECT Id FROM PermissionSet WHERE Name IN :OPTIONAL_PERMSETS]) {
+            grants.add(new PermissionSetAssignment(AssigneeId = u.Id, PermissionSetId = ps.Id));
+        }
+        insert grants;
         return u.Id;
     }
 
