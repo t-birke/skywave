@@ -62,11 +62,17 @@ global without sharing class Skywave_PresenterProvision {
         if (String.isBlank(lastName))  lastName  = defaultLastName(handle);
         if (String.isBlank(firstName)) firstName = 'Skywave';
 
-        // Idempotent: an existing account (matched by username or corp email)
-        // just gets its credentials re-sent.
+        // Idempotent: an existing presenter account just gets its credentials
+        // re-sent. Match on the DERIVED username only — never on Email. The
+        // username is a pure function of the (unique) salesforce.com local-part,
+        // so it already catches every same-person re-request; matching on Email
+        // would additionally collide with any infra user that reuses a corp
+        // address as a placeholder (e.g. the relay/website/admin users all carry
+        // one operator's email), wrongly resetting THAT user's password instead
+        // of creating the presenter account.
         List<User> existing = [
             SELECT Id FROM User
-            WHERE Username = :username OR Email = :email
+            WHERE Username = :username
             LIMIT 1
         ];
         if (!existing.isEmpty()) {
