@@ -525,7 +525,11 @@ blanket deploy via a `.forceignore` block (so Tier 1 never ships an unbuilt
 bundle or an app that references a missing bundle), then Tier 4 builds it
 (`npm run build` with `VITE_RELAY_WS_URL` from the resolved relay origin) and
 deploys the bundle + app + permset + CSP together (temporarily neutralizing that
-`.forceignore` block, then restoring it). **Prerequisite:** the Multi-Framework
+`.forceignore` block, then restoring it). The App-Launcher tile icon is a
+`Skywave_Globe_Icon` **ContentAsset** (`contentassets/`, a 128×128 PNG shipped as
+a `.asset` content file) referenced by the app's `<brand><logo>`; it is *not*
+in the `.forceignore` block, so Tier 1 already lands it — Tier 4 re-includes it
+in the globe deploy set only to stay self-contained. **Prerequisite:** the Multi-Framework
 UIBundle app domain (`*.salesforce.app`) must be **enabled in Setup** before the
 bundle will serve (Tier 4 marks this as a gate). Launched via a
 **CustomApplication** (`<uiBundle>c__SkywaveGlobe</uiBundle>`, API 67.0+) + the

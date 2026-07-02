@@ -2,6 +2,8 @@
 <CustomApplication xmlns="http://soap.sforce.com/2006/04/metadata">
     <brand>
         <headerColor>#0B1D3A</headerColor>
+        <logo>Skywave_Globe_Icon</logo>
+        <logoVersion>1</logoVersion>
         <shouldOverrideOrgTheme>false</shouldOverrideOrgTheme>
     </brand>
     <description>Skywave Interactive 3D globe demo monitor — React UIBundle (Salesforce Multi-Framework).</description>

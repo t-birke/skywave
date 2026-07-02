@@ -1326,7 +1326,7 @@ tier4_globe() {
     # one deploy, then always restore it (trap). node_modules stays excluded by
     # the bundle's OWN .forceignore, so the payload stays small.
     if section 4.2; then
-        say "4.2 Deploy globe bundle + app + permset + CSP"
+        say "4.2 Deploy globe bundle + app + icon + permset + CSP"
         local fi=".forceignore" fibak; fibak="$(mktemp)"
         cp "$fi" "$fibak"
         # Restore .forceignore on RETURN *and* EXIT — `die` calls exit (not a
@@ -1347,10 +1347,11 @@ PYEOF
         sf project deploy start --target-org "$ORG_ALIAS" \
             --source-dir "$GLOBE_DIR" \
             --source-dir force-app/main/default/applications/Skywave_Globe.app-meta.xml \
+            --source-dir force-app/main/default/contentassets/Skywave_Globe_Icon.asset-meta.xml \
             --source-dir force-app/main/default/permissionsets/Skywave_Globe_App.permissionset-meta.xml \
             --source-dir force-app/main/default/cspTrustedSites/Skywave_Globe_Relay_Wss.cspTrustedSite-meta.xml \
             --ignore-conflicts --wait 30 --concise \
-            && ok "globe deployed (bundle + app + permset + CSP)" \
+            && ok "globe deployed (bundle + app + icon + permset + CSP)" \
             || die "globe deploy failed — if it says 'Agentforce Vibe for MultiFramework feature gate is disabled', enable that feature in Setup (§4.0), then --resume."
         cp "$fibak" "$fi"; rm -f "$fibak"; trap - RETURN EXIT
         done_mark 4.2
