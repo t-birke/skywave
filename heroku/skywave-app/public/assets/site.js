@@ -611,7 +611,12 @@ function ensureWarmingBubble() {
 // conversation actually expired) can't suppress the pre-warm forever, and
 // cleared when the conversation ends.
 const CONV_MARKER_KEY = 'sw_chat_conv_v1';
-const CONV_MARKER_TTL_MS = 12 * 60 * 60 * 1000;  // 12h — spans a demo session, under ECv2's continuity window
+// Match the ECv2 conversation timeout (2h): past that the conversation is no
+// longer resumable, so a marker older than this is stale — let it expire and
+// pre-warm a FRESH conversation instead of revealing the FAB for a dead one.
+// The marker is refreshed on every conversation start / resume, so within an
+// active session (reloads) it never goes stale; 2h only bounds a truly idle gap.
+const CONV_MARKER_TTL_MS = 2 * 60 * 60 * 1000;  // 2h — the ECv2 conversation timeout
 function markConversationStarted() {
     try { localStorage.setItem(CONV_MARKER_KEY, String(Date.now())); } catch (_) { /* storage disabled */ }
 }

@@ -33,7 +33,12 @@
  * Scoped to Demo_Identifier__c = SKYWAVE_PHASE_4_5 so coexisting DriveMax/QBrix
  * rows are never touched.
  */
-String TAG = Skywave_ObservabilitySeeder.DEMO_TAG;
+// Inlined from Skywave_ObservabilitySeeder.DEMO_TAG (SSOT) so this maintenance
+// script needs NO Apex-class access — the CI automation user (skywave.refresh.bot)
+// runs it under a minimal profile and can't be granted access to the seeder class.
+// This identifier is baked into all observability seed rows and never changes; if
+// the seeder's DEMO_TAG ever does, update this literal to match.
+String TAG = 'SKYWAVE_PHASE_4_5';
 Integer sessionsShifted = 0;
 Integer participantsShifted = 0;
 

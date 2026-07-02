@@ -19,17 +19,23 @@ name: refresh-observability
 #      so Data Cloud re-ingests today's rolling-window values.
 # See ARCHITECTURE.md §3f.
 #
-# Reuses the same JWT-bearer auth + repo secrets as release-notes.yml (SECRETS.md):
-#   SF_CONSUMER_KEY   consumer key of the Skywave_Heroku_Relay connected app
-#   SF_JWT_KEY        the PEM private key (contents of secrets/jwt.key)
-#   SF_USERNAME       JWT subject user
-#   SF_INSTANCE_URL   optional login URL (default https://login.salesforce.com)
+# AUTH — DELIBERATELY NOT the same app/user as release-notes.yml (SECRETS.md).
+# The Playwright step bridges the JWT session into a Lightning web session via
+# frontdoor.jsp; that needs a WEB-scoped OAuth session. The shared Skywave_Heroku_Relay
+# app grants only Api/RefreshToken/CDP (no Web) on purpose, so a relay JWT session
+# bounces to login. This workflow therefore authenticates as a DEDICATED identity:
+#   app  = Skywave_CI_Refresh  (JWT-bearer, adds the Web scope; same keypair as relay)
+#   user = skywave.refresh.bot@skywave-interactive.demo (Standard User + the
+#          Data Cloud/analytics permsets that let it open DataStream pages & Full-Refresh)
+# The bot is pre-authorized on the app via the Skywave_Heroku_Website permset.
+# Repo secrets consumed:
+#   SF_REFRESH_CONSUMER_KEY   consumer key of the Skywave_CI_Refresh app
+#   SF_REFRESH_USERNAME       skywave.refresh.bot@skywave-interactive.demo (not secret; kept as a secret for parity)
+#   SF_JWT_KEY                PEM private key (contents of secrets/jwt.key) — SHARED with release-notes (one keypair)
+#   SF_INSTANCE_URL           optional login URL (default https://login.salesforce.com works for this SDO)
 #
-# PERMISSIONS: unlike release-notes (which only needs Release_Note__c create),
-# the SF_USERNAME subject user must be able to (a) open the DataStream Lightning
-# record pages and (b) trigger a Data Cloud Full Refresh. Grant it the Data Cloud
-# admin + SDO analytics permsets, or the refresh clicks will fail and this
-# workflow will file a failure issue (below).
+# If the refresh clicks ever fail (missing Data Cloud/UI access, app not authorized,
+# or a Lightning DOM change), this workflow files a failure issue (below).
 
 on:
   # 09:00 UTC daily = ~01:00-02:00 US Pacific/Mountain — off-hours. Adjust as
@@ -71,22 +77,23 @@ jobs:
       - name: Authenticate to org (JWT)
         run: |
           sf org login jwt \
-            --client-id "$SF_CONSUMER_KEY" \
+            --client-id "$SF_REFRESH_CONSUMER_KEY" \
             --jwt-key-file "$RUNNER_TEMP/jwt.key" \
-            --username "$SF_USERNAME" \
+            --username "$SF_REFRESH_USERNAME" \
             --instance-url "${SF_INSTANCE_URL:-https://login.salesforce.com}" \
             --alias ci --set-default
         env:
-          SF_CONSUMER_KEY: ${{ secrets.SF_CONSUMER_KEY }}
-          SF_USERNAME: ${{ secrets.SF_USERNAME }}
+          SF_REFRESH_CONSUMER_KEY: ${{ secrets.SF_REFRESH_CONSUMER_KEY }}
+          SF_REFRESH_USERNAME: ${{ secrets.SF_REFRESH_USERNAME }}
           SF_INSTANCE_URL: ${{ secrets.SF_INSTANCE_URL }}
 
       - name: Realign stored End_Timestamp fields (Apex)
+        # Verify with scripts/ci/check_apex_result.py, NOT jq: `sf apex run --json`
+        # embeds NUL/control bytes in .result.logs that jq rejects and bash $()
+        # corrupts — a false failure. The script parses the file leniently. See its header.
         run: |
-          out=$(sf apex run --target-org ci --file scripts/apex/freshenObservabilityDates.apex --json)
-          echo "$out" | jq -e '.result.compiled and .result.success' >/dev/null \
-            || { echo "$out"; echo "::error::freshenObservabilityDates.apex did not run cleanly"; exit 1; }
-          echo "$out" | jq -r '.result.logs' | grep -i 'freshenObservabilityDates' || true
+          sf apex run --target-org ci --file scripts/apex/freshenObservabilityDates.apex --json > "$RUNNER_TEMP/apex.json" 2>/dev/null || true
+          python3 scripts/ci/check_apex_result.py "$RUNNER_TEMP/apex.json"
 
       - name: Full-Refresh observability data streams (Playwright)
         run: node scripts/refreshDataStreams.mjs --target-org ci
