@@ -28,7 +28,10 @@ node_modules/
 **/appMenus/**
 **/authproviders/**
 **/objects/**__dll/**
+# SDOs ship many org-level permission-set groups we don't want to track — ignore
+# the folder, but re-include OUR one (the self-service presenter bundle).
 **/permissionsetgroups/**
+!**/permissionsetgroups/Skywave_Presenter.permissionsetgroup-meta.xml
 
 # Non-project permissionsets
 **/permissionsets/NextGen_*

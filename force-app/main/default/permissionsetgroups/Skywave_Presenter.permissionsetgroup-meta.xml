@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSetGroup xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>One-assignment bundle for self-service presenter accounts (Skywave_PresenterProvision / the /request-access page): Skywave_Demo_Admin (custom-field FLS) + Demo (Agentforce/Einstein). Optional-tier permsets layer on separately.</description>
+    <label>Skywave Presenter</label>
+    <permissionSets>Skywave_Demo_Admin</permissionSets>
+    <permissionSets>Demo</permissionSets>
+    <status>Updated</status>
+</PermissionSetGroup>
