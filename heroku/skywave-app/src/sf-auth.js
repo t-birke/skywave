@@ -8,7 +8,14 @@ import path from 'path';
 
 const TOKEN_LIFETIME_SECONDS = 60 * 60 * 2; // 2h is plenty; not the SF max
 
-let cached = null;
+// One cached token per JWT subject. Almost everything authenticates as the
+// minimal SF_USERNAME integration user; presenter provisioning authenticates
+// as a full-license admin (SF_PROVISION_USERNAME) because creating Users +
+// resetting passwords requires "Manage Users", which a Salesforce Integration
+// license can never hold. Both subjects are authorized on the SAME connected
+// app (isAdminApproved=true + each assigned the app via a permset), so they
+// share one private key and differ only in the `sub` claim.
+const tokenCache = new Map();
 
 function resolvePrivateKey() {
     // Heroku: SF_JWT_PRIVATE_KEY contains the PEM directly.
@@ -21,21 +28,27 @@ function resolvePrivateKey() {
     return null;
 }
 
-export async function getSalesforceToken() {
+// subject defaults to the standard relay integration user (SF_USERNAME). Pass
+// an explicit username to mint a token for a different JWT subject (e.g. the
+// provisioning admin).
+export async function getSalesforceToken(subject) {
     const now = Math.floor(Date.now() / 1000);
+    const sub = subject || process.env.SF_USERNAME;
+
+    const cached = tokenCache.get(sub);
     if (cached && cached.expiresAt > now + 60) {
         return cached;
     }
 
-    const { SF_LOGIN_URL, SF_USERNAME, SF_CLIENT_ID } = process.env;
+    const { SF_LOGIN_URL, SF_CLIENT_ID } = process.env;
     const SF_JWT_PRIVATE_KEY = resolvePrivateKey();
-    for (const [k, v] of Object.entries({ SF_LOGIN_URL, SF_USERNAME, SF_CLIENT_ID, SF_JWT_PRIVATE_KEY })) {
-        if (!v) throw new Error(`Missing: ${k}`);
+    for (const [k, v] of Object.entries({ SF_LOGIN_URL, sub, SF_CLIENT_ID, SF_JWT_PRIVATE_KEY })) {
+        if (!v) throw new Error(`Missing: ${k === 'sub' ? 'SF_USERNAME/subject' : k}`);
     }
 
     const claims = {
         iss: SF_CLIENT_ID,
-        sub: SF_USERNAME,
+        sub,
         aud: SF_LOGIN_URL,
         exp: now + 180
     };
@@ -47,10 +60,11 @@ export async function getSalesforceToken() {
 
     const { data } = await axios.post(`${SF_LOGIN_URL}/services/oauth2/token`, params);
 
-    cached = {
+    const token = {
         accessToken: data.access_token,
         instanceUrl: data.instance_url,
         expiresAt: now + TOKEN_LIFETIME_SECONDS
     };
-    return cached;
+    tokenCache.set(sub, token);
+    return token;
 }

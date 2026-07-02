@@ -12,6 +12,7 @@ import { startMonitorSubscriber } from './pubsub-monitor.js';
 import { register, registerMonitor, fanOut, fanOutMonitor, activeCount, monitorCount, startHeartbeat } from './ws-fanout.js';
 import { forwardToApex } from './sf-api.js';
 import { buildWebsiteRouter } from './website-routes.js';
+import { buildOnboardRouter } from './onboard-routes.js';
 import { buildPreflightRouter } from './preflight.js';
 import { readProofCookie } from './proof-cookie.js';
 
@@ -33,6 +34,13 @@ app.use(express.static(path.resolve(__dirname, '../public')));
 // straight to the existing #profile customer-area to create an account.
 app.get(['/signup', '/join'], (_, res) => {
     res.sendFile(path.resolve(__dirname, '../public/index.html'));
+});
+
+// Self-service presenter onboarding page. Standalone (not the demo SPA): a
+// @salesforce.com colleague requests a fully-configured demo org account, which
+// /api/onboard/request provisions via Apex. See public/request-access.html.
+app.get('/request-access', (_, res) => {
+    res.sendFile(path.resolve(__dirname, '../public/request-access.html'));
 });
 
 app.get('/healthz', (_, res) => {
@@ -83,6 +91,12 @@ app.get('/api/config', (_, res) => {
 // /api/* phone-demo routes are untouched.
 const allowedOrigin = process.env.SKYWAVE_PUBLIC_ORIGIN || 'http://localhost:3000';
 app.use('/api/website', buildWebsiteRouter({ allowedOrigin }));
+
+// Presenter onboarding surface (see /request-access above). Same hardening
+// stack as the website router but no proof cookie — identity is the work
+// email, and the server-side @salesforce.com gate + Apex re-check + a tight
+// provisioning rate limit guard it.
+app.use('/api/onboard', buildOnboardRouter({ allowedOrigin }));
 
 // Preflight self-report — guarded by x-preflight-key. Apex calls this
 // from the Skywave_PreflightController; not exposed to phones.

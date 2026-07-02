@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Run the Skywave demo · Request access</title>
+    <meta name="robots" content="noindex">
+    <style>
+        :root {
+            --navy: #0b1d3a;
+            --navy-deep: #06122a;
+            --teal: #14b8a6;
+            --teal-active: #0f766e;
+            --mute: #a8bcd8;
+            --text: #ffffff;
+            --warn: #ffb84d;
+            --card: rgba(255, 255, 255, 0.04);
+            --line: rgba(168, 188, 216, 0.22);
+        }
+        * { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; }
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(1200px 700px at 15% -10%, #163a6b 0%, transparent 55%),
+                radial-gradient(900px 600px at 100% 100%, #0f766e33 0%, transparent 50%),
+                linear-gradient(160deg, var(--navy) 0%, var(--navy-deep) 100%);
+            min-height: 100%;
+            display: grid;
+            place-items: center;
+            padding: 1.5rem;
+        }
+        .card {
+            width: 100%;
+            max-width: 460px;
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            padding: 2.2rem 2rem 2rem;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+        }
+        .brand {
+            display: flex; align-items: center; gap: 0.55rem;
+            font-weight: 700; letter-spacing: 0.02em; font-size: 1.05rem;
+            margin-bottom: 1.4rem;
+        }
+        .brand svg { width: 26px; height: 26px; color: var(--teal); }
+        h1 { font-size: 1.55rem; line-height: 1.2; margin: 0 0 0.5rem; }
+        .lede { color: var(--mute); font-size: 0.95rem; line-height: 1.5; margin: 0 0 1.6rem; }
+        label { display: block; font-size: 0.8rem; color: var(--mute); margin: 0 0 0.35rem; }
+        .row { display: flex; gap: 0.75rem; }
+        .row > .field { flex: 1; }
+        .field { margin-bottom: 1rem; }
+        input {
+            width: 100%; padding: 0.7rem 0.8rem; font-size: 0.95rem; font-family: inherit;
+            color: var(--text); background: rgba(6, 18, 42, 0.6);
+            border: 1px solid var(--line); border-radius: 10px; outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18); }
+        input::placeholder { color: #ffffff55; }
+        button {
+            width: 100%; margin-top: 0.4rem; padding: 0.8rem 1rem;
+            font-size: 0.98rem; font-weight: 650; font-family: inherit; cursor: pointer;
+            color: #04211d; background: var(--teal); border: 0; border-radius: 10px;
+            transition: background 0.15s, transform 0.05s;
+        }
+        button:hover:not(:disabled) { background: #2dd4bf; }
+        button:active:not(:disabled) { transform: translateY(1px); }
+        button:disabled { opacity: 0.55; cursor: default; }
+        .hint { color: var(--mute); font-size: 0.78rem; line-height: 1.5; margin-top: 1rem; }
+        .hint code { color: var(--text); background: rgba(255,255,255,0.06); padding: 0.05rem 0.3rem; border-radius: 5px; }
+        .msg { font-size: 0.85rem; line-height: 1.45; margin-top: 1rem; padding: 0.7rem 0.85rem; border-radius: 10px; display: none; }
+        .msg.error { display: block; background: rgba(255, 99, 99, 0.12); border: 1px solid rgba(255, 99, 99, 0.4); color: #ffd0d0; }
+        .msg.warn  { display: block; background: rgba(255, 184, 77, 0.12); border: 1px solid rgba(255, 184, 77, 0.4); color: var(--warn); }
+        /* Success state */
+        .done { display: none; text-align: center; }
+        .done.show { display: block; }
+        .done .check {
+            width: 62px; height: 62px; margin: 0.4rem auto 1rem; border-radius: 50%;
+            display: grid; place-items: center;
+            background: rgba(20, 184, 166, 0.15); border: 1px solid var(--teal);
+        }
+        .done .check svg { width: 30px; height: 30px; color: var(--teal); }
+        .done h2 { font-size: 1.3rem; margin: 0 0 0.6rem; }
+        .done p { color: var(--mute); font-size: 0.92rem; line-height: 1.55; margin: 0 0 0.5rem; }
+        .done .login { color: var(--text); }
+        .done code { color: var(--text); background: rgba(255,255,255,0.07); padding: 0.1rem 0.4rem; border-radius: 6px; }
+        form.hide { display: none; }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <div class="brand">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M22 2 11 13"></path>
+                <path d="M22 2 15 22l-4-9-9-4 20-7z"></path>
+            </svg>
+            Skywave&nbsp;Interactive
+        </div>
+
+        <form id="form" novalidate>
+            <h1>Run the Skywave demo yourself</h1>
+            <p class="lede">Salesforce colleagues can provision a fully-configured
+                demo org account in seconds. Enter your details and we'll email you
+                a link to set your password.</p>
+
+            <div class="row">
+                <div class="field">
+                    <label for="firstName">First name</label>
+                    <input id="firstName" name="firstName" autocomplete="given-name" required maxlength="40">
+                </div>
+                <div class="field">
+                    <label for="lastName">Last name</label>
+                    <input id="lastName" name="lastName" autocomplete="family-name" required maxlength="80">
+                </div>
+            </div>
+            <div class="field">
+                <label for="email">Work email</label>
+                <input id="email" name="email" type="email" inputmode="email"
+                       autocomplete="email" placeholder="you@salesforce.com" required maxlength="240">
+            </div>
+
+            <button id="submit" type="submit">Request my demo account</button>
+
+            <div id="msg" class="msg"></div>
+
+            <p class="hint">Only <code>@salesforce.com</code> addresses are accepted.
+                Your login username will be your email handle on <code>@skywave.demo</code>
+                (e.g. <code>jane.doe@skywave.demo</code>). Accounts have full admin access —
+                please use them only for demoing Skywave.</p>
+        </form>
+
+        <div id="done" class="done">
+            <div class="check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M20 6 9 17l-5-5"></path>
+                </svg>
+            </div>
+            <h2 id="doneTitle">Check your inbox</h2>
+            <p id="doneBody"></p>
+            <p class="login">Your login: <code id="doneUser"></code></p>
+        </div>
+    </main>
+
+    <script>
+        (function () {
+            var form = document.getElementById('form');
+            var btn = document.getElementById('submit');
+            var msg = document.getElementById('msg');
+            var done = document.getElementById('done');
+
+            function showMsg(text, kind) {
+                msg.textContent = text;
+                msg.className = 'msg ' + (kind || 'error');
+            }
+            function clearMsg() { msg.className = 'msg'; msg.textContent = ''; }
+
+            function isSalesforceEmail(email) {
+                var parts = String(email).split('@');
+                return parts.length === 2 && parts[1].toLowerCase() === 'salesforce.com';
+            }
+
+            function showDone(data, email) {
+                form.classList.add('hide');
+                done.classList.add('show');
+                var title = document.getElementById('doneTitle');
+                var body = document.getElementById('doneBody');
+                if (data.status === 'resent') {
+                    title.textContent = 'Login re-sent';
+                    body.textContent = 'That account already exists — we\'ve re-sent the '
+                        + 'set-password email to ' + email + '. It can take a minute to arrive.';
+                } else {
+                    title.textContent = 'Check your inbox';
+                    body.textContent = 'We\'ve emailed ' + email + ' a link to set your '
+                        + 'password. Follow it to log in and start running the demo. '
+                        + 'It can take a minute to arrive — check spam if you don\'t see it.';
+                }
+                document.getElementById('doneUser').textContent = data.username || '';
+            }
+
+            form.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                clearMsg();
+                var firstName = document.getElementById('firstName').value.trim();
+                var lastName = document.getElementById('lastName').value.trim();
+                var email = document.getElementById('email').value.trim().toLowerCase();
+
+                if (!firstName || !lastName || !email) {
+                    showMsg('Please fill in your name and work email.'); return;
+                }
+                if (!isSalesforceEmail(email)) {
+                    showMsg('Please use your @salesforce.com email address.', 'warn'); return;
+                }
+
+                btn.disabled = true;
+                var original = btn.textContent;
+                btn.textContent = 'Creating your account…';
+                try {
+                    var resp = await fetch('/api/onboard/request', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ firstName: firstName, lastName: lastName, email: email })
+                    });
+                    var data = await resp.json().catch(function () { return {}; });
+                    if (resp.ok && (data.status === 'created' || data.status === 'resent')) {
+                        showDone(data, email);
+                        return;
+                    }
+                    if (resp.status === 429) {
+                        showMsg(data.message || 'Too many requests — try again in a few minutes.', 'warn');
+                    } else {
+                        showMsg(data.message || 'Something went wrong creating your account. Please try again.');
+                    }
+                } catch (err) {
+                    showMsg('Network error — please check your connection and try again.');
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = original;
+                }
+            });
+        })();
+    </script>
+</body>
+</html>

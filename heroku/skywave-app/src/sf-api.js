@@ -23,8 +23,8 @@ const keepAliveAgent = new https.Agent({
     maxFreeSockets: 8
 });
 
-async function authedClient() {
-    const { accessToken, instanceUrl } = await getSalesforceToken();
+async function authedClient(subject) {
+    const { accessToken, instanceUrl } = await getSalesforceToken(subject);
     return {
         instanceUrl,
         config: {
@@ -38,8 +38,9 @@ async function authedClient() {
     };
 }
 
-export async function apexInvoke(method, apexPath, body) {
-    const { instanceUrl, config } = await authedClient();
+// opts.subject overrides the JWT subject (default = SF_USERNAME relay user).
+export async function apexInvoke(method, apexPath, body, opts = {}) {
+    const { instanceUrl, config } = await authedClient(opts.subject);
     const url = `${instanceUrl}/services/apexrest${apexPath}`;
     const res = method === 'GET'
         ? await axios.get(url, config)
