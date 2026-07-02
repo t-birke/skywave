@@ -262,6 +262,7 @@ body:not([data-esw-visible="1"]) embedded-messaging {
     box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1);
     z-index: 9998;               /* just under the real ESW FAB */
     cursor: default;
+    pointer-events: none;        /* purely an affordance — never eats a tap */
 }
 #skywave-chat-warming[data-on="1"] { display: flex; }
 #skywave-chat-warming .swc-glyph {

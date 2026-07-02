@@ -206,12 +206,20 @@ Key non-obvious points (each is a memory entry):
 - **Chat pre-warm (hide the agent cold-start).** Once the session is verified,
   `site.js` calls `utilAPI.launchChat()` **hidden** (CSS keeps `#embedded-messaging`
   collapsed) so the Agentforce welcome generates in the background; a FAB-look-alike
-  loading bubble (`#skywave-chat-warming`) covers the wait. The real FAB is revealed
-  the instant the welcome lands, detected via the ECv2 `window` event
-  **`onEmbeddedMessagingFirstBotMessageSent`** (undocumented but dispatched to the
-  host; `onEmbeddedMessagingConversationStarted` fires ~40s too early). `minimizeChat()`
-  runs before the reveal so the visitor gets the FAB, not an auto-opened window; a 90s
-  safety timeout reveals anyway if the event never fires.
+  loading bubble (`#skywave-chat-warming`) covers the wait. `launchChat()` **maximizes**
+  the window, and on mobile that maximized window locks background scroll — so we
+  `minimizeChat()` **immediately** after launch (not just before the reveal): the
+  conversation keeps warming minimized (the welcome still lands) while the page stays
+  interactive behind the bubble. The real FAB is revealed the instant the welcome
+  lands, detected via the ECv2 `window` event **`onEmbeddedMessagingFirstBotMessageSent`**
+  (undocumented but dispatched to the host; `onEmbeddedMessagingConversationStarted`
+  fires ~40s too early). A 90s safety timeout reveals anyway if the event never fires.
+  **Reload:** ECv2 resumes the prior conversation on refresh and sends **no** new
+  welcome, so the welcome gate would hang to the safety net. `site.js` writes a
+  TTL-bounded `localStorage` breadcrumb (`sw_chat_conv_v1`) when a conversation first
+  starts (`onEmbeddedMessagingConversationStarted`) and clears it on
+  `onEmbeddedMessagingConversationEnded`; a fresh breadcrumb on the next load means
+  "resume → reveal the FAB immediately, skip the pre-warm."
 
 ### 3a'''. The tracking pipeline that powers §3a (Tier 5, `scripts/datacloud/`)
 

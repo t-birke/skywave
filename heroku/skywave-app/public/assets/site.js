@@ -351,6 +351,10 @@ async function loadEcv2Snippet(deviceId) {
     // matches. Drop this listener once the platform gap closes.
     window.addEventListener('onEmbeddedMessagingConversationStarted', (e) => {
         setSessionPrechat('ConversationStarted');
+        // A conversation now exists — leave the reload breadcrumb (see
+        // hasResumableConversation) so a refresh reveals the FAB immediately
+        // instead of gating on a welcome that resume won't re-send.
+        markConversationStarted();
         const conversationId = e?.detail?.conversationId;
         if (!conversationId || !deviceId) {
             console.warn('[esw] no conversationId/deviceId on ConversationStarted; skipping identify');
@@ -366,6 +370,15 @@ async function loadEcv2Snippet(deviceId) {
         }
         postContactUpsert(csPayload);
     }, { once: true });
+
+    // Conversation ended → drop the resume breadcrumb so the NEXT visit pre-
+    // warms a fresh conversation (a genuinely new welcome will be sent) rather
+    // than revealing the FAB for a conversation that no longer exists. The
+    // marker's TTL is the backstop if this event name ever changes.
+    window.addEventListener('onEmbeddedMessagingConversationEnded', () => {
+        clearConversationMarker();
+        console.log('[esw] conversation ended — cleared resume marker');
+    });
 
     try {
         window.embeddedservice_bootstrap.settings.language = 'en_US';
@@ -572,6 +585,35 @@ function ensureWarmingBubble() {
     return el;
 }
 
+// ── Reload-resume detection ─────────────────────────────────────────────────
+// ECv2 persists an in-flight conversation across page reloads (its continuity
+// token lives in web storage). On reload it SILENTLY RESUMES the prior
+// conversation — history is re-rendered but NO new welcome message is sent, so
+// the pre-warm's welcome gate (onEmbeddedMessagingFirstBotMessageSent) never
+// fires and we'd sit on the loading bubble until the 90s safety net. ECv2
+// exposes no event for "you just resumed an existing conversation", so we leave
+// our own breadcrumb: a timestamped localStorage marker written when a
+// conversation first starts. On a later load a *fresh* marker means "resume,
+// don't gate" → reveal the FAB immediately. TTL-bounded so a stale marker (the
+// conversation actually expired) can't suppress the pre-warm forever, and
+// cleared when the conversation ends.
+const CONV_MARKER_KEY = 'sw_chat_conv_v1';
+const CONV_MARKER_TTL_MS = 12 * 60 * 60 * 1000;  // 12h — spans a demo session, under ECv2's continuity window
+function markConversationStarted() {
+    try { localStorage.setItem(CONV_MARKER_KEY, String(Date.now())); } catch (_) { /* storage disabled */ }
+}
+function clearConversationMarker() {
+    try { localStorage.removeItem(CONV_MARKER_KEY); } catch (_) { /* storage disabled */ }
+}
+function hasResumableConversation() {
+    try {
+        const ts = parseInt(localStorage.getItem(CONV_MARKER_KEY) || '', 10);
+        if (!Number.isFinite(ts)) return false;
+        if (Date.now() - ts > CONV_MARKER_TTL_MS) { clearConversationMarker(); return false; }
+        return true;
+    } catch (_) { return false; }
+}
+
 // Start the ECv2 conversation in the background (hidden) so the agent's
 // welcome message is already waiting by the time the visitor opens the chat.
 // Fired once, after the session is verified (setIdentityToken). launchChat()
@@ -582,7 +624,21 @@ function ensureWarmingBubble() {
 // usable) AND the identity token is set (authMode=Auth needs a verified
 // session to start the conversation). Either event can fire first.
 function maybePreWarm() {
-    if (eswButtonCreated && eswIdentityReady) preWarmChat();
+    if (!(eswButtonCreated && eswIdentityReady)) return;
+    // Reload case: a conversation already exists for this browser. ECv2 resumes
+    // it (with history) the moment the visitor opens the FAB and sends NO new
+    // welcome — so there's nothing to gate on. Reveal the real FAB immediately
+    // instead of pre-warming (which would just launch→resume the same
+    // conversation and then wait out the full 90s safety net for a welcome that
+    // never comes).
+    if (hasResumableConversation()) {
+        markConversationStarted();         // refresh the TTL for the next reload
+        state.chatWelcomeReady = true;     // gateOnWelcome=false → real FAB shows now
+        syncEswButtonVisibility();
+        console.log('[esw] resumable conversation detected — revealing FAB (no pre-warm)');
+        return;
+    }
+    preWarmChat();
 }
 
 function preWarmChat() {
@@ -604,10 +660,22 @@ function preWarmChat() {
         onWelcomeReady();
     }, 90000);
     console.log('[esw] pre-warming conversation (hidden)…');
-    // launchChat() returns a Promise; wrap so both a sync throw and an async
-    // rejection are handled (no unhandled rejection) and just reveal the FAB.
+    // launchChat() MAXIMIZES the window; on mobile the maximized ECv2 window is
+    // a full-screen overlay that locks background scroll — so even though our
+    // CSS hides the widget, the page would be frozen for the whole cold-start
+    // wait. Collapse it back to the FAB IMMEDIATELY: the conversation keeps
+    // warming in the background (the welcome still lands on a minimized window)
+    // and the page stays interactive behind the loading bubble. Wrap so neither
+    // a sync throw nor an async rejection goes unhandled.
     Promise.resolve()
         .then(() => boot.utilAPI.launchChat())
+        .then(() => {
+            // Non-fatal: if the collapse fails the page may stay locked until
+            // welcome, but the warm-up itself is unaffected.
+            Promise.resolve()
+                .then(() => boot.utilAPI.minimizeChat())
+                .catch((e) => console.warn('[esw] pre-warm minimize failed', e));
+        })
         .catch((e) => {
             console.warn('[esw] launchChat pre-warm failed — revealing FAB', e);
             onWelcomeReady();
@@ -621,19 +689,25 @@ function onWelcomeReady() {
     if (state.chatWelcomeReady || chatRevealing) return;
     chatRevealing = true;
     if (warmSafetyTimer) { clearTimeout(warmSafetyTimer); warmSafetyTimer = null; }
+    // Remember that a conversation now exists so a page RELOAD reveals the FAB
+    // immediately (resume sends no fresh welcome to gate on). Belt-and-
+    // suspenders — it's normally already set on onEmbeddedMessagingConversationStarted.
+    markConversationStarted();
     const reveal = () => {
         if (state.chatWelcomeReady) return;
         state.chatWelcomeReady = true;
         syncEswButtonVisibility();   // reveals the (now-minimized) FAB, hides the loading bubble
         console.log('[esw] welcome ready — chat revealed');
     };
+    // The window was already collapsed to the FAB during pre-warm, so it's safe
+    // to reveal right away. Fire minimizeChat() once more (no-op if already
+    // minimized) to cover the launch-failure path landing here un-minimized,
+    // and reveal on confirmation or a short fallback.
     window.addEventListener('onEmbeddedMessagingWindowMinimized', reveal, { once: true });
-    setTimeout(reveal, 1500);        // fallback if the minimized event doesn't fire
-    // minimizeChat() also returns a Promise — wrap so a rejection can't go
-    // unhandled; the reveal still fires via the event/timeout above.
     Promise.resolve()
         .then(() => window.embeddedservice_bootstrap.utilAPI.minimizeChat())
-        .catch(() => { /* reveal already scheduled */ });
+        .catch(() => { /* reveal still fires via the fallback below */ });
+    setTimeout(reveal, 400);         // window is already minimized in the normal path
 }
 
 async function loadInteractionsSdk() {
