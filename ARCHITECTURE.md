@@ -697,7 +697,7 @@ returning-visitor fast path (`profile_ever_collected` true) runs
 `ipinfo.io` token served from `/api/config` (env var, see SECRETS.md) →
 `site.js loadGeo()` resolves `lat/lon/city` → sent on `survey_complete` →
 trigger stamps `Contact.Geo_*` and derives `Home_Airport__c` via
-`Skywave_Airports.nearest()` (haversine over all 29 network airports) →
+`Skywave_Airports.nearest()` (haversine over all 30 network airports) →
 `ResolveSession` injects "use <airport> as the default origin" into the survey
 summary the booking subagent reads. Coordinates also feed the demo-monitor
 globe. Silent no-op if the token is unset.

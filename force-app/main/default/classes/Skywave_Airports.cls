@@ -43,6 +43,7 @@ public with sharing class Skywave_Airports {
         new Airport('LHR', 'London', 'London Heathrow', 51.47, -0.45),
         new Airport('CDG', 'Paris', 'Paris Charles de Gaulle', 49.01, 2.55),
         new Airport('FCO', 'Rome', 'Rome Fiumicino', 41.80, 12.25),
+        new Airport('MUC', 'Munich', 'Munich Franz Josef Strauss', 48.35, 11.79),
         new Airport('HND', 'Tokyo', 'Tokyo Haneda', 35.55, 139.78),
         new Airport('BKK', 'Bangkok', 'Bangkok Suvarnabhumi', 13.69, 100.75),
         new Airport('SIN', 'Singapore', 'Singapore Changi', 1.36, 103.99),

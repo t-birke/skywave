@@ -157,7 +157,7 @@ All paths under `force-app/main/default/uiBundles/SkywaveGlobe/src/`.
 | `graphql.ts` | **UI API GraphQL helpers** — `queryEdges()` (run a uiapi query, return `edges[].node`), `v()` (unwrap `{ value }`), `sinceIso()`, `updateRecord()` (write via Data SDK `fetch` PATCH `/ui-api/records/{id}`). The data-access seam. |
 | `replayData.ts` | **GraphQL → timeline.** Queries Contact (+geo, +`ContactCardPicture__c` avatar, +`Skywave_Survey_Json__c`) and Booking_Segment→Flight via `queryEdges`; emits ordered `Demo_Event__e`-shaped entries by `CreatedDate`. |
 | `surveyImages.ts` | Loads the `Survey_Answer_Option__c` image map once (`<questionKey>:<answerKey>` → `Image_Url__c`) for the answer thumbnails. |
-| `airports.ts` | `AIRPORTS`: IATA → {city, lat, lon} for the 29-airport network. **Mirrors `Skywave_Airports.ALL` (Apex)** — keep in sync if the network changes. |
+| `airports.ts` | `AIRPORTS`: IATA → {city, lat, lon} for the 30-airport network. **Mirrors `Skywave_Airports.ALL` (Apex)** — keep in sync if the network changes. |
 
 ### UI (`pages/`, `components/`)
 | File | Role |

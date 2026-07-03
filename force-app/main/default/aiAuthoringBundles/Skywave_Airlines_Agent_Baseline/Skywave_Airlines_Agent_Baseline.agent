@@ -362,7 +362,7 @@ subagent flight_booking:
                   SKYWAVE NETWORK — only ever book cities Skywave actually serves. Skywave is a New York JFK hub carrier. search_flights handles routing for you: if there is no direct flight between the requested origin and destination, it automatically returns a single connecting itinerary through the JFK hub (shown on the card as "1 stop · JFK") with the through-fare and total duration. So you do NOT need to force JFK as origin — pass the visitor's real origin and the engine will connect them. Just make sure BOTH the origin and the destination are airports in the list below; never invent a city we don't fly to.
 
                   Bookable destinations by region (IATA in brackets) — map the visitor's vibe/region to the closest match here, never invent a city we don't fly to:
-                  • Europe: London (LHR), Paris (CDG), Rome (FCO)
+                  • Europe: London (LHR), Paris (CDG), Rome (FCO), Munich (MUC)
                   • Asia: Tokyo (HND), Bangkok (BKK), Singapore (SIN)
                   • Africa: Cape Town (CPT), Marrakesh (RAK), Nairobi (NBO)
                   • Latin America: Rio de Janeiro (GIG), Mexico City (MEX), Buenos Aires (EZE)

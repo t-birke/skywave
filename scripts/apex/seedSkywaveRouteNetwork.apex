@@ -51,13 +51,15 @@ List<List<Object>> routes = new List<List<Object>>{
     new List<Object>{ 'SW3024', 'JFK', 'PHX', 18, 320, 'Airbus A321neo', 300 },
 
     // ── DESTINATIONS: JFK -> world (2-3 per continent), with return ──────────
-    // EUROPE — London, Paris, Rome
+    // EUROPE — London, Paris, Rome, Munich
     new List<Object>{ 'SW4001', 'JFK', 'LHR', 21, 420, 'Boeing 777-300ER', 820 },
     new List<Object>{ 'SW4002', 'LHR', 'JFK', 11, 480, 'Boeing 777-300ER', 820 },
     new List<Object>{ 'SW4003', 'JFK', 'CDG', 20, 435, 'Boeing 777-300ER', 840 },
     new List<Object>{ 'SW4004', 'CDG', 'JFK', 11, 490, 'Boeing 777-300ER', 840 },
     new List<Object>{ 'SW4005', 'JFK', 'FCO', 19, 510, 'Boeing 787-9',     880 },
     new List<Object>{ 'SW4006', 'FCO', 'JFK', 10, 570, 'Boeing 787-9',     880 },
+    new List<Object>{ 'SW4033', 'JFK', 'MUC', 20, 480, 'Boeing 787-9',     860 },
+    new List<Object>{ 'SW4034', 'MUC', 'JFK', 10, 540, 'Boeing 787-9',     860 },
     // ASIA — Tokyo, Bangkok, Singapore
     new List<Object>{ 'SW4007', 'JFK', 'HND', 13, 825, 'Boeing 777-300ER', 1150 },
     new List<Object>{ 'SW4008', 'HND', 'JFK', 16, 780, 'Boeing 777-300ER', 1150 },

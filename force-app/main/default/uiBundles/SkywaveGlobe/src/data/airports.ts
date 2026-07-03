@@ -31,6 +31,7 @@ export const AIRPORTS: Record<string, Airport> = {
   LHR: { code: 'LHR', city: 'London', lat: 51.47, lon: -0.45 },
   CDG: { code: 'CDG', city: 'Paris', lat: 49.01, lon: 2.55 },
   FCO: { code: 'FCO', city: 'Rome', lat: 41.8, lon: 12.25 },
+  MUC: { code: 'MUC', city: 'Munich', lat: 48.35, lon: 11.79 },
   HND: { code: 'HND', city: 'Tokyo', lat: 35.55, lon: 139.78 },
   BKK: { code: 'BKK', city: 'Bangkok', lat: 13.69, lon: 100.75 },
   SIN: { code: 'SIN', city: 'Singapore', lat: 1.36, lon: 103.99 },
