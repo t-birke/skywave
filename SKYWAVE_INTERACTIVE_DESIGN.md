@@ -1131,6 +1131,50 @@ The parking lot above is for "deferred until demo is stable." This
 backlog is for "we shipped v1 of X but want a slicker v2 someday."
 Add items as they come up. Don't pre-prioritize.
 
+- **Dynamic network — kill the per-change agent + globe republish.**
+  The network changes often, and today every airport/route change
+  drags TWO republishes behind the Apex deploy + seed re-run: (1)
+  `sf agent publish` + activate + the mandatory `Skywave_MIAW` ESD
+  republish — because the "Bookable destinations by region" list is
+  hard-coded into the `.agent` instructions; and (2) a full
+  `scripts/deploy-globe.sh` (npm build with baked relay/consumer
+  origins + redeploy) — because `SkywaveGlobe/src/data/airports.ts`
+  is a compiled-in artifact. Worse, the network is DUPLICATED across
+  four places that must be hand-synced: `Skywave_Airports.ALL`
+  (Apex), `airports.ts` (globe), the `routes` list in
+  `seedSkywaveRouteNetwork.apex`, and both agent bundles' prose. So a
+  one-airport add (see MUC, 2026-07-03) is a 4-file edit + 4 deploy
+  actions. **Goal:** the agent and globe resolve the network at
+  RUNTIME from a single source of truth, so a network change is just
+  "deploy Apex + re-run seed" — no publish, no rebuild.
+    - **SSOT as data, not code.** Promote the airport list (code,
+      city, lat, lon) out of the Apex `ALL` literal into a queryable
+      store — a Custom Metadata Type (`Skywave_Airport__mdt`) or a
+      small `Airport__c` object. Then every consumer reads one live
+      source: Apex keeps a thin cached accessor, the globe queries it
+      via UI-API/GraphQL, the agent reads it via an action. Routes
+      already live as data (`Flight__c`); this does the same for the
+      airport geography, which today exists ONLY in Apex (not
+      queryable — that's the blocker for the globe).
+    - **Agent:** stop enumerating cities in the prompt. `search_flights`
+      already validates origin/destination against `Flight__c`, so it
+      can be the ONLY "do we fly there" gate — the instruction becomes
+      "if the engine returns no options, we don't serve it." To keep
+      the proactive vibe→city suggestion, add a `get_network` action
+      that returns the live airport list and have the planner ground
+      suggestions on that instead of the static region list. Removes
+      the ESD-republish beat entirely for network edits.
+    - **Globe:** fetch the geography at runtime instead of baking it.
+      The `Skywave_WebsiteAirports` REST endpoint
+      (`/services/apexrest/skywave/website/airports`) ALREADY serves
+      this exact list at runtime for the website autocomplete — proof
+      the pattern works; point the globe at that (or the SSOT store
+      above) and demote `airports.ts` to an offline fallback.
+  **DoD:** adding an MUC-style route touches only the SSOT store +
+  `seedSkywaveRouteNetwork.apex`; the agent and globe pick it up with
+  no `sf agent publish`/ESD republish and no globe rebuild. Collapses
+  the 4-way duplication to one runtime source.
+
 - **Testing Center UI tour for Chapter 8 (deferred from Phase 5).** The
   signed-off §6/Q1 plan had `skywave-extend-agent` also scaffold + run an
   `AiEvaluationDefinition` that surfaces in Agentforce Studio's Testing
