@@ -76,7 +76,7 @@ Contact), so each presenter's session has its own seat state.
 | ├ `triggers/` | 4 triggers (Demo_Session, Contact-update PE, phone-digits, VoiceCall resolve) |
 | ├ `lwc/` | Chat/voice cards (CLT renderers), demo monitor, survey author, contact card |
 | ├ `objects/` | Custom objects + the Platform Events + custom fields on Contact/VoiceCall |
-| ├ `uiBundles/SkywaveGlobe/` | **3D globe demo monitor** — React UIBundle (Salesforce Multi-Framework). Successor to the 2D `skywaveDemoMonitor`/`skywaveWorldMap` LWCs. See §3b'' and **`docs/GLOBE_MONITOR.md`**. Installed by **`install.sh` Tier 4** (`--with-globe`/`--all`): excluded from the Tier 1 blanket deploy (`.forceignore`), then built (relay URL baked in) + deployed with its app/permset/CSP. Needs the Multi-Framework app domain enabled in Setup first. Runs locally via `npm run dev`. |
+| ├ `uiBundles/SkywaveGlobe/` | **3D globe demo monitor** — React UIBundle (Salesforce Multi-Framework). Successor to the 2D `skywaveDemoMonitor`/`skywaveWorldMap` LWCs. See §3b'' and **`docs/GLOBE_MONITOR.md`**. Installed by **`install.sh` Tier 4** (`--with-globe`/`--all`); **any redeploy after a source change = `scripts/deploy-globe.sh`** (Tier 4 delegates to it — one source of truth). It's excluded from the Tier 1 blanket deploy (`.forceignore`), then built (relay + consumer origins baked in) + deployed with its app/permset/CSP. Needs the Multi-Framework app domain enabled in Setup first. Runs locally via `npm run dev`. |
 | `heroku/skywave-app/` | Node app: static consumer site + WebSocket state relay |
 | └ `public/assets/website.css/.js` | Skywave Airlines marketing-site backdrop (nav, hero, search, deals, footer). Visible to every audience phone behind the demo modal. Extensible target for future booking/account features. |
 | └ `public/assets/site.css/.js` | The demo flow itself. Renders into a centered modal (`#modal-content`) overlaid on the website backdrop. Modal is hidden during agent stages so the chat icon takes over. Closable any time via X. |
@@ -511,7 +511,11 @@ inconspicuous **seat-capability toggle** (the corner dot that flips
 click and hides to a "QR" pill, encoding `<consumer-site>/?ds=<activeSessionId>`
 so phones join scoped to the presenter's session. The consumer-site origin is
 derived from `VITE_RELAY_WS_URL` (same Heroku app serves the site + relay WS;
-see `lib/consumerSite.ts`), so no extra build env is needed.
+see `lib/consumerSite.ts`) unless `VITE_CONSUMER_SITE_URL` overrides it with a
+custom domain. Beside the QR sits a **call-in overlay**
+(`components/CallJoinOverlay.tsx`) — a phone-icon-only button that reveals the
+Skywave voice-agent number on click, so the audience can *scan to join* or
+*call to join*.
 
 Both paths fold through one shared reducer (`visitorReducer.ts`) so live and
 replay look identical. **Reads/writes** (replay, survey images, seat toggle)
@@ -526,10 +530,17 @@ reads/writes verified in-org via GraphQL. (Also exercised in a `sitest` sandbox
 during development, but prod is the only deployment target.) **Installed by
 `install.sh` Tier 4** (`--with-globe`/`--all`): it's excluded from the Tier 1
 blanket deploy via a `.forceignore` block (so Tier 1 never ships an unbuilt
-bundle or an app that references a missing bundle), then Tier 4 builds it
-(`npm run build` with `VITE_RELAY_WS_URL` from the resolved relay origin) and
+bundle or an app that references a missing bundle), then Tier 4 builds it and
 deploys the bundle + app + permset + CSP together (temporarily neutralizing that
-`.forceignore` block, then restoring it). The App-Launcher tile icon is a
+`.forceignore` block, then restoring it). **Both the build+deploy mechanics live
+in `scripts/deploy-globe.sh`** — Tier 4 delegates to it, and it's also the
+standalone redeploy command for any source change. The build **bakes two
+org-specific origins** into the JS: `VITE_RELAY_WS_URL` (live-feed relay) and
+`VITE_CONSUMER_SITE_URL` (the join-QR origin — a custom domain like
+`app.skywave.flights`, CORS-gated). A plain `npm run build` with no env silently
+drops both (dead feed + 403'd QR), so **always redeploy via the script**, which
+resolves the origins (explicit env → live Heroku → cached state → derive), caches
+them to `.deploy-tmp/install-state.env`, and bakes them in. The App-Launcher tile icon is a
 `Skywave_Globe_Icon` **ContentAsset** (`contentassets/`, a 128×128 PNG shipped as
 a `.asset` content file) referenced by the app's `<brand><logo>`; it is *not*
 in the `.forceignore` block, so Tier 1 already lands it — Tier 4 re-includes it

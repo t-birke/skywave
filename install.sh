@@ -1309,61 +1309,33 @@ tier4_globe() {
         done_mark 4.0
     fi
 
-    # ── 4.1 Build the bundle with the relay URL baked in ─────────────────────
+    # ── 4.1 Build the bundle with the relay + consumer origins baked in ──────
+    # Delegates to scripts/deploy-globe.sh — the single source of truth for the
+    # globe build+deploy mechanics (so this path and a standalone redeploy never
+    # drift). install.sh resolves the origins (Heroku-first, persisted to state)
+    # and passes them in verbatim; the script's own resolution is the standalone
+    # fallback. The join-QR must point phones at the PUBLIC origin (custom domain
+    # if one fronts the dyno), NOT the raw Heroku host — else the CORS gate 403s
+    # the survey/identity rail.
     if section 4.1; then
         say "4.1 Build the UIBundle"
         resolve_heroku_origin; resolve_public_site_url
-        local ws="${SKYWAVE_HEROKU_ORIGIN/https:/wss:}/ws/monitor"
-        info "VITE_RELAY_WS_URL=${ws}"
-        # The join-QR must point phones at the PUBLIC origin (custom domain if
-        # one fronts the dyno), NOT the raw Heroku host — else phones land on an
-        # origin the CORS gate rejects and the survey/identity rail breaks. Bake
-        # it in so consumerSite.ts stops falling back to the relay host.
-        info "VITE_CONSUMER_SITE_URL=${SKYWAVE_PUBLIC_SITE_URL}"
-        ( cd "$GLOBE_DIR" \
-            && { [ -d node_modules ] || npm ci 2>/dev/null || npm install; } \
-            && VITE_RELAY_WS_URL="$ws" VITE_CONSUMER_SITE_URL="$SKYWAVE_PUBLIC_SITE_URL" npm run build ) \
-            && ok "bundle built (dist/)" \
+        VITE_RELAY_WS_URL="${SKYWAVE_HEROKU_ORIGIN/https:/wss:}/ws/monitor" \
+        VITE_CONSUMER_SITE_URL="$SKYWAVE_PUBLIC_SITE_URL" \
+        ORG_ALIAS="$ORG_ALIAS" HEROKU_APP="$HEROKU_APP" \
+            scripts/deploy-globe.sh build \
             || die "globe build failed — check $GLOBE_DIR (npm install / npm run build)"
-        [ -f "$GLOBE_DIR/dist/index.html" ] || die "no dist/index.html after build"
         done_mark 4.1
     fi
 
     # ── 4.2 Deploy the globe set ─────────────────────────────────────────────
-    # The globe set (bundle + app + permset + CSP) is excluded from Tier 1 by a
-    # block in the root .forceignore. .forceignore is honored even on explicit
-    # --source-dir deploys, so we temporarily neutralize JUST that block for this
-    # one deploy, then always restore it (trap). node_modules stays excluded by
-    # the bundle's OWN .forceignore, so the payload stays small.
+    # Delegates to scripts/deploy-globe.sh, which owns the .forceignore dance
+    # (the globe set is excluded from Tier 1's blanket deploy) and the exact
+    # --source-dir list — one place, so a standalone redeploy can't drift.
     if section 4.2; then
         say "4.2 Deploy globe bundle + app + icon + permset + CSP"
-        local fi=".forceignore" fibak; fibak="$(mktemp)"
-        cp "$fi" "$fibak"
-        # Restore .forceignore on RETURN *and* EXIT — `die` calls exit (not a
-        # function return), so a RETURN-only trap leaves the globe block stripped
-        # from .forceignore if the deploy fails (it did, before this fix).
-        # shellcheck disable=SC2064
-        trap "cp '$fibak' '$fi'; rm -f '$fibak'" RETURN EXIT
-        FI="$fi" python3 - <<'PYEOF'
-import os
-p = os.environ['FI']; lines = open(p).read().splitlines(); out=[]; skip=False
-for l in lines:
-    if 'Globe demo monitor (UIBundle)' in l: skip=True            # start of the globe block
-    if skip and l.strip()=='': skip=False; continue               # blank line ends it
-    if skip: continue
-    out.append(l)
-open(p,'w').write('\n'.join(out)+'\n')
-PYEOF
-        sf project deploy start --target-org "$ORG_ALIAS" \
-            --source-dir "$GLOBE_DIR" \
-            --source-dir force-app/main/default/applications/Skywave_Globe.app-meta.xml \
-            --source-dir force-app/main/default/contentassets/Skywave_Globe_Icon.asset-meta.xml \
-            --source-dir force-app/main/default/permissionsets/Skywave_Globe_App.permissionset-meta.xml \
-            --source-dir force-app/main/default/cspTrustedSites/Skywave_Globe_Relay_Wss.cspTrustedSite-meta.xml \
-            --ignore-conflicts --wait 30 --concise \
-            && ok "globe deployed (bundle + app + icon + permset + CSP)" \
+        ORG_ALIAS="$ORG_ALIAS" scripts/deploy-globe.sh deploy \
             || die "globe deploy failed — if it says 'Agentforce Vibe for MultiFramework feature gate is disabled', enable that feature in Setup (§4.0), then --resume."
-        cp "$fibak" "$fi"; rm -f "$fibak"; trap - RETURN EXIT
         done_mark 4.2
     fi
 

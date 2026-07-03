@@ -50,6 +50,39 @@ relay `wss://…/ws/monitor` WebSocket used in-org (no proxy); point dev at a
 different relay via `VITE_RELAY_WS_URL`. Override the org with
 `SKYWAVE_ORG=<alias> npm run dev`.
 
+## 0b. Deploy / redeploy to the org — ONE command
+
+After any source change (a component edit, a new overlay, …), redeploy the
+in-org globe with the single source of truth:
+
+```bash
+scripts/deploy-globe.sh          # resolve origins → build → deploy → assign permset
+# subcommands: `build` (build only) · `deploy` (deploy the built dist only)
+# override target: ORG_ALIAS=<alias> scripts/deploy-globe.sh
+```
+
+`install.sh` Tier 4 (`--with-globe`/`--all`) delegates to this same script, so
+the fresh-install path and a one-off redeploy can never drift.
+
+> ⚠️ **NEVER `npm run build` the globe by hand to deploy it.** The globe is a
+> **built artifact**: the build bakes two org-specific origins into the JS —
+> `VITE_RELAY_WS_URL` (live-feed relay) and `VITE_CONSUMER_SITE_URL` (the origin
+> the **join-QR** encodes). A plain build with no env **silently drops both** →
+> the live feed dies and the QR points phones at the wrong origin (CORS 403 →
+> survey re-runs, identity splits — see ARCHITECTURE.md §3b'' and the QR/CORS
+> note). `deploy-globe.sh` resolves those origins (explicit env → live Heroku →
+> cached `.deploy-tmp/install-state.env` → derive-from-relay), **caches them to
+> the state file**, bakes them in, and runs the `.forceignore`-safe deploy of
+> the whole set (bundle + app + icon + permset + CSP).
+>
+> **Origins after an org/dyno refresh change** (the relay host is per-dyno).
+> With `heroku login` active the script re-resolves live and refreshes the
+> cache. Offline, it uses the cached values and **warns** — if the org was just
+> recreated, pass `VITE_RELAY_WS_URL=… VITE_CONSUMER_SITE_URL=… scripts/deploy-globe.sh`
+> or log into Heroku first. Current `si` values: relay
+> `wss://skywave-app-<dyno>.herokuapp.com/ws/monitor`, consumer
+> `https://app.skywave.flights` (custom domain — must be preserved).
+
 **Seeing nothing?** That's expected with no live activity. Click a replay preset
 (**6H / 24H / 7D / 30D**) in the top-left HUD to replay that window from records
 (deterministic — always shows data if any exists). Pick a window wide enough to
