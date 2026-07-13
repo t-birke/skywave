@@ -6,7 +6,9 @@
  *     whenever the active session changes (so the QR always points phones at
  *     THIS presenter's tenant);
  *   - enlarge: click the card to zoom it to a centred fullscreen-ish size, click
- *     again to shrink back to the bottom-right corner;
+ *     again to shrink back to the bottom-right corner; when enlarged, a small
+ *     grey selectable URL strip appears under the code so the presenter can
+ *     mark + copy the site address and open it directly in a browser;
  *   - hide: a small × dismisses it to an inconspicuous "QR" pill that re-opens it.
  *
  * Sizing/animation mirror the LWC CSS (18vh corner → 75vh centred, 0.3s ease).
@@ -114,7 +116,7 @@ export function QrJoinOverlay({ sessionId }: QrJoinOverlayProps) {
           fgColor="#0b1d3a"
           bgColor="#ffffff"
           marginSize={2}
-          style={{ width: '88%', height: '88%' }}
+          style={{ width: '88%', height: enlarged ? '82%' : '88%' }}
         />
       ) : (
         <div
@@ -128,6 +130,36 @@ export function QrJoinOverlay({ sessionId }: QrJoinOverlayProps) {
           }}
         >
           No active demo session — activate one in Demo Home to generate a join QR.
+        </div>
+      )}
+
+      {/* Enlarged only: a small grey, selectable URL strip so the presenter can
+          mark + copy the site address to open it directly in a browser instead
+          of scanning. stopPropagation so selecting the text doesn't also toggle
+          the enlarge/shrink click on the card. */}
+      {enlarged && url && (
+        <div
+          onClick={e => e.stopPropagation()}
+          title="Select and copy to open the site in a browser"
+          style={{
+            position: 'absolute',
+            bottom: 10,
+            left: 0,
+            right: 0,
+            textAlign: 'center',
+            padding: '0 12px',
+            color: '#8a97a8',
+            fontFamily: 'monospace',
+            fontSize: 13,
+            lineHeight: 1.3,
+            userSelect: 'all',
+            cursor: 'text',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {url}
         </div>
       )}
     </div>
