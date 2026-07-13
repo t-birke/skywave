@@ -10,7 +10,10 @@
  *   - their bookings, each with its single segment's current seat,
  *
  * The seat map is cosmetic, so the agent invents sensible seat codes for the
- * offer; only the chosen seat is persisted, via Skywave_ChangeSeat.
+ * offer (each booking carries its fareClass so the offer stays in-cabin);
+ * only the chosen seat is persisted, via Skywave_ChangeSeat — which routes
+ * through Skywave_BookingEngine and snaps any out-of-cabin seat back into
+ * the booked class, so an invented Economy seat can't land a First flyer.
  *
  * Read-only. Returns a compact JSON envelope the agent reasons over.
  */
@@ -35,7 +38,7 @@ public with sharing class Skywave_GetSeatContext {
             description='Number of active bookings (0 / 1 / N).')
         public Integer bookingCount;
         @InvocableVariable(label='bookings JSON'
-            description='Compact JSON list of bookings: code, flightNumber, route, travelDate, currentSeat, segmentId.')
+            description='Compact JSON list of bookings: code, fareClass, flightNumber, route, travelDate, currentSeat, segmentId.')
         public String bookingsJson;
     }
 
@@ -71,7 +74,7 @@ public with sharing class Skywave_GetSeatContext {
 
             List<Map<String, Object>> bookings = new List<Map<String, Object>>();
             for (Booking__c b : [
-                SELECT Id, Confirmation_Code__c,
+                SELECT Id, Confirmation_Code__c, Fare_Class__c,
                        (SELECT Id, Seat_Number__c, Flight__r.Flight_Number__c,
                                Flight__r.Origin__c, Flight__r.Destination__c, Travel_Date__c
                         FROM Booking_Segments__r
@@ -85,6 +88,7 @@ public with sharing class Skywave_GetSeatContext {
                     bookings.add(new Map<String, Object>{
                         'code' => b.Confirmation_Code__c,
                         'segmentId' => seg.Id,
+                        'fareClass' => b.Fare_Class__c,
                         'flightNumber' => seg.Flight__r != null ? seg.Flight__r.Flight_Number__c : null,
                         'route' => (seg.Flight__r != null)
                             ? seg.Flight__r.Origin__c + '-' + seg.Flight__r.Destination__c : null,

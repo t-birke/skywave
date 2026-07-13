@@ -264,10 +264,12 @@ public inherited sharing class Skywave_BookingEngine {
         if (!isValidSeatFormat(newSeat)) { r.errorCode = 'invalid_seat_format'; return r; }
 
         List<Booking_Segment__c> segs = [
-            SELECT Id, Seat_Number__c, Segment_Order__c,
+            SELECT Id, Seat_Number__c, Segment_Order__c, Flight__c,
                    Booking__r.Id, Booking__r.Confirmation_Code__c, Booking__r.Status__c,
+                   Booking__r.Fare_Class__c,
                    Booking__r.Contact__r.Session_Id__c,
                    Booking__r.Contact__r.Demo_Session__c,
+                   Flight__r.Aircraft__c, Flight__r.Aircraft_Type__c,
                    Flight__r.Flight_Number__c
             FROM Booking_Segment__c
             WHERE Id = :segmentId
@@ -275,6 +277,14 @@ public inherited sharing class Skywave_BookingEngine {
         ];
         if (segs.isEmpty()) { r.errorCode = 'segment_not_found'; return r; }
         Booking_Segment__c seg = segs[0];
+
+        // Cabin enforcement — single source of truth for every seat-change
+        // caller (chat seatmap LWC, website REST, and the voice agent, which
+        // invents a seat code with no knowledge of the booked cabin). If the
+        // requested row falls outside the booked fare class's zone for this
+        // aircraft, snap it to a class-correct seat rather than persisting an
+        // out-of-cabin string (e.g. a First passenger handed "8A").
+        newSeat = enforceCabin(seg, newSeat);
 
         // Synthesize a thin Booking shell carrying the fields updateSeatRow
         // needs (id + code + monitor identifiers). We don't re-query the
@@ -442,6 +452,44 @@ public inherited sharing class Skywave_BookingEngine {
             }
         }
         return out;
+    }
+
+    /**
+     * Ensure a requested seat sits inside the booked cabin for this
+     * segment's aircraft. Returns the seat unchanged when it's already in
+     * zone (or when the zone can't be resolved — fail open, don't block a
+     * seat change). Otherwise returns a fresh class-correct seat that keeps
+     * the requested column letter's preference (window/aisle) where possible.
+     */
+    private static String enforceCabin(Booking_Segment__c seg, String requestedSeat) {
+        if (seg.Flight__r == null || seg.Booking__r == null) return requestedSeat;
+        ClassZone zone = resolveZoneForFlight(
+            seg.Flight__r, Skywave_FareClass.normalizeOrDefault(seg.Booking__r.Fare_Class__c));
+        if (zone == null) return requestedSeat;
+
+        Integer row = seatRow(requestedSeat);
+        if (row != null && row >= zone.rowStart && row <= zone.rowEnd) {
+            return requestedSeat;  // already in cabin
+        }
+        // Out of cabin — snap into the zone, honouring window/aisle if the
+        // requested letter hints at one.
+        String letter = seatLetter(requestedSeat);
+        String pref = (letter != null && zone.windowLetters.contains(letter)) ? 'Window'
+                    : (letter != null && zone.aisleLetters.contains(letter)) ? 'Aisle'
+                    : null;
+        return pickSeat(zone, pref);
+    }
+
+    private static Integer seatRow(String seat) {
+        if (String.isBlank(seat)) return null;
+        Matcher m = Pattern.compile('^(\\d{1,2})[A-Za-z]$').matcher(seat.trim());
+        return m.matches() ? Integer.valueOf(m.group(1)) : null;
+    }
+
+    private static String seatLetter(String seat) {
+        if (String.isBlank(seat)) return null;
+        Matcher m = Pattern.compile('^\\d{1,2}([A-Za-z])$').matcher(seat.trim());
+        return m.matches() ? m.group(1).toUpperCase() : null;
     }
 
     private static ClassZone resolveZoneForFlight(Flight__c f, String fareClass) {
