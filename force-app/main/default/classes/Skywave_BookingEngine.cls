@@ -427,7 +427,7 @@ public inherited sharing class Skywave_BookingEngine {
             FROM Skywave_Seat_Map__c
             WHERE Aircraft_Type__c IN :productIds
         ]) {
-            ClassZone z = parseZone(sm.Layout_Json__c, canonicalFareClass);
+            ClassZone z = zoneFor(sm.Layout_Json__c, canonicalFareClass);
             if (z != null) zoneByProduct.put(sm.Aircraft_Type__c, z);
         }
 
@@ -460,7 +460,70 @@ public inherited sharing class Skywave_BookingEngine {
             WHERE Aircraft_Type__c = :productId LIMIT 1
         ];
         if (sms.isEmpty()) return null;
-        return parseZone(sms[0].Layout_Json__c, fareClass);
+        return zoneFor(sms[0].Layout_Json__c, fareClass);
+    }
+
+    /**
+     * Cabin hierarchy, lowest → highest. Used to degrade a booked class
+     * to the nearest cabin that actually exists in a given aircraft's
+     * layout — so a connecting itinerary whose spoke leg flies a
+     * narrow-body without (say) a First cabin still seats the passenger
+     * in the front of that aircraft rather than dropping them into a
+     * generic Economy row (the old zone==null fallback in pickSeat).
+     */
+    private static final List<String> CLASS_RANK = new List<String>{
+        Skywave_FareClass.ECONOMY,
+        Skywave_FareClass.PREMIUM_ECONOMY,
+        Skywave_FareClass.BUSINESS,
+        Skywave_FareClass.FIRST
+    };
+
+    /**
+     * Resolve the booked class to a zone in this layout, tolerating a
+     * layout that doesn't offer that exact class. Exact match wins;
+     * otherwise the booked class is mapped to the nearest cabin present
+     * by rank, tie-breaking UPWARD so a missing premium cabin degrades
+     * to the next cabin above the gap rather than falling to Economy.
+     */
+    private static ClassZone zoneFor(String layoutJson, String fareClass) {
+        String resolved = resolveClassName(classNamesIn(layoutJson), fareClass);
+        if (resolved == null) return null;
+        return parseZone(layoutJson, resolved);
+    }
+
+    private static List<String> classNamesIn(String layoutJson) {
+        List<String> names = new List<String>();
+        try {
+            Map<String, Object> root = (Map<String, Object>) JSON.deserializeUntyped(layoutJson);
+            for (Object c : (List<Object>) root.get('classes')) {
+                names.add(String.valueOf(((Map<String, Object>) c).get('name')));
+            }
+        } catch (Exception e) {
+            System.debug('classNamesIn error: ' + e.getMessage());
+        }
+        return names;
+    }
+
+    private static String resolveClassName(List<String> available, String fareClass) {
+        if (available.isEmpty()) return null;
+        if (available.contains(fareClass)) return fareClass;
+        Integer want = CLASS_RANK.indexOf(fareClass);
+        if (want < 0) return null;
+        String best = null;
+        Integer bestDist = null;
+        for (String name : available) {
+            Integer rank = CLASS_RANK.indexOf(name);
+            if (rank < 0) continue;
+            Integer dist = Math.abs(rank - want);
+            // Nearest cabin wins; on a tie prefer the higher cabin so
+            // premium bookings never silently degrade to Economy.
+            if (bestDist == null || dist < bestDist
+                || (dist == bestDist && rank > CLASS_RANK.indexOf(best))) {
+                best = name;
+                bestDist = dist;
+            }
+        }
+        return best;
     }
 
     public static ClassZone parseZone(String layoutJson, String fareClass) {
