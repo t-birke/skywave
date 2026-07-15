@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Sourcing Request</label>
+    <pluralLabel>Sourcing Requests</pluralLabel>
+    <description>MOCK: one row per strategic-sourcing / seasonal purchasing initiative. Creating a record launches the Skywave Sourcing Flow Orchestration; the orchestration's interactive (human) steps attach their work items to this record. Demo/stub object.</description>
+    <nameField>
+        <label>Sourcing Request Number</label>
+        <type>AutoNumber</type>
+        <displayFormat>SRC-{0000}</displayFormat>
+        <startingNumber>1</startingNumber>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ReadWrite</sharingModel>
+    <visibility>Public</visibility>
+    <enableSearch>true</enableSearch>
+    <enableReports>true</enableReports>
+    <enableActivities>true</enableActivities>
+    <enableHistory>false</enableHistory>
+</CustomObject>

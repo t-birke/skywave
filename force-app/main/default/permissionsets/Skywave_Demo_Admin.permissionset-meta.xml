@@ -52,6 +52,15 @@
         <visible>true</visible>
     </applicationVisibilities>
     <objectPermissions>
+        <object>Sourcing_Request__c</object>
+        <allowCreate>true</allowCreate>
+        <allowDelete>true</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>true</modifyAllRecords>
+        <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
+    <objectPermissions>
         <object>Booking_Segment__c</object>
         <allowCreate>true</allowCreate>
         <allowDelete>true</allowDelete>
@@ -126,6 +135,21 @@
     <fieldPermissions>
         <editable>true</editable>
         <field>Booking_Segment__c.Seat_Number__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Sourcing_Request__c.Category__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Sourcing_Request__c.Season__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Sourcing_Request__c.Status__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>

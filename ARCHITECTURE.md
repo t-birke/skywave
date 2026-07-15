@@ -76,6 +76,8 @@ Contact), so each presenter's session has its own seat state.
 | ├ `triggers/` | 4 triggers (Demo_Session, Contact-update PE, phone-digits, VoiceCall resolve) |
 | ├ `lwc/` | Chat/voice cards (CLT renderers), demo monitor, survey author, contact card |
 | ├ `objects/` | Custom objects + the Platform Events + custom fields on Contact/VoiceCall |
+| ├ `flows/` | **`Skywave_Sourcing`** — a mock Flow *Orchestration* (`processType=Orchestrator`) showcasing a complex sourcing/purchasing pipeline, plus its 7 stub subflows. Record-triggered on `Sourcing_Request__c`. Two AI hand-offs: a prompt-template step + an Agentforce-agent step. See §3h and `flows/README_Sourcing.md`. Standalone demo — not wired to the live audience flow. |
+| ├ `genAiPromptTemplates/` | `Skywave_Sourcing_RFP_Draft` — the prompt template the sourcing orchestration hands over to (§3h) |
 | ├ `uiBundles/SkywaveGlobe/` | **3D globe demo monitor** — React UIBundle (Salesforce Multi-Framework). Successor to the 2D `skywaveDemoMonitor`/`skywaveWorldMap` LWCs. See §3b'' and **`docs/GLOBE_MONITOR.md`**. Installed by **`install.sh` Tier 4** (`--with-globe`/`--all`); **any redeploy after a source change = `scripts/deploy-globe.sh`** (Tier 4 delegates to it — one source of truth). It's excluded from the Tier 1 blanket deploy (`.forceignore`), then built (relay + consumer origins baked in) + deployed with its app/permset/CSP. Needs the Multi-Framework app domain enabled in Setup first. Runs locally via `npm run dev`. |
 | `heroku/skywave-app/` | Node app: static consumer site + WebSocket state relay |
 | └ `public/assets/website.css/.js` | Skywave Airlines marketing-site backdrop (nav, hero, search, deals, footer). Visible to every audience phone behind the demo modal. Extensible target for future booking/account features. |
@@ -1062,6 +1064,30 @@ site carry a `%%SKYWAVE_HEROKU_ORIGIN%%` placeholder (sfdx-project.json
 a CMD — the globe `wss://` CspTrustedSite and the ESW iframe whitelist —
 wildcard `*.herokuapp.com` instead. The globe UIBundle bakes its relay URL at
 build via `VITE_RELAY_WS_URL` (no default; see its README).
+
+### 3h. Sourcing orchestration (mock Flow Orchestrator demo)
+
+A **standalone** demo — not part of the live audience flow — showing what a complex
+strategic-purchasing process looks like as a Flow **Orchestration** (`processType =
+Orchestrator`). Lives in `flows/`, documented in `flows/README_Sourcing.md`.
+
+- **Launch:** record-triggered on the mock `Sourcing_Request__c` object
+  (`recordTriggerType=Create`, `RecordAfterSave`). Creating a request starts a run;
+  `$Record` is the context record threaded into every step.
+- **Shape:** 5 stages / 7 steps mixing `stepBackground` and `stepInteractive`, with data
+  threaded stage-to-stage (`Step_<Name>.Outputs.<var>`) and an entry-condition gate on the
+  final contract step (only runs when the approval decision = `Approved`). Every step calls
+  a **stub subflow** returning deterministic placeholder data — nothing external.
+- **The two AI hand-offs** (the point of the demo): the *Draft RFP* step hands to a
+  **prompt template** (`generatePromptResponse` → `Skywave_Sourcing_RFP_Draft`), and the
+  *Negotiate* step hands to the existing **Agentforce agent** (`generateAiAgentResponse` →
+  `Skywave_Airlines_Agent`). Each wraps its AI call in a fault path that falls back to mock
+  text so the run completes even if the agent/template is unavailable.
+- **Two gotchas that cost activation** (both now encoded in source): interactive steps
+  *require a context record* — each maps `ActionInput__RecordId` → `$Record.Id`, else
+  activation fails with *"A context record is required for interactive steps"*; and the
+  prompt template must be **Published** with a top-level `<activeVersionIdentifier>` or it
+  exposes no invocable action, leaving the Draft-RFP subflow `InvalidDraft`.
 
 ---
 

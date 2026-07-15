@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>63.0</apiVersion>
+    <description>STUB (mock): Sourcing pipeline — Step 1 of 7. Builds the seasonal demand forecast by rolling up the active operating schedule into estimated demand units per category, per route, per period. In a real build this would query the operational objects and write a forecast record; here it returns deterministic mock totals so the orchestration is runnable end-to-end.</description>
+    <environments>Default</environments>
+    <interviewLabel>Sourcing Demand Forecast {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Skywave Sourcing - Demand Forecast</label>
+    <processType>AutoLaunchedFlow</processType>
+    <assignments>
+        <name>Compute_Forecast</name>
+        <label>Compute Forecast (mock)</label>
+        <locationX>176</locationX>
+        <locationY>158</locationY>
+        <assignmentItems>
+            <assignToReference>out_EstimatedUnits</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <numberValue>4820000.0</numberValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>out_RouteCount</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <numberValue>212.0</numberValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>out_ForecastSummary</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Mock forecast for season {!inp_Season}: ~4.82M demand units across 212 routes (Tier A 74%, Tier B 15%, Tier C 9%, Tier D 2%). Peak demand Jul–Aug on long-haul routes.</stringValue>
+            </value>
+        </assignmentItems>
+    </assignments>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Compute_Forecast</targetReference>
+        </connector>
+    </start>
+    <status>Active</status>
+    <variables>
+        <name>inp_Season</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <name>out_EstimatedUnits</name>
+        <dataType>Number</dataType>
+        <scale>0</scale>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>true</isOutput>
+    </variables>
+    <variables>
+        <name>out_RouteCount</name>
+        <dataType>Number</dataType>
+        <scale>0</scale>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>true</isOutput>
+    </variables>
+    <variables>
+        <name>out_ForecastSummary</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>true</isOutput>
+    </variables>
+</Flow>

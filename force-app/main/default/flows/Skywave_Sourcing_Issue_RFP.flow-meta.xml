@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>63.0</apiVersion>
+    <description>STUB (mock): Sourcing pipeline — Step 3 of 7. INTERACTIVE screen step: the Category Manager reviews the AI-drafted RFP and decides whether to release it to the supplier panel. Returns the release decision to the orchestration.</description>
+    <environments>Default</environments>
+    <interviewLabel>Sourcing Issue RFP {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Skywave Sourcing - Issue RFP (Review)</label>
+    <processType>Flow</processType>
+    <screens>
+        <name>Review_And_Release</name>
+        <label>Review and Release RFP</label>
+        <locationX>176</locationX>
+        <locationY>158</locationY>
+        <allowBack>true</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>true</allowPause>
+        <fields>
+            <name>Intro_Text</name>
+            <fieldText>&lt;p&gt;&lt;b&gt;Category Manager review.&lt;/b&gt; Review the AI-generated RFP below for season &lt;b&gt;{!inp_Season}&lt;/b&gt; before releasing it to the approved supplier panel.&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <fields>
+            <name>Rfp_Preview</name>
+            <fieldText>{!inp_RfpDocument}</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <fields>
+            <name>Release_Decision</name>
+            <choiceReferences>Choice_Release</choiceReferences>
+            <choiceReferences>Choice_Revise</choiceReferences>
+            <dataType>String</dataType>
+            <fieldText>Decision</fieldText>
+            <fieldType>RadioButtons</fieldType>
+            <isRequired>true</isRequired>
+        </fields>
+        <showFooter>true</showFooter>
+        <showHeader>true</showHeader>
+        <connector>
+            <targetReference>Set_Decision</targetReference>
+        </connector>
+    </screens>
+    <assignments>
+        <name>Set_Decision</name>
+        <label>Set Decision</label>
+        <locationX>176</locationX>
+        <locationY>278</locationY>
+        <assignmentItems>
+            <assignToReference>out_ReleaseDecision</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>Release_Decision</elementReference>
+            </value>
+        </assignmentItems>
+    </assignments>
+    <choices>
+        <name>Choice_Release</name>
+        <choiceText>Release RFP to supplier panel</choiceText>
+        <dataType>String</dataType>
+        <value>
+            <stringValue>Released</stringValue>
+        </value>
+    </choices>
+    <choices>
+        <name>Choice_Revise</name>
+        <choiceText>Send back for revision</choiceText>
+        <dataType>String</dataType>
+        <value>
+            <stringValue>Revise</stringValue>
+        </value>
+    </choices>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Review_And_Release</targetReference>
+        </connector>
+    </start>
+    <status>Active</status>
+    <variables>
+        <name>inp_Season</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <name>inp_RfpDocument</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <name>out_ReleaseDecision</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>true</isOutput>
+    </variables>
+</Flow>

@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>63.0</apiVersion>
+    <description>STUB (mock): Sourcing pipeline — Step 4 of 7. Background step: scores the bids returned by the supplier panel on a weighted matrix (price 40%, quality 25%, sustainability 20%, service level 15%) and returns the leading supplier plus the shortlist. Deterministic mock output.</description>
+    <environments>Default</environments>
+    <interviewLabel>Sourcing Evaluate Bids {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Skywave Sourcing - Evaluate Bids</label>
+    <processType>AutoLaunchedFlow</processType>
+    <assignments>
+        <name>Score_Bids</name>
+        <label>Score Bids (mock)</label>
+        <locationX>176</locationX>
+        <locationY>158</locationY>
+        <assignmentItems>
+            <assignToReference>out_LeadingSupplier</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Meridian Supply Partners Ltd.</stringValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>out_LeadingScore</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <numberValue>87.4</numberValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>out_Shortlist</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>1. Meridian Supply Partners Ltd. (87.4) — best price/sustainability blend. 2. Continental Sourcing Group (84.1) — strongest quality record. 3. Vantage Procurement Partners (79.6) — lowest unit price but weaker service-level history.</stringValue>
+            </value>
+        </assignmentItems>
+    </assignments>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Score_Bids</targetReference>
+        </connector>
+    </start>
+    <status>Active</status>
+    <variables>
+        <name>inp_Season</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <name>out_LeadingSupplier</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>true</isOutput>
+    </variables>
+    <variables>
+        <name>out_LeadingScore</name>
+        <dataType>Number</dataType>
+        <scale>1</scale>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>true</isOutput>
+    </variables>
+    <variables>
+        <name>out_Shortlist</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>true</isOutput>
+    </variables>
+</Flow>

@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>63.0</apiVersion>
+    <description>STUB (mock): Sourcing pipeline — Step 6 of 7. INTERACTIVE screen step: the Procurement Director reviews the negotiated terms and the bid shortlist, then approves or rejects the award. Returns the approval decision.</description>
+    <environments>Default</environments>
+    <interviewLabel>Sourcing Award Approval {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Skywave Sourcing - Award Approval</label>
+    <processType>Flow</processType>
+    <screens>
+        <name>Approve_Award</name>
+        <label>Approve Sourcing Award</label>
+        <locationX>176</locationX>
+        <locationY>158</locationY>
+        <allowBack>true</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>true</allowPause>
+        <fields>
+            <name>Award_Header</name>
+            <fieldText>&lt;p&gt;&lt;b&gt;Procurement Director approval&lt;/b&gt; — season {!inp_Season}.&lt;/p&gt;&lt;p&gt;Recommended award: &lt;b&gt;{!inp_LeadingSupplier}&lt;/b&gt;.&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <fields>
+            <name>Negotiation_Text</name>
+            <fieldText>{!inp_NegotiationSummary}</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <fields>
+            <name>Approval_Decision</name>
+            <choiceReferences>Choice_Approve</choiceReferences>
+            <choiceReferences>Choice_Reject</choiceReferences>
+            <dataType>String</dataType>
+            <fieldText>Award decision</fieldText>
+            <fieldType>RadioButtons</fieldType>
+            <isRequired>true</isRequired>
+        </fields>
+        <showFooter>true</showFooter>
+        <showHeader>true</showHeader>
+        <connector>
+            <targetReference>Set_Approval</targetReference>
+        </connector>
+    </screens>
+    <assignments>
+        <name>Set_Approval</name>
+        <label>Set Approval</label>
+        <locationX>176</locationX>
+        <locationY>278</locationY>
+        <assignmentItems>
+            <assignToReference>out_ApprovalDecision</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>Approval_Decision</elementReference>
+            </value>
+        </assignmentItems>
+    </assignments>
+    <choices>
+        <name>Choice_Approve</name>
+        <choiceText>Approve and award contract</choiceText>
+        <dataType>String</dataType>
+        <value>
+            <stringValue>Approved</stringValue>
+        </value>
+    </choices>
+    <choices>
+        <name>Choice_Reject</name>
+        <choiceText>Reject — re-open negotiation</choiceText>
+        <dataType>String</dataType>
+        <value>
+            <stringValue>Rejected</stringValue>
+        </value>
+    </choices>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Approve_Award</targetReference>
+        </connector>
+    </start>
+    <status>Active</status>
+    <variables>
+        <name>inp_Season</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <name>inp_LeadingSupplier</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <name>inp_NegotiationSummary</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <name>out_ApprovalDecision</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>true</isOutput>
+    </variables>
+</Flow>

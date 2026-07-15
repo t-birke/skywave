@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiPromptTemplate xmlns="http://soap.sforce.com/2006/04/metadata">
+    <activeVersionIdentifier>4RADlKiCfUL9TuNnhucMUuP8CIBcQrKVJRIX51Smyps=_2</activeVersionIdentifier>
+    <description>MOCK: Drafts the narrative body of a seasonal Request-for-Proposal (RFP) from the demand forecast. Used by the Skywave Sourcing orchestration as the "hand over to a prompt template" step.</description>
+    <developerName>Skywave_Sourcing_RFP_Draft</developerName>
+    <masterLabel>Skywave Sourcing - RFP Draft</masterLabel>
+    <overridable>false</overridable>
+    <templateVersions>
+        <content>You are a procurement writer for Skywave Airlines. Draft a concise, professional Request for Proposal (RFP) for the upcoming season&apos;s sourcing program.
+
+Season: {!$Input:Season}
+Estimated demand volume (units): {!$Input:EstimatedUnits}
+Number of routes / locations in scope: {!$Input:RouteCount}
+Forecast notes: {!$Input:ForecastSummary}
+
+Write the RFP with these sections:
+1. Overview &amp; scope of the seasonal sourcing program.
+2. Volume &amp; category mix expectations (use the numbers above).
+3. Product / service specifications and quality requirements.
+4. Compliance, safety, and service-level standards.
+5. Sustainability expectations (responsible sourcing, waste-reduction targets).
+6. Commercial terms requested (unit pricing by category, volume rebates, commodity escalators).
+7. Bid submission instructions and timeline.
+
+Keep it under 500 words and business-ready.</content>
+        <inputs>
+            <apiName>Season</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>Season</masterLabel>
+            <referenceName>Input:Season</referenceName>
+            <required>true</required>
+        </inputs>
+        <inputs>
+            <apiName>EstimatedUnits</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>Estimated Units</masterLabel>
+            <referenceName>Input:EstimatedUnits</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>RouteCount</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>Route Count</masterLabel>
+            <referenceName>Input:RouteCount</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>ForecastSummary</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>Forecast Summary</masterLabel>
+            <referenceName>Input:ForecastSummary</referenceName>
+            <required>false</required>
+        </inputs>
+        <isCitationEnabled>false</isCitationEnabled>
+        <primaryModel>sfdc_ai__DefaultOpenAIGPT4OmniMini</primaryModel>
+        <status>Published</status>
+        <versionIdentifier>4RADlKiCfUL9TuNnhucMUuP8CIBcQrKVJRIX51Smyps=_2</versionIdentifier>
+    </templateVersions>
+    <type>einstein_gpt__flex</type>
+    <visibility>Global</visibility>
+</GenAiPromptTemplate>

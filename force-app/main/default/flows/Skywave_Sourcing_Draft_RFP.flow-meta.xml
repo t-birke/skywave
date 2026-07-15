@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>63.0</apiVersion>
+    <description>STUB (mock): Sourcing pipeline — Step 2 of 7. HANDS OVER TO A PROMPT TEMPLATE: calls the Skywave_Sourcing_RFP_Draft GenAiPromptTemplate (actionType generatePromptResponse) to generate the RFP narrative from the demand forecast, and returns the generated text.</description>
+    <environments>Default</environments>
+    <interviewLabel>Sourcing Draft RFP {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Skywave Sourcing - Draft RFP (Prompt Template)</label>
+    <processType>AutoLaunchedFlow</processType>
+    <actionCalls>
+        <name>Generate_RFP_Text</name>
+        <label>Generate RFP Text (Prompt Template)</label>
+        <locationX>176</locationX>
+        <locationY>158</locationY>
+        <actionName>Skywave_Sourcing_RFP_Draft</actionName>
+        <actionType>generatePromptResponse</actionType>
+        <connector>
+            <targetReference>Capture_Response</targetReference>
+        </connector>
+        <faultConnector>
+            <targetReference>Capture_Fault</targetReference>
+        </faultConnector>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+        <inputParameters>
+            <name>Input:Season</name>
+            <value>
+                <elementReference>inp_Season</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>Input:ForecastSummary</name>
+            <value>
+                <elementReference>inp_ForecastSummary</elementReference>
+            </value>
+        </inputParameters>
+        <nameSegment>Skywave_Sourcing_RFP_Draft</nameSegment>
+    </actionCalls>
+    <assignments>
+        <name>Capture_Response</name>
+        <label>Capture Response</label>
+        <locationX>176</locationX>
+        <locationY>278</locationY>
+        <assignmentItems>
+            <assignToReference>out_RfpDocument</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>Generate_RFP_Text.promptResponse</elementReference>
+            </value>
+        </assignmentItems>
+    </assignments>
+    <assignments>
+        <name>Capture_Fault</name>
+        <label>Capture Fault (mock fallback)</label>
+        <locationX>400</locationX>
+        <locationY>278</locationY>
+        <assignmentItems>
+            <assignToReference>out_RfpDocument</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>[Mock RFP placeholder — prompt template unavailable in this org. Season: {!inp_Season}]</stringValue>
+            </value>
+        </assignmentItems>
+    </assignments>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Generate_RFP_Text</targetReference>
+        </connector>
+    </start>
+    <status>Active</status>
+    <variables>
+        <name>inp_Season</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <name>inp_ForecastSummary</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <name>out_RfpDocument</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>true</isOutput>
+    </variables>
+</Flow>
