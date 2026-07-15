@@ -1074,10 +1074,22 @@ Orchestrator`). Lives in `flows/`, documented in `flows/README_Sourcing.md`.
 - **Launch:** record-triggered on the mock `Sourcing_Request__c` object
   (`recordTriggerType=Create`, `RecordAfterSave`). Creating a request starts a run;
   `$Record` is the context record threaded into every step.
-- **Shape:** 5 stages / 7 steps mixing `stepBackground` and `stepInteractive`, with data
-  threaded stage-to-stage (`Step_<Name>.Outputs.<var>`) and an entry-condition gate on the
-  final contract step (only runs when the approval decision = `Approved`). Every step calls
-  a **stub subflow** returning deterministic placeholder data — nothing external.
+- **Shape:** 6 stages / 8 steps, all `stepBackground`, with data threaded stage-to-stage
+  (`Step_<Name>.Outputs.<var>`). A top-level **`<decisions>` element (`Bid_Quality_Gate`)**
+  forks after bid evaluation: leading score ≥ 75 → negotiate → award → contract; otherwise
+  → a terminal **"Sourcing Cancelled"** stage (`Skywave_Sourcing_Cancel`) that records the
+  reason and recommends re-scoping the RFP. An entry-condition gate on the final contract
+  step keeps it from running unless the approval decision = `Approved`. Every step calls a
+  **stub subflow** returning deterministic placeholder data — nothing external. Both branches
+  verified end-to-end (score 87.4 → award/contract Completed; forced 61.2 → cancellation
+  Completed).
+- **Human steps are *simulated*.** The two review points (Category Manager releases the RFP;
+  Procurement Director approves the award) are modelled as background "approval-sim" stubs
+  (`Skywave_Sourcing_Issue_RFP_Sim` → `out_ReleaseDecision='Released'`;
+  `Skywave_Sourcing_Award_Approval_Sim` → `out_ApprovalDecision='Approved'`) so the whole
+  orchestration runs green without a work-item assignee. The real `stepInteractive` screen
+  flows (`Skywave_Sourcing_Issue_RFP`, `_Award_Approval`) are kept in the repo to swap back
+  in once assignment is sorted — see the assignee blocker below.
 - **The two AI hand-offs** (the point of the demo): the *Draft RFP* step hands to a
   **prompt template** (`generatePromptResponse` → `Skywave_Sourcing_RFP_Draft`), and the
   *Negotiate* step hands to the existing **Agentforce agent** (`generateAiAgentResponse` →
@@ -1096,6 +1108,20 @@ Orchestrator`). Lives in `flows/`, documented in `flows/README_Sourcing.md`.
   boolean fields (`canAssigneeEdit`, `debugSimulateStep`, `entry`/`exitConditionLogic`,
   `runAsUser`, `shouldLock`). No CLI error surfaces — the flow just doesn't draw. Full
   write-up in the `sf-flow-orchestration` skill.
+- **Open blocker — interactive-step assignee on this SDO.** A `stepInteractive` step fails
+  at *runtime* with `FLOW_ELEMENT_ERROR|Invalid Resource reference|FlowOrchestratedStage`
+  the moment the stage is entered — for **every** assignee reference tried (`$User.Id`,
+  `$Record.OwnerId`, a formula returning an active System Admin's Id); a literal
+  `<stringValue>` user Id is even rejected at *deploy* ("user doesn't exist or is inactive")
+  for a confirmed-active admin. Isolation proved it: swapping the same step to
+  `stepBackground` (no assignee) runs clean through to the end, so the decision / async
+  prompt / data refs / rendering metadata are all exonerated — it is assignee-specific.
+  Root cause not yet confirmed (record-triggered orchestrations run as the **Automated
+  Process** user, and the org's only working interactive orchestrations are managed —
+  `CAB`=ApprovalWorkflow, `CMS_BasicApprovalRequest`=ManagedContentAuthoringWorkflow — so
+  no local known-good custom-Orchestrator assignee shape to copy). Worked around by
+  simulating the human steps (above). Next lead: build one interactive step in Flow Builder
+  on `si`, retrieve it, diff the assignee encoding.
 
 ---
 

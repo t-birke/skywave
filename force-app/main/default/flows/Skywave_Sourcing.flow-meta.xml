@@ -1,7 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
     <apiVersion>63.0</apiVersion>
-    <description>MOCK Flow Orchestration: Skywave Airlines seasonal sourcing / strategic-purchasing pipeline. A 7-step procurement process across 5 stages that mixes automated background work with human review, and includes one subprocess that hands over to a prompt template (RFP drafting) and one that hands over to an Agentforce agent (supplier negotiation). All steps call stub subflows so the orchestration runs end-to-end without external systems.</description>
+    <decisions>
+        <name>Bid_Quality_Gate</name>
+        <label>Qualified Bid Received?</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <defaultConnector>
+            <targetReference>Stage_Sourcing_Failed</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>No Qualified Bid</defaultConnectorLabel>
+        <rules>
+            <name>Qualified_Bid</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>Step_Evaluate_Bids.Outputs.out_LeadingScore</leftValueReference>
+                <operator>GreaterThanOrEqualTo</operator>
+                <rightValue>
+                    <numberValue>75.0</numberValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Stage_4_Negotiate</targetReference>
+            </connector>
+            <label>Qualified Bid (score &gt;= 75)</label>
+        </rules>
+    </decisions>
+    <description>MOCK Flow Orchestration: Skywave Airlines seasonal sourcing / strategic-purchasing pipeline. A procurement process across 6 stages with a decision that forks on bid quality: if the leading bid clears the award threshold it proceeds to negotiate/award/contract; otherwise it routes to a cancellation stage that recommends re-scoping the RFP. Includes one subprocess that hands over to a prompt template (RFP drafting) and one that hands over to an Agentforce agent (supplier negotiation). The two human review points (RFP release, award approval) are simulated by background stub subflows so the orchestration runs end-to-end without work-item assignees; the real interactive screen flows are kept in the repo to swap back in.</description>
     <environments>Default</environments>
     <interviewLabel>Skywave Sourcing {!$Flow.CurrentDateTime}</interviewLabel>
     <label>Skywave Sourcing</label>
@@ -63,7 +88,7 @@
     </orchestratedStages>
     <orchestratedStages>
         <name>Stage_2_Issue_RFP</name>
-        <label>2. Category Manager Releases RFP</label>
+        <label>2. Category Manager Releases RFP (Simulated)</label>
         <locationX>0</locationX>
         <locationY>0</locationY>
         <connector>
@@ -72,25 +97,13 @@
         <exitConditionLogic>and</exitConditionLogic>
         <stageSteps>
             <name>Step_Issue_RFP</name>
-            <label>Review and Release RFP</label>
-            <actionName>Skywave_Sourcing_Issue_RFP</actionName>
-            <actionType>stepInteractive</actionType>
-            <assignees>
-                <assignee>
-                    <elementReference>$User.Id</elementReference>
-                </assignee>
-                <assigneeType>User</assigneeType>
-            </assignees>
+            <label>Review and Release RFP (Simulated)</label>
+            <actionName>Skywave_Sourcing_Issue_RFP_Sim</actionName>
+            <actionType>stepBackground</actionType>
             <canAssigneeEdit>false</canAssigneeEdit>
             <debugSimulateStep>false</debugSimulateStep>
             <entryConditionLogic>and</entryConditionLogic>
             <exitConditionLogic>and</exitConditionLogic>
-            <inputParameters>
-                <name>ActionInput__RecordId</name>
-                <value>
-                    <elementReference>$Record.Id</elementReference>
-                </value>
-            </inputParameters>
             <inputParameters>
                 <name>inp_Season</name>
                 <value>
@@ -106,7 +119,7 @@
             <requiresAsyncProcessing>false</requiresAsyncProcessing>
             <runAsUser>false</runAsUser>
             <shouldLock>false</shouldLock>
-            <stepSubtype>InteractiveStep</stepSubtype>
+            <stepSubtype>BackgroundStep</stepSubtype>
         </stageSteps>
     </orchestratedStages>
     <orchestratedStages>
@@ -115,7 +128,7 @@
         <locationX>0</locationX>
         <locationY>0</locationY>
         <connector>
-            <targetReference>Stage_4_Negotiate</targetReference>
+            <targetReference>Bid_Quality_Gate</targetReference>
         </connector>
         <exitConditionLogic>and</exitConditionLogic>
         <stageSteps>
@@ -177,31 +190,19 @@
     </orchestratedStages>
     <orchestratedStages>
         <name>Stage_5_Award_And_Contract</name>
-        <label>5. Approve Award and Finalize Contract</label>
+        <label>5. Approve Award (Simulated) and Finalize Contract</label>
         <locationX>0</locationX>
         <locationY>0</locationY>
         <exitConditionLogic>and</exitConditionLogic>
         <stageSteps>
             <name>Step_Award_Approval</name>
-            <label>Procurement Director Approval</label>
-            <actionName>Skywave_Sourcing_Award_Approval</actionName>
-            <actionType>stepInteractive</actionType>
-            <assignees>
-                <assignee>
-                    <elementReference>$User.Id</elementReference>
-                </assignee>
-                <assigneeType>User</assigneeType>
-            </assignees>
+            <label>Procurement Director Approval (Simulated)</label>
+            <actionName>Skywave_Sourcing_Award_Approval_Sim</actionName>
+            <actionType>stepBackground</actionType>
             <canAssigneeEdit>false</canAssigneeEdit>
             <debugSimulateStep>false</debugSimulateStep>
             <entryConditionLogic>and</entryConditionLogic>
             <exitConditionLogic>and</exitConditionLogic>
-            <inputParameters>
-                <name>ActionInput__RecordId</name>
-                <value>
-                    <elementReference>$Record.Id</elementReference>
-                </value>
-            </inputParameters>
             <inputParameters>
                 <name>inp_Season</name>
                 <value>
@@ -223,7 +224,7 @@
             <requiresAsyncProcessing>false</requiresAsyncProcessing>
             <runAsUser>false</runAsUser>
             <shouldLock>false</shouldLock>
-            <stepSubtype>InteractiveStep</stepSubtype>
+            <stepSubtype>BackgroundStep</stepSubtype>
         </stageSteps>
         <stageSteps>
             <name>Step_Finalize_Contract</name>
@@ -252,6 +253,45 @@
                 <name>inp_LeadingSupplier</name>
                 <value>
                     <elementReference>Step_Evaluate_Bids.Outputs.out_LeadingSupplier</elementReference>
+                </value>
+            </inputParameters>
+            <requiresAsyncProcessing>false</requiresAsyncProcessing>
+            <runAsUser>false</runAsUser>
+            <shouldLock>false</shouldLock>
+            <stepSubtype>BackgroundStep</stepSubtype>
+        </stageSteps>
+    </orchestratedStages>
+    <orchestratedStages>
+        <name>Stage_Sourcing_Failed</name>
+        <label>X. Sourcing Cancelled (No Qualified Bid)</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <exitConditionLogic>and</exitConditionLogic>
+        <stageSteps>
+            <name>Step_Cancel_Sourcing</name>
+            <label>Record Cancellation and Re-scope Advice</label>
+            <actionName>Skywave_Sourcing_Cancel</actionName>
+            <actionType>stepBackground</actionType>
+            <canAssigneeEdit>false</canAssigneeEdit>
+            <debugSimulateStep>false</debugSimulateStep>
+            <entryConditionLogic>and</entryConditionLogic>
+            <exitConditionLogic>and</exitConditionLogic>
+            <inputParameters>
+                <name>inp_Season</name>
+                <value>
+                    <elementReference>$Record.Season__c</elementReference>
+                </value>
+            </inputParameters>
+            <inputParameters>
+                <name>inp_LeadingScore</name>
+                <value>
+                    <elementReference>Step_Evaluate_Bids.Outputs.out_LeadingScore</elementReference>
+                </value>
+            </inputParameters>
+            <inputParameters>
+                <name>inp_Shortlist</name>
+                <value>
+                    <elementReference>Step_Evaluate_Bids.Outputs.out_Shortlist</elementReference>
                 </value>
             </inputParameters>
             <requiresAsyncProcessing>false</requiresAsyncProcessing>
