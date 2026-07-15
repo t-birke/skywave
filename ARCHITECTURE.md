@@ -1088,6 +1088,14 @@ Orchestrator`). Lives in `flows/`, documented in `flows/README_Sourcing.md`.
   activation fails with *"A context record is required for interactive steps"*; and the
   prompt template must be **Published** with a top-level `<activeVersionIdentifier>` or it
   exposes no invocable action, leaving the Draft-RFP subflow `InvalidDraft`.
+- **A third gotcha that costs *rendering* (not activation):** a hand-authored orchestration
+  deploys and runs fine but opens in Flow Builder as **empty stage placeholders** unless it
+  carries the builder metadata. Now in source: three top-level `<processMetadataValues>`
+  (`CanvasMode=AUTO_LAYOUT_CANVAS`, `BuilderType`, `OriginBuilderType`) and, on every step, a
+  `<stepSubtype>` (lowercase `t` — `BackgroundStep`/`InteractiveStep`) plus the builder
+  boolean fields (`canAssigneeEdit`, `debugSimulateStep`, `entry`/`exitConditionLogic`,
+  `runAsUser`, `shouldLock`). No CLI error surfaces — the flow just doesn't draw. Full
+  write-up in the `sf-flow-orchestration` skill.
 
 ---
 

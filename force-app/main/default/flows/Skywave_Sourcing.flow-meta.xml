@@ -5,32 +5,44 @@
     <environments>Default</environments>
     <interviewLabel>Skywave Sourcing {!$Flow.CurrentDateTime}</interviewLabel>
     <label>Skywave Sourcing</label>
-    <processType>Orchestrator</processType>
     <orchestratedStages>
         <name>Stage_1_Plan_And_Draft</name>
         <label>1. Plan Demand and Draft RFP</label>
-        <locationX>176</locationX>
-        <locationY>158</locationY>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
         <connector>
             <targetReference>Stage_2_Issue_RFP</targetReference>
         </connector>
+        <exitConditionLogic>and</exitConditionLogic>
         <stageSteps>
             <name>Step_Demand_Forecast</name>
             <label>Build Demand Forecast</label>
             <actionName>Skywave_Sourcing_Demand_Forecast</actionName>
             <actionType>stepBackground</actionType>
+            <canAssigneeEdit>false</canAssigneeEdit>
+            <debugSimulateStep>false</debugSimulateStep>
+            <entryConditionLogic>and</entryConditionLogic>
+            <exitConditionLogic>and</exitConditionLogic>
             <inputParameters>
                 <name>inp_Season</name>
                 <value>
                     <elementReference>$Record.Season__c</elementReference>
                 </value>
             </inputParameters>
+            <requiresAsyncProcessing>false</requiresAsyncProcessing>
+            <runAsUser>false</runAsUser>
+            <shouldLock>false</shouldLock>
+            <stepSubtype>BackgroundStep</stepSubtype>
         </stageSteps>
         <stageSteps>
             <name>Step_Draft_RFP</name>
             <label>Draft RFP (Prompt Template)</label>
             <actionName>Skywave_Sourcing_Draft_RFP</actionName>
             <actionType>stepBackground</actionType>
+            <canAssigneeEdit>false</canAssigneeEdit>
+            <debugSimulateStep>false</debugSimulateStep>
+            <entryConditionLogic>and</entryConditionLogic>
+            <exitConditionLogic>and</exitConditionLogic>
             <inputParameters>
                 <name>inp_Season</name>
                 <value>
@@ -43,16 +55,21 @@
                     <elementReference>Step_Demand_Forecast.Outputs.out_ForecastSummary</elementReference>
                 </value>
             </inputParameters>
+            <requiresAsyncProcessing>false</requiresAsyncProcessing>
+            <runAsUser>false</runAsUser>
+            <shouldLock>false</shouldLock>
+            <stepSubtype>BackgroundStep</stepSubtype>
         </stageSteps>
     </orchestratedStages>
     <orchestratedStages>
         <name>Stage_2_Issue_RFP</name>
         <label>2. Category Manager Releases RFP</label>
-        <locationX>176</locationX>
-        <locationY>278</locationY>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
         <connector>
             <targetReference>Stage_3_Evaluate</targetReference>
         </connector>
+        <exitConditionLogic>and</exitConditionLogic>
         <stageSteps>
             <name>Step_Issue_RFP</name>
             <label>Review and Release RFP</label>
@@ -64,6 +81,10 @@
                 </assignee>
                 <assigneeType>User</assigneeType>
             </assignees>
+            <canAssigneeEdit>false</canAssigneeEdit>
+            <debugSimulateStep>false</debugSimulateStep>
+            <entryConditionLogic>and</entryConditionLogic>
+            <exitConditionLogic>and</exitConditionLogic>
             <inputParameters>
                 <name>ActionInput__RecordId</name>
                 <value>
@@ -83,42 +104,59 @@
                 </value>
             </inputParameters>
             <requiresAsyncProcessing>false</requiresAsyncProcessing>
+            <runAsUser>false</runAsUser>
+            <shouldLock>false</shouldLock>
+            <stepSubtype>InteractiveStep</stepSubtype>
         </stageSteps>
     </orchestratedStages>
     <orchestratedStages>
         <name>Stage_3_Evaluate</name>
         <label>3. Evaluate Bids</label>
-        <locationX>176</locationX>
-        <locationY>398</locationY>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
         <connector>
             <targetReference>Stage_4_Negotiate</targetReference>
         </connector>
+        <exitConditionLogic>and</exitConditionLogic>
         <stageSteps>
             <name>Step_Evaluate_Bids</name>
             <label>Score Supplier Bids</label>
             <actionName>Skywave_Sourcing_Evaluate_Bids</actionName>
             <actionType>stepBackground</actionType>
+            <canAssigneeEdit>false</canAssigneeEdit>
+            <debugSimulateStep>false</debugSimulateStep>
+            <entryConditionLogic>and</entryConditionLogic>
+            <exitConditionLogic>and</exitConditionLogic>
             <inputParameters>
                 <name>inp_Season</name>
                 <value>
                     <elementReference>$Record.Season__c</elementReference>
                 </value>
             </inputParameters>
+            <requiresAsyncProcessing>false</requiresAsyncProcessing>
+            <runAsUser>false</runAsUser>
+            <shouldLock>false</shouldLock>
+            <stepSubtype>BackgroundStep</stepSubtype>
         </stageSteps>
     </orchestratedStages>
     <orchestratedStages>
         <name>Stage_4_Negotiate</name>
         <label>4. Negotiate with Leading Supplier (Agent)</label>
-        <locationX>176</locationX>
-        <locationY>518</locationY>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
         <connector>
             <targetReference>Stage_5_Award_And_Contract</targetReference>
         </connector>
+        <exitConditionLogic>and</exitConditionLogic>
         <stageSteps>
             <name>Step_Negotiate</name>
             <label>Agent Negotiation</label>
             <actionName>Skywave_Sourcing_Negotiate_Supplier</actionName>
             <actionType>stepBackground</actionType>
+            <canAssigneeEdit>false</canAssigneeEdit>
+            <debugSimulateStep>false</debugSimulateStep>
+            <entryConditionLogic>and</entryConditionLogic>
+            <exitConditionLogic>and</exitConditionLogic>
             <inputParameters>
                 <name>inp_Season</name>
                 <value>
@@ -131,13 +169,18 @@
                     <elementReference>Step_Evaluate_Bids.Outputs.out_LeadingSupplier</elementReference>
                 </value>
             </inputParameters>
+            <requiresAsyncProcessing>false</requiresAsyncProcessing>
+            <runAsUser>false</runAsUser>
+            <shouldLock>false</shouldLock>
+            <stepSubtype>BackgroundStep</stepSubtype>
         </stageSteps>
     </orchestratedStages>
     <orchestratedStages>
         <name>Stage_5_Award_And_Contract</name>
         <label>5. Approve Award and Finalize Contract</label>
-        <locationX>176</locationX>
-        <locationY>638</locationY>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <exitConditionLogic>and</exitConditionLogic>
         <stageSteps>
             <name>Step_Award_Approval</name>
             <label>Procurement Director Approval</label>
@@ -149,6 +192,10 @@
                 </assignee>
                 <assigneeType>User</assigneeType>
             </assignees>
+            <canAssigneeEdit>false</canAssigneeEdit>
+            <debugSimulateStep>false</debugSimulateStep>
+            <entryConditionLogic>and</entryConditionLogic>
+            <exitConditionLogic>and</exitConditionLogic>
             <inputParameters>
                 <name>ActionInput__RecordId</name>
                 <value>
@@ -174,20 +221,27 @@
                 </value>
             </inputParameters>
             <requiresAsyncProcessing>false</requiresAsyncProcessing>
+            <runAsUser>false</runAsUser>
+            <shouldLock>false</shouldLock>
+            <stepSubtype>InteractiveStep</stepSubtype>
         </stageSteps>
         <stageSteps>
             <name>Step_Finalize_Contract</name>
             <label>Generate Contract and POs</label>
             <actionName>Skywave_Sourcing_Finalize_Contract</actionName>
             <actionType>stepBackground</actionType>
+            <canAssigneeEdit>false</canAssigneeEdit>
+            <debugSimulateStep>false</debugSimulateStep>
             <entryConditionLogic>and</entryConditionLogic>
             <entryConditions>
+                <conditionType>EntryCondition</conditionType>
                 <leftValueReference>Step_Award_Approval.Outputs.out_ApprovalDecision</leftValueReference>
                 <operator>EqualTo</operator>
                 <rightValue>
                     <stringValue>Approved</stringValue>
                 </rightValue>
             </entryConditions>
+            <exitConditionLogic>and</exitConditionLogic>
             <inputParameters>
                 <name>inp_Season</name>
                 <value>
@@ -200,10 +254,33 @@
                     <elementReference>Step_Evaluate_Bids.Outputs.out_LeadingSupplier</elementReference>
                 </value>
             </inputParameters>
+            <requiresAsyncProcessing>false</requiresAsyncProcessing>
+            <runAsUser>false</runAsUser>
+            <shouldLock>false</shouldLock>
+            <stepSubtype>BackgroundStep</stepSubtype>
         </stageSteps>
     </orchestratedStages>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>OriginBuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>Orchestrator</processType>
     <start>
-        <locationX>50</locationX>
+        <locationX>0</locationX>
         <locationY>0</locationY>
         <connector>
             <targetReference>Stage_1_Plan_And_Draft</targetReference>
