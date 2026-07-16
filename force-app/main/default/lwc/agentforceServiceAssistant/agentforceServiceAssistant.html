@@ -3,7 +3,7 @@
         <header class="header">
             <lightning-icon icon-name="standard:agent_astro" size="small" alternative-text=""></lightning-icon>
             <h2 class="slds-text-heading_medium header-title">Agentforce Service Assistant</h2>
-            <button class="info" type="button" aria-label="Mehr erfahren">
+            <button class="info" type="button" aria-label="Learn more">
                 <lightning-icon icon-name="utility:info" size="x-small"></lightning-icon>
             </button>
         </header>
@@ -11,11 +11,11 @@
         <div class="scroll-area">
             <section class="intro" style={heroStyle}>
                 <div class="slds-text-body_small intro-copy">
-                    Hi! Ich bin dein Service Assistant, ein intelligenter Begleiter auf Basis von Agentforce.
-                    Mein Ziel ist es, im Hintergrund Informationen aufzubereiten und Aktionen vorzubereiten.
-                    Alles was ich finde, wird dem Datensatz zugeordnet.
+                    Hi! I'm your Service Assistant, an intelligent companion powered by Agentforce.
+                    My job is to prepare information and stage actions for you in the background.
+                    Everything I find is linked back to the record.
                 </div>
-                <a href="javascript:void(0);" class="slds-text-body_small learn-more">Mehr erfahren…</a>
+                <a href="javascript:void(0);" class="slds-text-body_small learn-more">Learn more…</a>
             </section>
 
         <section class={catchUpClass}>
@@ -28,7 +28,7 @@
             <template lwc:if={catchUpExpanded}>
                 <div class="catch-up-body">
                     <template lwc:if={summaryCreated}>
-                        <p class="created">Zusammenfassung erstellt am {summaryCreated}</p>
+                        <p class="created">Summary created on {summaryCreated}</p>
                     </template>
 
                     <p class="summary">{summary}</p>
@@ -42,19 +42,19 @@
                         <lightning-button-icon
                             icon-name="utility:bolt"
                             variant="bare"
-                            alternative-text="Aktion ausführen"
+                            alternative-text="Run action"
                             size="small">
                         </lightning-button-icon>
                         <lightning-button-icon
                             icon-name="utility:bolt"
                             variant="bare"
-                            alternative-text="Aktion ausführen"
+                            alternative-text="Run action"
                             size="small">
                         </lightning-button-icon>
                         <lightning-button-icon
                             icon-name="utility:copy_to_clipboard"
                             variant="bare"
-                            alternative-text="Kopieren"
+                            alternative-text="Copy"
                             size="small">
                         </lightning-button-icon>
                     </div>
@@ -67,11 +67,11 @@
             <div class="prompt-field">
                 <textarea
                     class="prompt-input"
-                    placeholder="Stelle eine Frage oder löse Agentforce Aktionen aus…"
+                    placeholder="Ask a question or trigger Agentforce actions…"
                     rows="2"
                     aria-label="Agentforce Prompt"
                 ></textarea>
-                <button class="send" type="button" aria-label="Senden">
+                <button class="send" type="button" aria-label="Send">
                     <lightning-icon icon-name="utility:send" size="x-small"></lightning-icon>
                 </button>
             </div>

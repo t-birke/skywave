@@ -9,10 +9,10 @@ export default class AgentforceServiceAssistant extends LightningElement {
     heroImg = HERO_IMG;
 
     summary =
-        'Stefan ruft an, weil seine Vitocal 250-A einen Fehlercode zeigt und nicht heizt. Der Agent hat eine Ferndiagnose ausgelöst und einen Servicetermin angeboten.';
+        'The caller reached out to change the seat on an upcoming Skywave booking. The Agentforce voice agent verified their identity, located the reservation, and confirmed the requested seat change. Mid-conversation the caller asked to be transferred to a live agent and the call was escalated — no reason was given before the hand-off.';
 
     topic =
-        'Kunde benötigt einen Technikereinsatz für die Wärmepumpe und möchte zusätzlich Informationen zum erweiterten Garantieangebot erhalten.';
+        'Seat change completed on an existing booking, followed by an unexplained escalation to a human agent. Reason for the transfer is unknown; recommend confirming what the caller still needs before the seat change is finalized.';
 
     transferDateTime;
 
@@ -28,7 +28,7 @@ export default class AgentforceServiceAssistant extends LightningElement {
             return null;
         }
         const dt = new Date(this.transferDateTime);
-        return new Intl.DateTimeFormat('de-DE', {
+        return new Intl.DateTimeFormat('en-US', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric',
