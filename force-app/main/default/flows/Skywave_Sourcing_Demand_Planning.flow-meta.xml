@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>63.0</apiVersion>
+    <description>INTERACTIVE screen step: Demand Planning review. A demand planner reviews the mock demand forecast for the season and either approves the plan (proceed to draft the RFP) or sends it back. Placed FIRST in the pipeline, before any asynchronous AI step, so the orchestration interview has not yet paused/resumed when the work item is created. Returns the planning decision.</description>
+    <environments>Default</environments>
+    <interviewLabel>Sourcing Demand Planning {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Skywave Sourcing - Demand Planning (Review)</label>
+    <processType>Flow</processType>
+    <screens>
+        <name>Review_Demand_Plan</name>
+        <label>Review Demand Plan</label>
+        <locationX>176</locationX>
+        <locationY>158</locationY>
+        <allowBack>true</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>true</allowPause>
+        <fields>
+            <name>Intro_Text</name>
+            <fieldText>&lt;p&gt;&lt;b&gt;Demand planning review.&lt;/b&gt; Confirm the demand forecast for season &lt;b&gt;{!inp_Season}&lt;/b&gt; before the sourcing team drafts the RFP.&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <fields>
+            <name>Forecast_Preview</name>
+            <fieldText>{!inp_ForecastSummary}</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <fields>
+            <name>Planning_Decision</name>
+            <choiceReferences>Choice_Approve_Plan</choiceReferences>
+            <choiceReferences>Choice_Revise_Plan</choiceReferences>
+            <dataType>String</dataType>
+            <fieldText>Decision</fieldText>
+            <fieldType>RadioButtons</fieldType>
+            <isRequired>true</isRequired>
+        </fields>
+        <showFooter>true</showFooter>
+        <showHeader>true</showHeader>
+        <connector>
+            <targetReference>Set_Planning_Decision</targetReference>
+        </connector>
+    </screens>
+    <assignments>
+        <name>Set_Planning_Decision</name>
+        <label>Set Planning Decision</label>
+        <locationX>176</locationX>
+        <locationY>278</locationY>
+        <assignmentItems>
+            <assignToReference>out_PlanningDecision</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>Planning_Decision</elementReference>
+            </value>
+        </assignmentItems>
+    </assignments>
+    <choices>
+        <name>Choice_Approve_Plan</name>
+        <choiceText>Approve demand plan and proceed to RFP</choiceText>
+        <dataType>String</dataType>
+        <value>
+            <stringValue>Approved</stringValue>
+        </value>
+    </choices>
+    <choices>
+        <name>Choice_Revise_Plan</name>
+        <choiceText>Send back for re-forecasting</choiceText>
+        <dataType>String</dataType>
+        <value>
+            <stringValue>Revise</stringValue>
+        </value>
+    </choices>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Review_Demand_Plan</targetReference>
+        </connector>
+    </start>
+    <status>Active</status>
+    <variables>
+        <name>inp_Season</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <name>inp_ForecastSummary</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <name>out_PlanningDecision</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>true</isOutput>
+    </variables>
+</Flow>

@@ -74,21 +74,27 @@ work items:
 - `Skywave_Sourcing_Award_Approval_Sim` → returns `out_ApprovalDecision='Approved'`
   (which satisfies the finalize step's entry-condition gate).
 
-**Why:** on this SDO a `stepInteractive` step fails at *runtime* with
-`FLOW_ELEMENT_ERROR|Invalid Resource reference|FlowOrchestratedStage` the instant the stage
-is entered — for **every** assignee reference tried (`$User.Id`, `$Record.OwnerId`, a formula
-returning an active System Admin's Id); a literal `<stringValue>` user Id is even rejected at
-*deploy* for a confirmed-active admin. Isolation confirmed it is assignee-specific: swapping
-the identical step to `stepBackground` (no assignee) runs clean to completion, so the
-decision / async prompt / data refs / rendering metadata are all fine. Root cause unconfirmed
-(record-triggered orchestrations run as the **Automated Process** user; the org's only working
-interactive orchestrations are managed packages, so there's no local known-good custom shape
-to copy).
+**Why (confirmed root cause):** this SDO **lacks the Flow-Orchestration runtime license**, so
+interactive steps can't be created. Any `stepInteractive` fails at *runtime* the instant its
+stage is entered — `FLOW_ELEMENT_ERROR|Invalid Resource reference|FlowOrchestratedStage`, with
+**zero** `FlowOrchestrationStepInstance` rows and the instance `Status=Error`,
+`CurrentStage=null`. It fails identically for every assignee tried (`$User.Id`,
+`$Record.OwnerId`, a formula → active System Admin Id, and a public **Group**) and regardless
+of position (even as the *first* step, before any async pause), while every `stepBackground`
+step runs clean — so the assignee, ordering, data refs, and rendering metadata are all fine.
+
+The smoking gun: the `ManageOrchestrationRuns` / `ReassignOrchestrationWorkItems` user
+permissions are held by **no** permission set or profile in the org, and deploying either onto
+`Skywave_Demo_Admin` is rejected with *"The user license doesn't allow the permission:
+ManageOrchestrationRuns."* Interactive steps need those perms to write the work item; without
+the entitlement the runtime aborts at stage entry. The only working interactive orchestrations
+here are managed packages (which ship their own licensing). **Not fixable from source** — it
+needs the Flow Orchestration license provisioned on the org.
 
 The **real interactive screen flows are retained** in the repo —
-`Skywave_Sourcing_Issue_RFP` and `Skywave_Sourcing_Award_Approval` — to swap back in once the
-assignee encoding is sorted (next lead: build one interactive step in Flow Builder on `si`,
-retrieve it, and diff the assignee XML).
+`Skywave_Sourcing_Issue_RFP`, `Skywave_Sourcing_Award_Approval`, and
+`Skywave_Sourcing_Demand_Planning` — and will work as-is once the license is present; just swap
+the `_Sim` background actions back to the `stepInteractive` versions.
 
 ## The two hand-off mechanisms (how Flow "hands over")
 

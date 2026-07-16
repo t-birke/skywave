@@ -1108,20 +1108,29 @@ Orchestrator`). Lives in `flows/`, documented in `flows/README_Sourcing.md`.
   boolean fields (`canAssigneeEdit`, `debugSimulateStep`, `entry`/`exitConditionLogic`,
   `runAsUser`, `shouldLock`). No CLI error surfaces — the flow just doesn't draw. Full
   write-up in the `sf-flow-orchestration` skill.
-- **Open blocker — interactive-step assignee on this SDO.** A `stepInteractive` step fails
-  at *runtime* with `FLOW_ELEMENT_ERROR|Invalid Resource reference|FlowOrchestratedStage`
-  the moment the stage is entered — for **every** assignee reference tried (`$User.Id`,
-  `$Record.OwnerId`, a formula returning an active System Admin's Id); a literal
-  `<stringValue>` user Id is even rejected at *deploy* ("user doesn't exist or is inactive")
-  for a confirmed-active admin. Isolation proved it: swapping the same step to
-  `stepBackground` (no assignee) runs clean through to the end, so the decision / async
-  prompt / data refs / rendering metadata are all exonerated — it is assignee-specific.
-  Root cause not yet confirmed (record-triggered orchestrations run as the **Automated
-  Process** user, and the org's only working interactive orchestrations are managed —
-  `CAB`=ApprovalWorkflow, `CMS_BasicApprovalRequest`=ManagedContentAuthoringWorkflow — so
-  no local known-good custom-Orchestrator assignee shape to copy). Worked around by
-  simulating the human steps (above). Next lead: build one interactive step in Flow Builder
-  on `si`, retrieve it, diff the assignee encoding.
+- **Confirmed blocker — `stepInteractive` is not licensed on this SDO (why the human steps
+  are simulated).** Any interactive step fails at *runtime* with
+  `FLOW_ELEMENT_ERROR|Invalid Resource reference|FlowOrchestratedStage` the instant its
+  stage is entered — **zero** `FlowOrchestrationStepInstance` rows, `FlowOrchestrationInstance.Status=Error`,
+  `CurrentStage=null`. It fails identically for **every** assignee (`$User.Id`,
+  `$Record.OwnerId`, a formula → active System Admin Id, and a public **Group**) and
+  regardless of position (even as the *first* step, synchronously, before any async pause),
+  while every `stepBackground` step runs clean — so the assignee value, async ordering,
+  data refs, and rendering metadata are all exonerated.
+  **Root cause (confirmed):** the org lacks the Flow-Orchestration runtime *license*. The
+  `ManageOrchestrationRuns` and `ReassignOrchestrationWorkItems` user permissions are held
+  by **no** permission set or profile in the org, and deploying either onto `Skywave_Demo_Admin`
+  is rejected with *"The user license doesn't allow the permission: ManageOrchestrationRuns"*.
+  Interactive steps need those perms to write `FlowOrchestrationWorkItem`/`StepInstance`;
+  without the entitlement the runtime can't materialise a work item and aborts at stage entry.
+  This is why the only working interactive orchestrations here are managed packages
+  (`CAB`=ApprovalWorkflow, `CMS_BasicApprovalRequest`=ManagedContentAuthoringWorkflow) — they
+  ship their own packaged licensing. **Not fixable from source on this SDO**; needs the Flow
+  Orchestration license provisioned on the org. Diagnosis matches an internal
+  Flow-Orchestration swarm answer (missing *Access/Manage Orchestration* perms + Work Guide
+  component are the classic zero-step-instance causes). Worked around by simulating the two
+  human steps (above); the real `stepInteractive` screen flows are retained in the repo and
+  will work as-is once the license is present.
 
 ---
 
