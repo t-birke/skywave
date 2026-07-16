@@ -50,7 +50,7 @@ The `Season__c` field feeds every step; `Category__c` keeps the request generic 
 | 1. Plan & Draft | Build Demand Forecast | background | `Skywave_Sourcing_Demand_Forecast` | Rolls the season's operating schedule into estimated demand units per category/route. |
 | 1. Plan & Draft | Draft RFP | background | `Skywave_Sourcing_Draft_RFP` | **→ hands to prompt template** `Skywave_Sourcing_RFP_Draft` (`generatePromptResponse`) to write the RFP narrative. |
 | 2. Issue RFP | Review & Release RFP *(simulated)* | background | `Skywave_Sourcing_Issue_RFP_Sim` | Stands in for the Category Manager releasing the RFP → `out_ReleaseDecision='Released'`. |
-| 3. Evaluate | Score Supplier Bids | background | `Skywave_Sourcing_Evaluate_Bids` | Weighted matrix (price / quality / sustainability / service level); emits `out_LeadingScore`. |
+| 3. Evaluate | Score Supplier Bids | background | `Skywave_Sourcing_Evaluate_Bids` | Weighted matrix (price / quality / sustainability / service level); emits `out_LeadingScore`. **Deliberately built out (~20 nodes) as a Flow Builder teaching canvas** — see below. |
 | — | **`Bid_Quality_Gate` decision** | *decision* | — | `out_LeadingScore ≥ 75` → Stage 4; else → Stage X (cancel). |
 | 4. Negotiate | Agent Negotiation | background | `Skywave_Sourcing_Negotiate_Supplier` | **→ hands to Agentforce agent** `Skywave_Airlines_Agent` (`generateAiAgentResponse`) to negotiate pricing & rebate tiers. |
 | 5. Award & Contract | Procurement Director Approval *(simulated)* | background | `Skywave_Sourcing_Award_Approval_Sim` | Stands in for the Director approving the award → `out_ApprovalDecision='Approved'`. |
@@ -64,6 +64,36 @@ both the negotiation and the award steps).
 Both branches are verified end-to-end on `si`: the demo default (mock leading score 87.4)
 completes award → contract; forcing the score below 75 completes via the cancellation stage
 with negotiate/award/contract correctly skipped.
+
+## `Skywave_Sourcing_Evaluate_Bids` — the Flow Builder teaching canvas
+
+This subflow is intentionally over-built (~20 elements, multiple happy/error paths) so it can
+be opened in Flow Builder to walk an audience through the element palette. It still takes the
+same input (`inp_Season`) and returns the same outputs, so the orchestration is unaffected —
+the mock max score is 87.4 → **Meridian**, keeping the demo's qualified-bid branch.
+
+Canvas walkthrough (start → end):
+
+1. **Get Records** `Get_Sourcing_Request` — looks up the `Sourcing_Request__c` by season.
+   Has a **fault path** → `Handle_Query_Fault` (returns safe defaults on any query error).
+2. **Decision** `Was_Request_Found` — *Not Found* → `Handle_No_Request` (safe defaults);
+   *Found* → continues. (a not-found branch.)
+3. **Assignment** `Init_Evaluation` → **Assignment** `Seed_Bid_Scores` — seed a numeric
+   collection of candidate bid scores (mock data).
+4. **Loop** `Loop_Bid_Scores` over the collection:
+   - **Decision** `Check_New_Max` — *Higher Score* → `Capture_New_Max` (updates the running
+     max + count); *Not Higher* → `Count_Bid_Only`. Both loop back.
+5. After the loop, **Decision** `Determine_Leader` — a **four-way** branch on the max score
+   (Meridian ≥ 87 / Continental ≥ 84 / Vantage ≥ 79 / default *None Qualified*), each setting
+   `out_LeadingSupplier`.
+6. **Assignment** `Build_Shortlist` — sets `out_LeadingScore` + `out_Shortlist`.
+7. **Update Records** `Update_Request_Status` — writes `Status__c`; has its own **fault path**
+   → `Handle_Update_Fault` (keeps the computed outputs even if the DML fails).
+8. **Assignment** `Finalize_Success` — end of the happy path.
+
+Elements on show: Get Records, Update Records, two independent **fault paths**, a **Loop**, a
+two-way and a **four-way Decision**, a not-found branch, several Assignments, plus collection /
+counter / fault-message (`{!$Flow.FaultMessage}`) variables.
 
 ## Simulated human steps & interactive-step blocker
 
