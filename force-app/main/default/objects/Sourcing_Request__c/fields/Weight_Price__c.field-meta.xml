@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Weight_Price__c</fullName>
+    <label>Weight: Price (%)</label>
+    <description>Percentage weight applied to each bid's Price Score in the weighted evaluation. The four weights are intended to sum to 100 but the flow normalizes by their total, so any positive values work.</description>
+    <type>Number</type>
+    <precision>3</precision>
+    <scale>0</scale>
+    <required>false</required>
+    <defaultValue>40</defaultValue>
+</CustomField>

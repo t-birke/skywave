@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Sourcing_Request__c</fullName>
+    <label>Sourcing Request</label>
+    <description>The sourcing request (RFP) this bid was submitted against.</description>
+    <type>MasterDetail</type>
+    <referenceTo>Sourcing_Request__c</referenceTo>
+    <relationshipName>Supplier_Bids</relationshipName>
+    <relationshipLabel>Supplier Bids</relationshipLabel>
+    <reparentableMasterDetail>false</reparentableMasterDetail>
+    <writeRequiresMasterRead>false</writeRequiresMasterRead>
+</CustomField>

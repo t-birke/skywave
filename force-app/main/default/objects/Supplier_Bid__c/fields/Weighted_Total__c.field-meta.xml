@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Weighted_Total__c</fullName>
+    <label>Weighted Total</label>
+    <description>Weighted evaluation score for this bid (0-100), computed by the Evaluate Bids flow from the four component scores and the sourcing request's configurable weights. Populated at evaluation time.</description>
+    <type>Number</type>
+    <precision>5</precision>
+    <scale>1</scale>
+    <required>false</required>
+</CustomField>

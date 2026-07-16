@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Weight_Quality__c</fullName>
+    <label>Weight: Quality (%)</label>
+    <description>Percentage weight applied to each bid's Quality Score in the weighted evaluation.</description>
+    <type>Number</type>
+    <precision>3</precision>
+    <scale>0</scale>
+    <required>false</required>
+    <defaultValue>25</defaultValue>
+</CustomField>

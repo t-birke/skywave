@@ -1076,13 +1076,25 @@ Orchestrator`). Lives in `flows/`, documented in `flows/README_Sourcing.md`.
   `$Record` is the context record threaded into every step.
 - **Shape:** 6 stages / 8 steps, all `stepBackground`, with data threaded stage-to-stage
   (`Step_<Name>.Outputs.<var>`). A top-level **`<decisions>` element (`Bid_Quality_Gate`)**
-  forks after bid evaluation: leading score ≥ 75 → negotiate → award → contract; otherwise
-  → a terminal **"Sourcing Cancelled"** stage (`Skywave_Sourcing_Cancel`) that records the
-  reason and recommends re-scoping the RFP. An entry-condition gate on the final contract
-  step keeps it from running unless the approval decision = `Approved`. Every step calls a
-  **stub subflow** returning deterministic placeholder data — nothing external. Both branches
-  verified end-to-end (score 87.4 → award/contract Completed; forced 61.2 → cancellation
+  forks after bid evaluation: a qualifying leader (`out_LeadingScore > 0`) → negotiate →
+  award → contract; otherwise → a terminal **"Sourcing Cancelled"** stage
+  (`Skywave_Sourcing_Cancel`) that records the reason and recommends re-scoping the RFP. An
+  entry-condition gate on the final contract step keeps it from running unless the approval
+  decision = `Approved`. Both branches verified end-to-end (default threshold 75 → Meridian
+  87.6 → award/contract Completed; per-request threshold 95 → none qualified → cancellation
   Completed).
+- **Bid evaluation is data-driven (not mocked).** `Skywave_Sourcing_Evaluate_Bids` reads the
+  request's **`Supplier_Bid__c`** rows (master-detail child, `BID-{0000}`), computes each
+  bid's `Weighted_Total__c` from its four component scores (price/quality/sustainability/
+  service, 0–100) against the request's **configurable** weight fields (`Weight_*__c`,
+  default 40/25/20/15, normalized by their sum), ranks them, flags the single winning
+  `Is_Leading_Bid__c` if it clears the request's `Qualifying_Threshold__c` (default 75), and
+  bulk-writes results back. Nothing about suppliers/scores/weights is hardcoded. It is also
+  the demo's **Flow Builder teaching canvas** (~20 elements: 3 data + bulk/targeted updates,
+  three fault paths, a Loop, four Decisions, formula resources, an sObject collection). The
+  example bids are seeded by the RFP-release step (`Skywave_Sourcing_Issue_RFP_Sim`) — the
+  one place example supplier names live; real bids would come from suppliers. FLS for both
+  objects is on `Skywave_Demo_Admin` (added to `regen-demo-admin-fls.py`).
 - **Human steps are *simulated*.** The two review points (Category Manager releases the RFP;
   Procurement Director approves the award) are modelled as background "approval-sim" stubs
   (`Skywave_Sourcing_Issue_RFP_Sim` → `out_ReleaseDecision='Released'`;

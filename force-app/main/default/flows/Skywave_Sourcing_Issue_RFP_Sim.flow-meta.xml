@@ -1,16 +1,228 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
     <apiVersion>63.0</apiVersion>
-    <description>STUB (mock): Sourcing pipeline — Step 3 of 7, APPROVAL-SIMULATION. Stands in for the human "Category Manager releases the RFP" interactive step so the orchestration runs green end-to-end for the demo without a work-item assignee. Deterministically returns a "Released" decision plus a note. The real interactive screen flow (Skywave_Sourcing_Issue_RFP) is kept in the repo to swap back in once work-item assignment is sorted.</description>
+    <description>Sourcing pipeline — Step 3 of 7, RFP release + demo bid intake. Stands in for the human "Category Manager releases the RFP" interactive step, and simulates the supplier panel responding by seeding a set of example Supplier_Bid__c records against the request (this is the ONLY place example supplier names / raw component scores live — clearly-labelled demo seed data; the downstream Evaluate Bids flow reads and scores whatever bids exist, hardcoding nothing). Returns a "Released" decision. Swap in the real interactive screen flow Skywave_Sourcing_Issue_RFP once work-item assignment is available; real bids would arrive from suppliers rather than this seed.</description>
     <environments>Default</environments>
     <interviewLabel>Sourcing Issue RFP (Sim) {!$Flow.CurrentDateTime}</interviewLabel>
-    <label>Skywave Sourcing - Issue RFP (Approval Sim)</label>
+    <label>Skywave Sourcing - Issue RFP (Release + Bid Seed)</label>
     <processType>AutoLaunchedFlow</processType>
-    <assignments>
-        <name>Simulate_Release</name>
-        <label>Simulate RFP Release (mock)</label>
+    <recordCreates>
+        <name>Seed_Bid_Meridian</name>
+        <label>Seed Bid: Meridian (demo data)</label>
         <locationX>176</locationX>
         <locationY>158</locationY>
+        <connector>
+            <targetReference>Seed_Bid_Continental</targetReference>
+        </connector>
+        <inputAssignments>
+            <field>Sourcing_Request__c</field>
+            <value>
+                <elementReference>inp_RequestId</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Supplier_Name__c</field>
+            <value>
+                <stringValue>Meridian Supply Partners Ltd.</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Unit_Price__c</field>
+            <value>
+                <numberValue>18.40</numberValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Price_Score__c</field>
+            <value>
+                <numberValue>90</numberValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Quality_Score__c</field>
+            <value>
+                <numberValue>85</numberValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Sustainability_Score__c</field>
+            <value>
+                <numberValue>90</numberValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Service_Level_Score__c</field>
+            <value>
+                <numberValue>82</numberValue>
+            </value>
+        </inputAssignments>
+        <object>Supplier_Bid__c</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordCreates>
+    <recordCreates>
+        <name>Seed_Bid_Continental</name>
+        <label>Seed Bid: Continental (demo data)</label>
+        <locationX>176</locationX>
+        <locationY>278</locationY>
+        <connector>
+            <targetReference>Seed_Bid_Vantage</targetReference>
+        </connector>
+        <inputAssignments>
+            <field>Sourcing_Request__c</field>
+            <value>
+                <elementReference>inp_RequestId</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Supplier_Name__c</field>
+            <value>
+                <stringValue>Continental Sourcing Group</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Unit_Price__c</field>
+            <value>
+                <numberValue>19.10</numberValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Price_Score__c</field>
+            <value>
+                <numberValue>82</numberValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Quality_Score__c</field>
+            <value>
+                <numberValue>92</numberValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Sustainability_Score__c</field>
+            <value>
+                <numberValue>80</numberValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Service_Level_Score__c</field>
+            <value>
+                <numberValue>85</numberValue>
+            </value>
+        </inputAssignments>
+        <object>Supplier_Bid__c</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordCreates>
+    <recordCreates>
+        <name>Seed_Bid_Vantage</name>
+        <label>Seed Bid: Vantage (demo data)</label>
+        <locationX>176</locationX>
+        <locationY>398</locationY>
+        <connector>
+            <targetReference>Seed_Bid_Horizon</targetReference>
+        </connector>
+        <inputAssignments>
+            <field>Sourcing_Request__c</field>
+            <value>
+                <elementReference>inp_RequestId</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Supplier_Name__c</field>
+            <value>
+                <stringValue>Vantage Procurement Partners</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Unit_Price__c</field>
+            <value>
+                <numberValue>17.75</numberValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Price_Score__c</field>
+            <value>
+                <numberValue>88</numberValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Quality_Score__c</field>
+            <value>
+                <numberValue>78</numberValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Sustainability_Score__c</field>
+            <value>
+                <numberValue>72</numberValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Service_Level_Score__c</field>
+            <value>
+                <numberValue>74</numberValue>
+            </value>
+        </inputAssignments>
+        <object>Supplier_Bid__c</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordCreates>
+    <recordCreates>
+        <name>Seed_Bid_Horizon</name>
+        <label>Seed Bid: Horizon (demo data)</label>
+        <locationX>176</locationX>
+        <locationY>518</locationY>
+        <connector>
+            <targetReference>Simulate_Release</targetReference>
+        </connector>
+        <inputAssignments>
+            <field>Sourcing_Request__c</field>
+            <value>
+                <elementReference>inp_RequestId</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Supplier_Name__c</field>
+            <value>
+                <stringValue>Horizon Trade Supply Co.</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Unit_Price__c</field>
+            <value>
+                <numberValue>22.30</numberValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Price_Score__c</field>
+            <value>
+                <numberValue>60</numberValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Quality_Score__c</field>
+            <value>
+                <numberValue>65</numberValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Sustainability_Score__c</field>
+            <value>
+                <numberValue>58</numberValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Service_Level_Score__c</field>
+            <value>
+                <numberValue>62</numberValue>
+            </value>
+        </inputAssignments>
+        <object>Supplier_Bid__c</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordCreates>
+    <assignments>
+        <name>Simulate_Release</name>
+        <label>Release RFP to Panel</label>
+        <locationX>176</locationX>
+        <locationY>638</locationY>
         <assignmentItems>
             <assignToReference>out_ReleaseDecision</assignToReference>
             <operator>Assign</operator>
@@ -22,7 +234,7 @@
             <assignToReference>out_ReleaseNote</assignToReference>
             <operator>Assign</operator>
             <value>
-                <stringValue>[SIMULATED] Category Manager reviewed the draft RFP for the {!inp_Season} season and released it to the supplier panel. (Human review step simulated for the demo.)</stringValue>
+                <stringValue>[SIMULATED] RFP for the {!inp_Season} season released to the supplier panel; four bids received and recorded for evaluation. (Human review step simulated for the demo.)</stringValue>
             </value>
         </assignmentItems>
     </assignments>
@@ -30,10 +242,17 @@
         <locationX>50</locationX>
         <locationY>0</locationY>
         <connector>
-            <targetReference>Simulate_Release</targetReference>
+            <targetReference>Seed_Bid_Meridian</targetReference>
         </connector>
     </start>
     <status>Active</status>
+    <variables>
+        <name>inp_RequestId</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
     <variables>
         <name>inp_Season</name>
         <dataType>String</dataType>

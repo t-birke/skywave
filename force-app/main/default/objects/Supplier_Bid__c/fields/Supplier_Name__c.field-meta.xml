@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Supplier_Name__c</fullName>
+    <label>Supplier Name</label>
+    <description>The supplier that submitted this bid.</description>
+    <type>Text</type>
+    <length>120</length>
+    <required>true</required>
+</CustomField>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Unit_Price__c</fullName>
+    <label>Unit Price</label>
+    <description>The unit price the supplier offered in this bid.</description>
+    <type>Currency</type>
+    <precision>12</precision>
+    <scale>2</scale>
+    <required>false</required>
+</CustomField>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Is_Leading_Bid__c</fullName>
+    <label>Is Leading Bid</label>
+    <description>Set by the Evaluate Bids flow on the single highest-scoring bid that also clears the qualifying threshold. All other bids are cleared.</description>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+</CustomField>

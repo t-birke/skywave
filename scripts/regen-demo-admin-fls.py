@@ -45,7 +45,7 @@ PERMSET = 'force-app/main/default/permissionsets/Skywave_Demo_Admin.permissionse
 # Our own custom objects — get full object access + all custom fields.
 OUR_OBJECTS = ['Booking_Segment__c', 'Booking__c', 'Demo_Session__c', 'Flight__c',
                'Release_Note__c', 'Skywave_Seat_Map__c', 'Sourcing_Request__c',
-               'Survey_Answer_Option__c', 'Survey_Question__c']
+               'Supplier_Bid__c', 'Survey_Answer_Option__c', 'Survey_Question__c']
 
 # Standard objects — only the custom fields WE added (whitelist; no object perms).
 STD_FIELDS = {

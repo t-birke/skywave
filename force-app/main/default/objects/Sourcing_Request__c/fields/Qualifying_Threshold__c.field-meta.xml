@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Qualifying_Threshold__c</fullName>
+    <label>Qualifying Threshold</label>
+    <description>Minimum weighted total (0-100) a bid must reach to be considered award-worthy. If the leading bid's weighted total is below this, the evaluation returns no qualified supplier and the orchestration routes to the cancellation stage.</description>
+    <type>Number</type>
+    <precision>4</precision>
+    <scale>1</scale>
+    <required>false</required>
+    <defaultValue>75</defaultValue>
+</CustomField>

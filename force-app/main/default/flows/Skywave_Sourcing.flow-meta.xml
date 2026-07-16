@@ -15,15 +15,15 @@
             <conditionLogic>and</conditionLogic>
             <conditions>
                 <leftValueReference>Step_Evaluate_Bids.Outputs.out_LeadingScore</leftValueReference>
-                <operator>GreaterThanOrEqualTo</operator>
+                <operator>GreaterThan</operator>
                 <rightValue>
-                    <numberValue>75.0</numberValue>
+                    <numberValue>0.0</numberValue>
                 </rightValue>
             </conditions>
             <connector>
                 <targetReference>Stage_4_Negotiate</targetReference>
             </connector>
-            <label>Qualified Bid (score &gt;= 75)</label>
+            <label>Qualified Bid (Evaluate returned a leader)</label>
         </rules>
     </decisions>
     <description>MOCK Flow Orchestration: Skywave Airlines seasonal sourcing / strategic-purchasing pipeline. A procurement process across 6 stages with a decision that forks on bid quality: if the leading bid clears the award threshold it proceeds to negotiate/award/contract; otherwise it routes to a cancellation stage that recommends re-scoping the RFP. Includes one subprocess that hands over to a prompt template (RFP drafting) and one that hands over to an Agentforce agent (supplier negotiation). The two human review points (RFP release, award approval) are simulated by background stub subflows so the orchestration runs end-to-end without work-item assignees; the real interactive screen flows are kept in the repo to swap back in.</description>
@@ -105,6 +105,12 @@
             <entryConditionLogic>and</entryConditionLogic>
             <exitConditionLogic>and</exitConditionLogic>
             <inputParameters>
+                <name>inp_RequestId</name>
+                <value>
+                    <elementReference>$Record.Id</elementReference>
+                </value>
+            </inputParameters>
+            <inputParameters>
                 <name>inp_Season</name>
                 <value>
                     <elementReference>$Record.Season__c</elementReference>
@@ -140,6 +146,12 @@
             <debugSimulateStep>false</debugSimulateStep>
             <entryConditionLogic>and</entryConditionLogic>
             <exitConditionLogic>and</exitConditionLogic>
+            <inputParameters>
+                <name>inp_RequestId</name>
+                <value>
+                    <elementReference>$Record.Id</elementReference>
+                </value>
+            </inputParameters>
             <inputParameters>
                 <name>inp_Season</name>
                 <value>

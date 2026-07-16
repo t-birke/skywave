@@ -1,16 +1,44 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
     <apiVersion>63.0</apiVersion>
-    <description>STUB (mock): Sourcing pipeline — Step 4 of 7. Background step that scores the bids returned by the supplier panel on a weighted matrix (price 40%, quality 25%, sustainability 20%, service level 15%) and returns the leading supplier, its score, and the shortlist. Deterministic mock output (max score 87.4 -> Meridian). Deliberately built out with many elements — Get Records + fault path, a not-found branch, a Loop that tracks the maximum score, a four-way "which supplier leads" decision, and an Update Records with its own fault path — so it can be used to walk an audience through the Flow Builder canvas.</description>
+    <description>Sourcing pipeline — Step 4 of 7. Evaluates the supplier bids submitted against a sourcing request. Reads every Supplier_Bid__c for the request, computes each bid's weighted total from its own component scores (price / quality / sustainability / service level) against the request's configurable weights, ranks them, flags the single highest bid that clears the request's qualifying threshold, and writes the weighted totals and leader flag back to the bids. Fully data-driven — no supplier names, scores, or weights are hardcoded. Returns the leading supplier, its weighted score, and a shortlist for the orchestration.</description>
     <environments>Default</environments>
     <interviewLabel>Sourcing Evaluate Bids {!$Flow.CurrentDateTime}</interviewLabel>
     <label>Skywave Sourcing - Evaluate Bids</label>
     <processType>AutoLaunchedFlow</processType>
+    <formulas>
+        <name>fx_WeightedTotal</name>
+        <dataType>Number</dataType>
+        <scale>1</scale>
+        <expression>ROUND(
+(
+  BLANKVALUE({!Loop_Bids.Price_Score__c},0) * BLANKVALUE({!Get_Request.Weight_Price__c},40)
++ BLANKVALUE({!Loop_Bids.Quality_Score__c},0) * BLANKVALUE({!Get_Request.Weight_Quality__c},25)
++ BLANKVALUE({!Loop_Bids.Sustainability_Score__c},0) * BLANKVALUE({!Get_Request.Weight_Sustainability__c},20)
++ BLANKVALUE({!Loop_Bids.Service_Level_Score__c},0) * BLANKVALUE({!Get_Request.Weight_Service_Level__c},15)
+) / (
+  BLANKVALUE({!Get_Request.Weight_Price__c},40)
++ BLANKVALUE({!Get_Request.Weight_Quality__c},25)
++ BLANKVALUE({!Get_Request.Weight_Sustainability__c},20)
++ BLANKVALUE({!Get_Request.Weight_Service_Level__c},15)
+), 1)</expression>
+    </formulas>
+    <formulas>
+        <name>fx_Threshold</name>
+        <dataType>Number</dataType>
+        <scale>1</scale>
+        <expression>BLANKVALUE({!Get_Request.Qualifying_Threshold__c}, 75)</expression>
+    </formulas>
+    <formulas>
+        <name>fx_AppendShortlist</name>
+        <dataType>String</dataType>
+        <expression>{!out_Shortlist} &amp; {!Loop_Bids.Supplier_Name__c} &amp; " (" &amp; TEXT({!fx_WeightedTotal}) &amp; "). "</expression>
+    </formulas>
     <assignments>
         <name>Init_Evaluation</name>
         <label>Initialize Counters</label>
         <locationX>176</locationX>
-        <locationY>326</locationY>
+        <locationY>458</locationY>
         <assignmentItems>
             <assignToReference>varMaxScore</assignToReference>
             <operator>Assign</operator>
@@ -25,155 +53,110 @@
                 <numberValue>0.0</numberValue>
             </value>
         </assignmentItems>
-        <connector>
-            <targetReference>Seed_Bid_Scores</targetReference>
-        </connector>
-    </assignments>
-    <assignments>
-        <name>Seed_Bid_Scores</name>
-        <label>Seed Bid Scores (mock)</label>
-        <locationX>176</locationX>
-        <locationY>446</locationY>
         <assignmentItems>
-            <assignToReference>collBidScores</assignToReference>
-            <operator>Add</operator>
+            <assignToReference>out_Shortlist</assignToReference>
+            <operator>Assign</operator>
             <value>
-                <numberValue>87.4</numberValue>
-            </value>
-        </assignmentItems>
-        <assignmentItems>
-            <assignToReference>collBidScores</assignToReference>
-            <operator>Add</operator>
-            <value>
-                <numberValue>84.1</numberValue>
-            </value>
-        </assignmentItems>
-        <assignmentItems>
-            <assignToReference>collBidScores</assignToReference>
-            <operator>Add</operator>
-            <value>
-                <numberValue>79.6</numberValue>
-            </value>
-        </assignmentItems>
-        <assignmentItems>
-            <assignToReference>collBidScores</assignToReference>
-            <operator>Add</operator>
-            <value>
-                <numberValue>62.0</numberValue>
+                <stringValue></stringValue>
             </value>
         </assignmentItems>
         <connector>
-            <targetReference>Loop_Bid_Scores</targetReference>
+            <targetReference>Loop_Bids</targetReference>
         </connector>
     </assignments>
     <assignments>
-        <name>Capture_New_Max</name>
-        <label>Capture New Max</label>
-        <locationX>578</locationX>
-        <locationY>434</locationY>
+        <name>Score_This_Bid</name>
+        <label>Score This Bid</label>
+        <locationX>440</locationX>
+        <locationY>350</locationY>
+        <assignmentItems>
+            <assignToReference>varThisScore</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>fx_WeightedTotal</elementReference>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>Loop_Bids.Weighted_Total__c</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>varThisScore</elementReference>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>Loop_Bids.Is_Leading_Bid__c</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <booleanValue>false</booleanValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>collBidsToUpdate</assignToReference>
+            <operator>Add</operator>
+            <value>
+                <elementReference>Loop_Bids</elementReference>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>varBidCount</assignToReference>
+            <operator>Add</operator>
+            <value>
+                <numberValue>1.0</numberValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>out_Shortlist</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>fx_AppendShortlist</elementReference>
+            </value>
+        </assignmentItems>
+        <connector>
+            <targetReference>Check_New_Max</targetReference>
+        </connector>
+    </assignments>
+    <assignments>
+        <name>Capture_Leader</name>
+        <label>Capture Leader</label>
+        <locationX>660</locationX>
+        <locationY>242</locationY>
         <assignmentItems>
             <assignToReference>varMaxScore</assignToReference>
             <operator>Assign</operator>
             <value>
-                <elementReference>Loop_Bid_Scores</elementReference>
+                <elementReference>varThisScore</elementReference>
             </value>
         </assignmentItems>
         <assignmentItems>
-            <assignToReference>varBidCount</assignToReference>
-            <operator>Add</operator>
+            <assignToReference>varLeadingSupplier</assignToReference>
+            <operator>Assign</operator>
             <value>
-                <numberValue>1.0</numberValue>
+                <elementReference>Loop_Bids.Supplier_Name__c</elementReference>
             </value>
         </assignmentItems>
-        <connector>
-            <targetReference>Loop_Bid_Scores</targetReference>
-        </connector>
-    </assignments>
-    <assignments>
-        <name>Count_Bid_Only</name>
-        <label>Count Bid Only</label>
-        <locationX>810</locationX>
-        <locationY>434</locationY>
         <assignmentItems>
-            <assignToReference>varBidCount</assignToReference>
-            <operator>Add</operator>
+            <assignToReference>varLeadingBidId</assignToReference>
+            <operator>Assign</operator>
             <value>
-                <numberValue>1.0</numberValue>
+                <elementReference>Loop_Bids.Id</elementReference>
             </value>
         </assignmentItems>
         <connector>
-            <targetReference>Loop_Bid_Scores</targetReference>
+            <targetReference>Loop_Bids</targetReference>
         </connector>
     </assignments>
     <assignments>
-        <name>Set_Leader_Meridian</name>
-        <label>Leader: Meridian</label>
+        <name>Set_Qualified_Outputs</name>
+        <label>Set Outputs: Qualified</label>
         <locationX>50</locationX>
-        <locationY>806</locationY>
+        <locationY>1130</locationY>
         <assignmentItems>
             <assignToReference>out_LeadingSupplier</assignToReference>
             <operator>Assign</operator>
             <value>
-                <stringValue>Meridian Supply Partners Ltd.</stringValue>
+                <elementReference>varLeadingSupplier</elementReference>
             </value>
         </assignmentItems>
-        <connector>
-            <targetReference>Build_Shortlist</targetReference>
-        </connector>
-    </assignments>
-    <assignments>
-        <name>Set_Leader_Continental</name>
-        <label>Leader: Continental</label>
-        <locationX>270</locationX>
-        <locationY>806</locationY>
-        <assignmentItems>
-            <assignToReference>out_LeadingSupplier</assignToReference>
-            <operator>Assign</operator>
-            <value>
-                <stringValue>Continental Sourcing Group</stringValue>
-            </value>
-        </assignmentItems>
-        <connector>
-            <targetReference>Build_Shortlist</targetReference>
-        </connector>
-    </assignments>
-    <assignments>
-        <name>Set_Leader_Vantage</name>
-        <label>Leader: Vantage</label>
-        <locationX>490</locationX>
-        <locationY>806</locationY>
-        <assignmentItems>
-            <assignToReference>out_LeadingSupplier</assignToReference>
-            <operator>Assign</operator>
-            <value>
-                <stringValue>Vantage Procurement Partners</stringValue>
-            </value>
-        </assignmentItems>
-        <connector>
-            <targetReference>Build_Shortlist</targetReference>
-        </connector>
-    </assignments>
-    <assignments>
-        <name>Set_Leader_None</name>
-        <label>Leader: None Qualified</label>
-        <locationX>710</locationX>
-        <locationY>806</locationY>
-        <assignmentItems>
-            <assignToReference>out_LeadingSupplier</assignToReference>
-            <operator>Assign</operator>
-            <value>
-                <stringValue>No qualified supplier</stringValue>
-            </value>
-        </assignmentItems>
-        <connector>
-            <targetReference>Build_Shortlist</targetReference>
-        </connector>
-    </assignments>
-    <assignments>
-        <name>Build_Shortlist</name>
-        <label>Build Shortlist and Outputs</label>
-        <locationX>380</locationX>
-        <locationY>926</locationY>
         <assignmentItems>
             <assignToReference>out_LeadingScore</assignToReference>
             <operator>Assign</operator>
@@ -181,11 +164,27 @@
                 <elementReference>varMaxScore</elementReference>
             </value>
         </assignmentItems>
+        <connector>
+            <targetReference>Mark_Leading_Bid</targetReference>
+        </connector>
+    </assignments>
+    <assignments>
+        <name>Set_No_Qualified_Outputs</name>
+        <label>Set Outputs: None Qualified</label>
+        <locationX>388</locationX>
+        <locationY>1130</locationY>
         <assignmentItems>
-            <assignToReference>out_Shortlist</assignToReference>
+            <assignToReference>out_LeadingSupplier</assignToReference>
             <operator>Assign</operator>
             <value>
-                <stringValue>1. Meridian Supply Partners Ltd. (87.4) — best price/sustainability blend. 2. Continental Sourcing Group (84.1) — strongest quality record. 3. Vantage Procurement Partners (79.6) — lowest unit price but weaker service-level history.</stringValue>
+                <stringValue>No qualified supplier</stringValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>out_LeadingScore</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <numberValue>0.0</numberValue>
             </value>
         </assignmentItems>
         <connector>
@@ -195,21 +194,55 @@
     <assignments>
         <name>Finalize_Success</name>
         <label>Finalize (success)</label>
-        <locationX>380</locationX>
-        <locationY>1166</locationY>
+        <locationX>176</locationX>
+        <locationY>1610</locationY>
         <assignmentItems>
             <assignToReference>varRunNote</assignToReference>
             <operator>Assign</operator>
             <value>
-                <stringValue>Evaluation complete: scored {!varBidCount} bids; leading supplier recorded and request status advanced.</stringValue>
+                <stringValue>Evaluation complete: scored {!varBidCount} bid(s); leading supplier {!out_LeadingSupplier} at {!out_LeadingScore}.</stringValue>
+            </value>
+        </assignmentItems>
+    </assignments>
+    <assignments>
+        <name>Handle_No_Bids</name>
+        <label>Handle No Bids</label>
+        <locationX>440</locationX>
+        <locationY>722</locationY>
+        <assignmentItems>
+            <assignToReference>out_LeadingSupplier</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>No bids received</stringValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>out_LeadingScore</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <numberValue>0.0</numberValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>out_Shortlist</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>No supplier bids were submitted against this RFP.</stringValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>varRunNote</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>No bids to evaluate.</stringValue>
             </value>
         </assignmentItems>
     </assignments>
     <assignments>
         <name>Handle_No_Request</name>
         <label>Handle Missing Request</label>
-        <locationX>726</locationX>
-        <locationY>206</locationY>
+        <locationX>820</locationX>
+        <locationY>242</locationY>
         <assignmentItems>
             <assignToReference>out_LeadingSupplier</assignToReference>
             <operator>Assign</operator>
@@ -228,7 +261,7 @@
             <assignToReference>out_Shortlist</assignToReference>
             <operator>Assign</operator>
             <value>
-                <stringValue>No matching Sourcing_Request__c for the supplied season — evaluation skipped.</stringValue>
+                <stringValue>The sourcing request could not be found — evaluation skipped.</stringValue>
             </value>
         </assignmentItems>
         <assignmentItems>
@@ -242,8 +275,8 @@
     <assignments>
         <name>Handle_Query_Fault</name>
         <label>Handle Query Fault</label>
-        <locationX>726</locationX>
-        <locationY>50</locationY>
+        <locationX>820</locationX>
+        <locationY>86</locationY>
         <assignmentItems>
             <assignToReference>out_LeadingSupplier</assignToReference>
             <operator>Assign</operator>
@@ -262,7 +295,7 @@
             <assignToReference>out_Shortlist</assignToReference>
             <operator>Assign</operator>
             <value>
-                <stringValue>Could not query sourcing requests ({!$Flow.FaultMessage}).</stringValue>
+                <stringValue>Could not read the sourcing request or its bids ({!$Flow.FaultMessage}).</stringValue>
             </value>
         </assignmentItems>
         <assignmentItems>
@@ -276,13 +309,13 @@
     <assignments>
         <name>Handle_Update_Fault</name>
         <label>Handle Update Fault</label>
-        <locationX>726</locationX>
-        <locationY>1046</locationY>
+        <locationX>820</locationX>
+        <locationY>1370</locationY>
         <assignmentItems>
             <assignToReference>varRunNote</assignToReference>
             <operator>Assign</operator>
             <value>
-                <stringValue>Scores computed but status update failed ({!$Flow.FaultMessage}); outputs still returned.</stringValue>
+                <stringValue>Scores computed but a write-back failed ({!$Flow.FaultMessage}); outputs still returned.</stringValue>
             </value>
         </assignmentItems>
     </assignments>
@@ -290,16 +323,16 @@
         <name>Was_Request_Found</name>
         <label>Sourcing Request Found?</label>
         <locationX>176</locationX>
-        <locationY>206</locationY>
+        <locationY>218</locationY>
         <defaultConnector>
-            <targetReference>Init_Evaluation</targetReference>
+            <targetReference>Get_Bids</targetReference>
         </defaultConnector>
         <defaultConnectorLabel>Found</defaultConnectorLabel>
         <rules>
             <name>Request_Missing</name>
             <conditionLogic>and</conditionLogic>
             <conditions>
-                <leftValueReference>Get_Sourcing_Request.Id</leftValueReference>
+                <leftValueReference>Get_Request.Id</leftValueReference>
                 <operator>IsNull</operator>
                 <rightValue>
                     <booleanValue>true</booleanValue>
@@ -313,103 +346,98 @@
     </decisions>
     <decisions>
         <name>Check_New_Max</name>
-        <label>New Maximum Score?</label>
-        <locationX>380</locationX>
-        <locationY>566</locationY>
+        <label>New Highest Score?</label>
+        <locationX>440</locationX>
+        <locationY>458</locationY>
         <defaultConnector>
-            <targetReference>Count_Bid_Only</targetReference>
+            <targetReference>Loop_Bids</targetReference>
         </defaultConnector>
         <defaultConnectorLabel>Not Higher</defaultConnectorLabel>
         <rules>
             <name>Is_New_Max</name>
             <conditionLogic>and</conditionLogic>
             <conditions>
-                <leftValueReference>Loop_Bid_Scores</leftValueReference>
+                <leftValueReference>varThisScore</leftValueReference>
                 <operator>GreaterThan</operator>
                 <rightValue>
                     <elementReference>varMaxScore</elementReference>
                 </rightValue>
             </conditions>
             <connector>
-                <targetReference>Capture_New_Max</targetReference>
+                <targetReference>Capture_Leader</targetReference>
             </connector>
             <label>Higher Score</label>
         </rules>
     </decisions>
     <decisions>
-        <name>Determine_Leader</name>
-        <label>Which Supplier Leads?</label>
-        <locationX>380</locationX>
-        <locationY>686</locationY>
+        <name>Had_Any_Bids</name>
+        <label>Any Bids Evaluated?</label>
+        <locationX>176</locationX>
+        <locationY>722</locationY>
         <defaultConnector>
-            <targetReference>Set_Leader_None</targetReference>
+            <targetReference>Update_All_Bids</targetReference>
         </defaultConnector>
-        <defaultConnectorLabel>None Qualified</defaultConnectorLabel>
+        <defaultConnectorLabel>Bids Evaluated</defaultConnectorLabel>
         <rules>
-            <name>Leader_Meridian</name>
+            <name>No_Bids</name>
             <conditionLogic>and</conditionLogic>
             <conditions>
-                <leftValueReference>varMaxScore</leftValueReference>
-                <operator>GreaterThanOrEqualTo</operator>
+                <leftValueReference>varBidCount</leftValueReference>
+                <operator>EqualTo</operator>
                 <rightValue>
-                    <numberValue>87.0</numberValue>
+                    <numberValue>0.0</numberValue>
                 </rightValue>
             </conditions>
             <connector>
-                <targetReference>Set_Leader_Meridian</targetReference>
+                <targetReference>Handle_No_Bids</targetReference>
             </connector>
-            <label>Meridian (>= 87)</label>
+            <label>No Bids</label>
         </rules>
+    </decisions>
+    <decisions>
+        <name>Is_Leader_Qualified</name>
+        <label>Leader Clears Threshold?</label>
+        <locationX>176</locationX>
+        <locationY>1010</locationY>
+        <defaultConnector>
+            <targetReference>Set_No_Qualified_Outputs</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>Below Threshold</defaultConnectorLabel>
         <rules>
-            <name>Leader_Continental</name>
+            <name>Qualified</name>
             <conditionLogic>and</conditionLogic>
             <conditions>
                 <leftValueReference>varMaxScore</leftValueReference>
                 <operator>GreaterThanOrEqualTo</operator>
                 <rightValue>
-                    <numberValue>84.0</numberValue>
+                    <elementReference>fx_Threshold</elementReference>
                 </rightValue>
             </conditions>
             <connector>
-                <targetReference>Set_Leader_Continental</targetReference>
+                <targetReference>Set_Qualified_Outputs</targetReference>
             </connector>
-            <label>Continental (>= 84)</label>
-        </rules>
-        <rules>
-            <name>Leader_Vantage</name>
-            <conditionLogic>and</conditionLogic>
-            <conditions>
-                <leftValueReference>varMaxScore</leftValueReference>
-                <operator>GreaterThanOrEqualTo</operator>
-                <rightValue>
-                    <numberValue>79.0</numberValue>
-                </rightValue>
-            </conditions>
-            <connector>
-                <targetReference>Set_Leader_Vantage</targetReference>
-            </connector>
-            <label>Vantage (>= 79)</label>
+            <label>Qualified</label>
         </rules>
     </decisions>
     <loops>
-        <name>Loop_Bid_Scores</name>
-        <label>Loop Bid Scores</label>
+        <name>Loop_Bids</name>
+        <label>Loop Over Bids</label>
         <locationX>176</locationX>
-        <locationY>566</locationY>
-        <collectionReference>collBidScores</collectionReference>
+        <locationY>590</locationY>
+        <collectionReference>Get_Bids</collectionReference>
         <iterationOrder>Asc</iterationOrder>
         <nextValueConnector>
-            <targetReference>Check_New_Max</targetReference>
+            <targetReference>Score_This_Bid</targetReference>
         </nextValueConnector>
         <noMoreValuesConnector>
-            <targetReference>Determine_Leader</targetReference>
+            <targetReference>Had_Any_Bids</targetReference>
         </noMoreValuesConnector>
     </loops>
     <recordLookups>
-        <name>Get_Sourcing_Request</name>
+        <name>Get_Request</name>
         <label>Get Sourcing Request</label>
         <locationX>176</locationX>
-        <locationY>86</locationY>
+        <locationY>98</locationY>
         <assignNullValuesIfNoRecordsFound>true</assignNullValuesIfNoRecordsFound>
         <connector>
             <targetReference>Was_Request_Found</targetReference>
@@ -419,21 +447,85 @@
         </faultConnector>
         <filterLogic>and</filterLogic>
         <filters>
-            <field>Season__c</field>
+            <field>Id</field>
             <operator>EqualTo</operator>
             <value>
-                <elementReference>inp_Season</elementReference>
+                <elementReference>inp_RequestId</elementReference>
             </value>
         </filters>
         <getFirstRecordOnly>true</getFirstRecordOnly>
         <object>Sourcing_Request__c</object>
         <storeOutputAutomatically>true</storeOutputAutomatically>
     </recordLookups>
+    <recordLookups>
+        <name>Get_Bids</name>
+        <label>Get Supplier Bids</label>
+        <locationX>176</locationX>
+        <locationY>338</locationY>
+        <assignNullValuesIfNoRecordsFound>true</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Init_Evaluation</targetReference>
+        </connector>
+        <faultConnector>
+            <targetReference>Handle_Query_Fault</targetReference>
+        </faultConnector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Sourcing_Request__c</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>inp_RequestId</elementReference>
+            </value>
+        </filters>
+        <getFirstRecordOnly>false</getFirstRecordOnly>
+        <object>Supplier_Bid__c</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
+    <recordUpdates>
+        <name>Update_All_Bids</name>
+        <label>Save Bid Scores</label>
+        <locationX>176</locationX>
+        <locationY>890</locationY>
+        <connector>
+            <targetReference>Is_Leader_Qualified</targetReference>
+        </connector>
+        <faultConnector>
+            <targetReference>Handle_Update_Fault</targetReference>
+        </faultConnector>
+        <inputReference>collBidsToUpdate</inputReference>
+    </recordUpdates>
+    <recordUpdates>
+        <name>Mark_Leading_Bid</name>
+        <label>Mark Leading Bid</label>
+        <locationX>50</locationX>
+        <locationY>1250</locationY>
+        <connector>
+            <targetReference>Update_Request_Status</targetReference>
+        </connector>
+        <faultConnector>
+            <targetReference>Handle_Update_Fault</targetReference>
+        </faultConnector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Id</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>varLeadingBidId</elementReference>
+            </value>
+        </filters>
+        <inputAssignments>
+            <field>Is_Leading_Bid__c</field>
+            <value>
+                <booleanValue>true</booleanValue>
+            </value>
+        </inputAssignments>
+        <object>Supplier_Bid__c</object>
+    </recordUpdates>
     <recordUpdates>
         <name>Update_Request_Status</name>
         <label>Update Request Status</label>
-        <locationX>380</locationX>
-        <locationY>1046</locationY>
+        <locationX>176</locationX>
+        <locationY>1490</locationY>
         <connector>
             <targetReference>Finalize_Success</targetReference>
         </connector>
@@ -442,10 +534,10 @@
         </faultConnector>
         <filterLogic>and</filterLogic>
         <filters>
-            <field>Season__c</field>
+            <field>Id</field>
             <operator>EqualTo</operator>
             <value>
-                <elementReference>inp_Season</elementReference>
+                <elementReference>inp_RequestId</elementReference>
             </value>
         </filters>
         <inputAssignments>
@@ -460,17 +552,24 @@
         <locationX>50</locationX>
         <locationY>0</locationY>
         <connector>
-            <targetReference>Get_Sourcing_Request</targetReference>
+            <targetReference>Get_Request</targetReference>
         </connector>
     </start>
     <status>Active</status>
     <variables>
-        <name>collBidScores</name>
-        <dataType>Number</dataType>
+        <name>collBidsToUpdate</name>
+        <dataType>SObject</dataType>
         <isCollection>true</isCollection>
         <isInput>false</isInput>
         <isOutput>false</isOutput>
-        <scale>1</scale>
+        <objectType>Supplier_Bid__c</objectType>
+    </variables>
+    <variables>
+        <name>inp_RequestId</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
     </variables>
     <variables>
         <name>inp_Season</name>
@@ -510,6 +609,20 @@
         <scale>0</scale>
     </variables>
     <variables>
+        <name>varLeadingBidId</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <name>varLeadingSupplier</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
         <name>varMaxScore</name>
         <dataType>Number</dataType>
         <isCollection>false</isCollection>
@@ -523,5 +636,13 @@
         <isCollection>false</isCollection>
         <isInput>false</isInput>
         <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <name>varThisScore</name>
+        <dataType>Number</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+        <scale>1</scale>
     </variables>
 </Flow>

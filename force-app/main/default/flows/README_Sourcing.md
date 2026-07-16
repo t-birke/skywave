@@ -49,9 +49,9 @@ The `Season__c` field feeds every step; `Category__c` keeps the request generic 
 |-------|------|------|---------|-------|
 | 1. Plan & Draft | Build Demand Forecast | background | `Skywave_Sourcing_Demand_Forecast` | Rolls the season's operating schedule into estimated demand units per category/route. |
 | 1. Plan & Draft | Draft RFP | background | `Skywave_Sourcing_Draft_RFP` | **→ hands to prompt template** `Skywave_Sourcing_RFP_Draft` (`generatePromptResponse`) to write the RFP narrative. |
-| 2. Issue RFP | Review & Release RFP *(simulated)* | background | `Skywave_Sourcing_Issue_RFP_Sim` | Stands in for the Category Manager releasing the RFP → `out_ReleaseDecision='Released'`. |
-| 3. Evaluate | Score Supplier Bids | background | `Skywave_Sourcing_Evaluate_Bids` | Weighted matrix (price / quality / sustainability / service level); emits `out_LeadingScore`. **Deliberately built out (~20 nodes) as a Flow Builder teaching canvas** — see below. |
-| — | **`Bid_Quality_Gate` decision** | *decision* | — | `out_LeadingScore ≥ 75` → Stage 4; else → Stage X (cancel). |
+| 2. Issue RFP | Review & Release RFP *(simulated)* | background | `Skywave_Sourcing_Issue_RFP_Sim` | Releases the RFP and **seeds the supplier panel's bids** — creates example `Supplier_Bid__c` records against the request (the one place demo supplier names live). |
+| 3. Evaluate | Score Supplier Bids | background | `Skywave_Sourcing_Evaluate_Bids` | **Data-driven**: reads the request's `Supplier_Bid__c` rows, computes each bid's `Weighted_Total__c` from its component scores × the request's configurable weights, ranks, flags the winning `Is_Leading_Bid__c`, writes back. Emits the leader + score. **Built out (~20 nodes) as a Flow Builder teaching canvas** — see below. |
+| — | **`Bid_Quality_Gate` decision** | *decision* | — | `out_LeadingScore > 0` (Evaluate returned a qualifying leader) → Stage 4; else → Stage X (cancel). The qualifying *threshold* itself is `Sourcing_Request__c.Qualifying_Threshold__c`, applied inside Evaluate. |
 | 4. Negotiate | Agent Negotiation | background | `Skywave_Sourcing_Negotiate_Supplier` | **→ hands to Agentforce agent** `Skywave_Airlines_Agent` (`generateAiAgentResponse`) to negotiate pricing & rebate tiers. |
 | 5. Award & Contract | Procurement Director Approval *(simulated)* | background | `Skywave_Sourcing_Award_Approval_Sim` | Stands in for the Director approving the award → `out_ApprovalDecision='Approved'`. |
 | 5. Award & Contract | Generate Contract & POs | background | `Skywave_Sourcing_Finalize_Contract` | **Entry condition:** only runs when the approval decision = `Approved`. |
@@ -65,35 +65,59 @@ Both branches are verified end-to-end on `si`: the demo default (mock leading sc
 completes award → contract; forcing the score below 75 completes via the cancellation stage
 with negotiate/award/contract correctly skipped.
 
+## The data model (what makes it versatile)
+
+The evaluation is **data-driven** — nothing about suppliers, scores, or weights is hardcoded
+in the flow logic:
+
+- **`Supplier_Bid__c`** (child of `Sourcing_Request__c`, master-detail): one row per bid.
+  `Supplier_Name__c`, `Unit_Price__c`, four buyer-assigned component scores
+  (`Price_Score__c`, `Quality_Score__c`, `Sustainability_Score__c`, `Service_Level_Score__c`,
+  each 0–100), plus two fields the flow writes: `Weighted_Total__c` and `Is_Leading_Bid__c`.
+- **`Sourcing_Request__c`** gains configurable evaluation settings: `Weight_Price__c` (40),
+  `Weight_Quality__c` (25), `Weight_Sustainability__c` (20), `Weight_Service_Level__c` (15),
+  and `Qualifying_Threshold__c` (75). Change these per request and the outcome changes — no
+  flow edit. (The flow normalizes by the weights' sum, so they need not total 100.)
+
+In the demo, the RFP-release step (`Skywave_Sourcing_Issue_RFP_Sim`) seeds four example bids
+so there's something to evaluate; in a real deployment those rows would be created by
+suppliers/buyers. That seed step is the only place example supplier names appear.
+
 ## `Skywave_Sourcing_Evaluate_Bids` — the Flow Builder teaching canvas
 
-This subflow is intentionally over-built (~20 elements, multiple happy/error paths) so it can
-be opened in Flow Builder to walk an audience through the element palette. It still takes the
-same input (`inp_Season`) and returns the same outputs, so the orchestration is unaffected —
-the mock max score is 87.4 → **Meridian**, keeping the demo's qualified-bid branch.
+Built out (~20 elements, multiple happy/error paths) so it can be opened in Flow Builder to
+walk an audience through the element palette — while being a genuine, reusable evaluation.
+Inputs: `inp_RequestId` (+ `inp_Season`); outputs: `out_LeadingSupplier`, `out_LeadingScore`,
+`out_Shortlist`.
 
 Canvas walkthrough (start → end):
 
-1. **Get Records** `Get_Sourcing_Request` — looks up the `Sourcing_Request__c` by season.
-   Has a **fault path** → `Handle_Query_Fault` (returns safe defaults on any query error).
-2. **Decision** `Was_Request_Found` — *Not Found* → `Handle_No_Request` (safe defaults);
-   *Found* → continues. (a not-found branch.)
-3. **Assignment** `Init_Evaluation` → **Assignment** `Seed_Bid_Scores` — seed a numeric
-   collection of candidate bid scores (mock data).
-4. **Loop** `Loop_Bid_Scores` over the collection:
-   - **Decision** `Check_New_Max` — *Higher Score* → `Capture_New_Max` (updates the running
-     max + count); *Not Higher* → `Count_Bid_Only`. Both loop back.
-5. After the loop, **Decision** `Determine_Leader` — a **four-way** branch on the max score
-   (Meridian ≥ 87 / Continental ≥ 84 / Vantage ≥ 79 / default *None Qualified*), each setting
-   `out_LeadingSupplier`.
-6. **Assignment** `Build_Shortlist` — sets `out_LeadingScore` + `out_Shortlist`.
-7. **Update Records** `Update_Request_Status` — writes `Status__c`; has its own **fault path**
-   → `Handle_Update_Fault` (keeps the computed outputs even if the DML fails).
-8. **Assignment** `Finalize_Success` — end of the happy path.
+1. **Get Records** `Get_Request` — the `Sourcing_Request__c` (for its weights + threshold).
+   **Fault path** → `Handle_Query_Fault`.
+2. **Decision** `Was_Request_Found` — *Not Found* → `Handle_No_Request`; else continue.
+3. **Get Records** `Get_Bids` — all `Supplier_Bid__c` for the request. **Fault path** →
+   `Handle_Query_Fault`.
+4. **Assignment** `Init_Evaluation` — reset counters + shortlist.
+5. **Loop** `Loop_Bids` over the bids:
+   - **Assignment** `Score_This_Bid` — computes the weighted total for *this* bid via formula
+     `fx_WeightedTotal` (component scores × the request's weights ÷ weight-sum), writes it onto
+     the loop record, appends to the shortlist, adds the record to a collection to bulk-update.
+   - **Decision** `Check_New_Max` — *Higher Score* → `Capture_Leader` (remember supplier, id,
+     score); *Not Higher* → loop. Both return to the loop.
+6. After the loop, **Decision** `Had_Any_Bids` — *No Bids* → `Handle_No_Bids`; else continue.
+7. **Update Records** `Update_All_Bids` — bulk-writes every bid's `Weighted_Total__c` (from the
+   collection). **Fault path** → `Handle_Update_Fault`.
+8. **Decision** `Is_Leader_Qualified` — leader's max score vs. formula `fx_Threshold`
+   (the request's `Qualifying_Threshold__c`). *Qualified* → set qualified outputs →
+   **Update Records** `Mark_Leading_Bid` (sets `Is_Leading_Bid__c` on the winner);
+   *Below Threshold* → set "none qualified" outputs (`out_LeadingScore = 0`).
+9. **Update Records** `Update_Request_Status`. **Fault path** → `Handle_Update_Fault`.
+10. **Assignment** `Finalize_Success`.
 
-Elements on show: Get Records, Update Records, two independent **fault paths**, a **Loop**, a
-two-way and a **four-way Decision**, a not-found branch, several Assignments, plus collection /
-counter / fault-message (`{!$Flow.FaultMessage}`) variables.
+Elements on show: **three Get/Update data elements plus a bulk update and a targeted update**,
+**three independent fault paths**, a **Loop**, **four Decisions** (found / new-max / any-bids /
+qualified), a not-found and a no-bids branch, formula resources, an sObject collection, and
+`{!$Flow.FaultMessage}` — all in service of real logic, not filler.
 
 ## Simulated human steps & interactive-step blocker
 
@@ -168,9 +192,13 @@ orchestration still completes if the agent/template isn't available in the org.
   Must be **Published** with a top-level `<activeVersionIdentifier>` pointing at the active
   version — a Draft template exposes *no* invocable action, which leaves the Draft-RFP
   subflow `InvalidDraft` ("invalid reference to `…promptResponse`").
-- **Trigger object:** `Sourcing_Request__c` (mock; AutoNumber `SRC-{0000}`) with fields
-  `Season__c`, `Category__c`, `Status__c`. Full access granted on the
-  `Skywave_Demo_Admin` permission set.
+- **Trigger object:** `Sourcing_Request__c` (AutoNumber `SRC-{0000}`) with `Season__c`,
+  `Category__c`, `Status__c`, the four `Weight_*__c` fields, and `Qualifying_Threshold__c`.
+- **Bid object:** `Supplier_Bid__c` (AutoNumber `BID-{0000}`, master-detail child) with
+  `Supplier_Name__c`, `Unit_Price__c`, the four component score fields, `Weighted_Total__c`,
+  and `Is_Leading_Bid__c`. Full access for both objects is granted on the `Skywave_Demo_Admin`
+  permission set (add new fields to `scripts/regen-demo-admin-fls.py`'s `OUR_OBJECTS` and
+  re-run if you extend them).
 
 The agent hand-off reuses the existing `Skywave_Airlines_Agent` already in the org.
 
