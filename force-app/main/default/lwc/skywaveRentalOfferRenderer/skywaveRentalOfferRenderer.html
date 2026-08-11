@@ -1,0 +1,63 @@
+<template>
+    <template lwc:if={errorMessage}>
+        <p class="sw-error">{errorMessage}</p>
+    </template>
+    <template lwc:elseif={placeholderMessage}>
+        <p class="sw-placeholder">{placeholderMessage}</p>
+    </template>
+    <template lwc:elseif={reserved}>
+        <div class="sw-rent-reserved">
+            <span class="sw-rent-reserved__icon">🚗</span>
+            <div>
+                <div class="sw-rent-reserved__title">Reserving your car</div>
+                <div class="sw-rent-reserved__sub">{reservedLabel}</div>
+            </div>
+        </div>
+    </template>
+    <template lwc:else>
+        <article class="sw-rent-card">
+            <header class="sw-rent-card__header">
+                <h3 class="sw-rent-card__title">{headline}</h3>
+                <p class="sw-rent-card__sub">{pickupSubtitle}</p>
+            </header>
+
+            <div class="sw-rent-slider">
+                <div class="sw-rent-slider__top">
+                    <span class="sw-rent-slider__label">Duration</span>
+                    <span class="sw-rent-slider__value">{daysLabel}</span>
+                </div>
+                <input
+                    type="range"
+                    class="sw-rent-range"
+                    min={minDays}
+                    max={maxDays}
+                    step="1"
+                    value={days}
+                    onchange={handleSliderChange}
+                    oninput={handleSliderChange} />
+                <div class="sw-rent-slider__ends">
+                    <span>{minDays}</span>
+                    <span>{maxDays} days</span>
+                </div>
+            </div>
+
+            <div class="sw-rent-tiles">
+                <template for:each={tiers} for:item="tier">
+                    <div key={tier.category} class="sw-rent-tile">
+                        <div class="sw-rent-tile__name">{tier.category}</div>
+                        <div class="sw-rent-tile__model">{tier.exampleModel}</div>
+                        <div class="sw-rent-tile__rate">{tier.rateLabel}</div>
+                        <div class="sw-rent-tile__total">{tier.totalLabel}</div>
+                        <button
+                            type="button"
+                            class="sw-rent-reserve"
+                            data-category={tier.category}
+                            onclick={handleReserve}>
+                            Reserve
+                        </button>
+                    </div>
+                </template>
+            </div>
+        </article>
+    </template>
+</template>

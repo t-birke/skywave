@@ -1,0 +1,5 @@
+{
+    "title": "Skywave Rental Offer",
+    "description": "Output from Skywave_PresentRentalOffer — JSON envelope rendered as a rental card with a duration slider (1-14 days) and three vehicle tiles (Economy / Comfort / Luxury).",
+    "lightning:type": "@apexClassType/c__Skywave_RentalOfferData"
+}

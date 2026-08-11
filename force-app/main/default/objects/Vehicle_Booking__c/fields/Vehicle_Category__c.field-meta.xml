@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Vehicle_Category__c</fullName>
+    <label>Vehicle Category</label>
+    <description>The rental vehicle tier booked</description>
+    <inlineHelpText>Select the vehicle tier for this rental</inlineHelpText>
+    <type>Picklist</type>
+    <required>true</required>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Economy</fullName>
+                <default>true</default>
+                <label>Economy</label>
+            </value>
+            <value>
+                <fullName>Comfort</fullName>
+                <default>false</default>
+                <label>Comfort</label>
+            </value>
+            <value>
+                <fullName>Luxury</fullName>
+                <default>false</default>
+                <label>Luxury</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

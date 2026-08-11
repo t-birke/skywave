@@ -71,7 +71,7 @@ Contact), so each presenter's session has its own seat state.
 | Path | What it holds |
 |------|---------------|
 | `force-app/main/default/` | All Salesforce metadata (the bulk of the system) |
-| ├ `aiAuthoringBundles/` | The two `.agent` files — chat + voice agents |
+| ├ `aiAuthoringBundles/` | The `.agent` files — airlines chat, voice, and the **rental-car connected sub-agent** (`Skywave_Rental_Agent`, §3c''') |
 | ├ `classes/` | ~50 Apex classes: agent actions, REST endpoints, controllers, seeders |
 | ├ `triggers/` | 4 triggers (Demo_Session, Contact-update PE, phone-digits, VoiceCall resolve) |
 | ├ `lwc/` | Chat/voice cards (CLT renderers), demo monitor, survey author, contact card |
@@ -693,6 +693,52 @@ trace-disproven):
 the ladder (evaluated so the lowest step wins last) then leaves it cleared. The
 returning-visitor fast path (`profile_ever_collected` true) runs
 `ack_profile_form` deterministically and skips the profile card.
+
+### 3c'''. How the Skywave Rental Car Agent works (connected sub-agent)
+
+`Skywave_Rental_Agent` is a **separate, standalone** Agent Script service agent
+(its own `.agent` bundle, its own `AGENT_USER` replacement in `sfdx-project.json`)
+designed to be reached as a **connected sub-agent** from the airlines agent via a
+`@agent.` handoff — the orchestrator can transfer trip context in a variable
+assignment. Because a handoff keeps the **same MIAW messaging session**, the
+rental agent resolves the visitor's identity independently from its own `linked`
+identity variables (`@MessagingEndUser.MessagingPlatformKey` / `ConversationId`),
+so it also works standalone. **The airlines agent was intentionally left untouched**
+— the proactive-offer-after-confirm wiring is deferred to a future edit; the
+rental agent is built ready to accept the transfer.
+
+**Gate: no car without a flight.** The router runs `Skywave_ResolveRentalContext`
+once (sentinel `rental_context_resolved`). That action *delegates identity
+resolution to `Skywave_ResolveSession`* (one implementation of the
+deviceId/conversationId/demo-seed logic — no drift between the two agents), then
+finds the visitor's most recent **upcoming** flight booking. Its final segment's
+destination + arrival date become the rental pickup location + date, and its
+confirmation code links the `Vehicle_Booking__c` back to the flight `Booking__c`.
+If there is no upcoming flight, `has_flight_booking` is false and the router
+transitions to the `no_flight_booking` spoke (explains a car is added to a trip).
+
+**Simpler data than flights.** Rentals need no segments/seat-zones, so there is
+one object — `Vehicle_Booking__c` (Contact lookup + `Flight_Booking__c` lookup to
+`Booking__c`) — written by one SSOT, `Skywave_RentalEngine`, off the catalogue in
+`Skywave_RentalCatalog` (three tiers: Economy $45 / Comfort $75 / Luxury $140 per
+day). Rental confirmation codes are `RC`-prefixed to stay visually distinct from
+flight codes.
+
+**Rental pipeline** (its own step ladder, same dual-copy pattern as §3c — router
+copy for cross-turn re-entry, subagent copy for within-turn chaining):
+offer → reserve → payment → confirm, gated by `rental_step`.
+
+| Step | Action | CLT card / cue |
+|------|--------|----------------|
+| offer | `Skywave_PresentRentalOffer` | **Rental Offer card** (`skywaveRentalOfferRenderer`): one duration slider (1–14 days) + 3 tier tiles, totals recompute live as the slider moves. Reserve posts `Rent <category> for <N> days`. |
+| reserve | `Skywave_ReserveVehicle` | inserts Pending/Unpaid `Vehicle_Booking__c`; returns code + total |
+| payment | `Skywave_PresentRentalPayment` | **Rental Payment card** (`skywaveRentalPaymentRenderer`, twin of the flight payment picker): Demo Pay calls `Skywave_ProcessRentalPayment` (`without sharing`) to flip Paid/Confirmed, posts `Rental payment completed` |
+| confirm | `Skywave_ConfirmRental` | verify-only re-read (defence against forged cues), quotes the confirmed code |
+
+No profile step: the rental option only appears after a flight is booked, so the
+Contact profile is already complete. Guest-runtime Apex (`Skywave_ProcessRentalPayment`
++ the two renderer DTOs) is granted on `Skywave_Embedded_Messaging`; the agent-run
+invocables + engine/catalogue on `Skywave_Agent_User`; full FLS on `Skywave_Demo_Admin`.
 
 ### 3d. IP geolocation → home airport (web)
 

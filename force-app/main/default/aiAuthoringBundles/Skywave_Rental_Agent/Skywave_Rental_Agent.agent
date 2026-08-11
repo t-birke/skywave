@@ -1,0 +1,628 @@
+system:
+  instructions: "You are the Skywave rental-car assistant. You help travellers add a rental car at the destination of a flight they have already booked. You offer three vehicle categories — Economy, Comfort, and Luxury — and take the car from reservation through payment to confirmation."
+
+  messages:
+    # Static welcome — fires the moment the agent joins the session. This
+    # agent is reached as a connected sub-agent from the Skywave Airlines
+    # agent once a flight is booked, or directly when a traveller asks for
+    # a car. Keep it short and on-brand.
+    welcome: "Great — let's get you a car for your trip. One moment while I pull up your options."
+    error: "Something went wrong, please try again."
+
+config:
+    developer_name: "Skywave_Rental_Agent"
+    agent_label: "Skywave Rental Car Agent"
+    description: "A connected sub-agent for Skywave that offers and books rental cars (Economy, Comfort, Luxury) at the destination of a flight the traveller has already booked."
+    agent_type: "AgentforceServiceAgent"
+    default_agent_user: "skywaveserviceagent@example.com"
+    additional_parameter__enable_graph_runtime: True
+
+variables:
+    ContactId: linked string
+        source: @MessagingEndUser.ContactId
+        description: "MessagingEndUser ContactId"
+    Session_Key: linked string
+        source: @MessagingEndUser.MessagingPlatformKey
+        description: "Verified-session key (format ...AUTH/<config>/uid:<deviceId>). Skywave_ResolveRentalContext extracts the deviceId and resolves the Contact by Session_Id__c — same key the airlines agent uses. Conversation_Id is the fallback."
+    Conversation_Id: linked string
+        source: @MessagingSession.ConversationId
+        description: "Legacy join key for Skywave_ResolveRentalContext (pre-User-Verification fallback)."
+    testingSession: mutable string = ""
+        label: "Testing Session (studio override)"
+        description: "Studio-preview override for Conversation_Id (real chat ignores it). Points at a Contact with an upcoming flight so the preview hydrates."
+
+    rental_context_resolved: mutable boolean = False
+        label: "Rental Context Resolved"
+        description: "True once Skywave_ResolveRentalContext has run for this conversation."
+    resolved_contact_id: mutable string = ""
+        label: "Resolved Contact Id"
+        description: "Resolved Contact Id for the current visitor. Empty until resolve_rental_context runs (or the orchestrator transfers it)."
+    has_flight_booking: mutable boolean = False
+        label: "Has Flight Booking"
+        description: "True when the visitor has an upcoming flight booking. Gates the whole rental offer — no car is offered without a booked flight."
+    flight_booking_code: mutable string = ""
+        label: "Flight Booking Code"
+        description: "Confirmation code of the flight booking the rental is tied to. Passed to reserve_vehicle so the Vehicle_Booking__c links back to the flight."
+    destination_code: mutable string = ""
+        label: "Destination Code (IATA)"
+        description: "Destination airport of the booked flight — the rental pickup location."
+    destination_city: mutable string = ""
+        label: "Destination City"
+        description: "City label of the destination, for the offer card headline."
+    pickup_date: mutable string = ""
+        label: "Pickup Date (YYYY-MM-DD)"
+        description: "Arrival date of the booked flight — the rental start date."
+    trip_summary: mutable string
+        label: "Trip Summary"
+        description: "Natural-language summary of the visitor's trip (destination + arrival date) for agent reasoning."
+
+    rental_step: mutable string = ""
+        label: "Rental Step"
+        description: "Rental pipeline state: '' (offer) / payment / confirm / done."
+    selected_category: mutable string = ""
+        label: "Selected Category"
+        description: "Vehicle tier the visitor reserved (Economy/Comfort/Luxury). Echoed back from reserve_vehicle."
+    selected_days: mutable number = 0
+        label: "Selected Days"
+        description: "Rental duration in days chosen on the slider. Echoed back from reserve_vehicle."
+    rental_selected: mutable boolean = False
+        label: "Rental Selected"
+        description: "True once reserve_vehicle created the Pending/Unpaid Vehicle_Booking__c. Drives rental_step=payment."
+    rental_booking_code: mutable string = ""
+        label: "Rental Booking Code"
+        description: "Confirmation code of the reserved rental; passed to the payment widget."
+    rental_total_charged: mutable string = ""
+        label: "Rental Total Charged"
+        description: "Total amount string (e.g. '$300.00') from reserve_vehicle."
+    rental_payment_processed: mutable boolean = False
+        label: "Rental Payment Processed"
+        description: "True once confirm_rental verified the payment widget flipped the rental to Paid."
+    rental_confirmed: mutable boolean = False
+        label: "Rental Confirmed"
+        description: "True once confirm_rental succeeded. Drives rental_step=done."
+    rental_confirmation_code: mutable string = ""
+        label: "Rental Confirmation Code"
+        description: "Verified confirmation code from confirm_rental, so the agent can re-quote without re-running."
+
+language:
+    default_locale: "en_US"
+    additional_locales: ""
+    all_additional_locales: False
+
+knowledge:
+    citations_enabled: False
+
+start_agent rental_router:
+    label: "Rental Router"
+
+    description: "Resolve the visitor's trip context, gate on a booked flight, and route to the rental booking flow."
+
+    reasoning:
+        instructions: ->
+            # Deterministic rental-step ladder. Each completed sub-action flips
+            # a flag; this recomputes rental_step from those flags every turn so
+            # the flow can't get stuck or skip a step.
+            if @variables.rental_confirmed is True:
+                set @variables.rental_step = "done"
+            if @variables.rental_payment_processed is True and @variables.rental_confirmed is False:
+                set @variables.rental_step = "confirm"
+            if @variables.rental_selected is True and @variables.rental_payment_processed is False:
+                set @variables.rental_step = "payment"
+
+            # Resolve identity + trip context exactly ONCE. This agent runs in
+            # the same messaging session as the airlines agent, so it resolves
+            # the Contact independently via the linked identity variables. It
+            # also finds the visitor's upcoming flight to gate the offer and
+            # pre-fill destination + pickup date. When reached by handoff, the
+            # orchestrator may also transfer these values, but self-resolving
+            # keeps the agent correct standalone.
+            if @variables.rental_context_resolved is False:
+                run @actions.resolve_rental_context
+                    with sessionKey = @variables.Session_Key
+                    with conversationId = @variables.Conversation_Id
+                    with testingSession = @variables.testingSession
+                    set @variables.resolved_contact_id = @outputs.contactId
+                    set @variables.has_flight_booking = @outputs.hasFlightBooking
+                    set @variables.flight_booking_code = @outputs.flightBookingCode
+                    set @variables.destination_code = @outputs.destinationCode
+                    set @variables.destination_city = @outputs.destinationCity
+                    set @variables.pickup_date = @outputs.pickupDate
+                    set @variables.trip_summary = @outputs.summary
+                    set @variables.rental_context_resolved = True
+
+            # Once a rental booking is in flight, keep the visitor in the
+            # booking subagent so the ladder continues to completion.
+            if @variables.rental_step == "payment" or @variables.rental_step == "confirm":
+                transition to @subagent.rental_booking
+
+            if @variables.has_flight_booking is False:
+                transition to @subagent.no_flight_booking
+
+            | You are a router only. Do NOT answer questions or book anything directly. Always use a transition action.
+
+              The visitor has a booked flight and this agent exists to add a rental car for that trip. {!@variables.trip_summary}
+
+              Route by intent:
+              - Renting a car, choosing a vehicle, or any travel-flavoured request about ground transport at the destination -> use go_to_rental_booking. This is the default — assume rental intent.
+              - Request to speak to a human or live agent -> use escalate_to_human (this transfers the conversation directly; it is NOT a transition to another subagent).
+              - Genuinely off-topic and unrelated to renting a car (weather chitchat, news, jokes, general knowledge, or a request to change the flight itself) -> use go_to_off_topic.
+              Never attempt to help the visitor yourself. Always route.
+
+        actions:
+            go_to_rental_booking: @utils.transition to @subagent.rental_booking
+                description: "Route to offer and book a rental car (select vehicle + duration, pay, confirm)."
+
+            escalate_to_human: @utils.escalate
+                description: "Transfer the conversation to a live human agent. Use when the visitor explicitly asks to speak to a person/live agent."
+
+            go_to_off_topic: @utils.transition to @subagent.off_topic
+                description: "Handle off-topic or unrelated questions."
+
+    actions:
+        resolve_rental_context:
+            description: "Resolves the visitor's Contact (same logic as the airlines agent) and their upcoming flight destination + arrival date, so the rental agent can gate the offer on a booked flight and pre-fill the pickup location/date. Runs once at the router."
+            label: "Resolve Rental Context"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Checking your trip"
+            target: "apex://Skywave_ResolveRentalContext"
+
+            inputs:
+                "sessionKey": string
+                    description: "Verified-session MessagingPlatformKey from @MessagingEndUser.MessagingPlatformKey. Resolver extracts the deviceId and matches Contact.Session_Id__c. Primary identity path."
+                    label: "Session Key"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "conversationId": string
+                    description: "The MessagingSession.ConversationId, sourced from @MessagingSession.ConversationId. Fallback identity path."
+                    label: "Conversation Id"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "testingSession": string
+                    description: "Studio-preview fallback. Real chat ignores it (conversationId wins)."
+                    label: "Testing Session"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "contactId": string
+                    description: "Salesforce Id of the resolved Contact. Pin into resolved_contact_id."
+                    label: "Contact Id"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "hasFlightBooking": boolean
+                    description: "True when the visitor has an upcoming flight booking. Gates the rental offer."
+                    label: "Has Flight Booking"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__booleanType"
+                "flightBookingCode": string
+                    description: "Confirmation code of the linked flight booking. Pin into flight_booking_code."
+                    label: "Flight Booking Code"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "destinationCode": string
+                    description: "Destination airport IATA (rental pickup). Pin into destination_code."
+                    label: "Destination Code"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "destinationCity": string
+                    description: "Destination city label. Pin into destination_city."
+                    label: "Destination City"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "pickupDate": string
+                    description: "Arrival date YYYY-MM-DD (rental start). Pin into pickup_date."
+                    label: "Pickup Date"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "summary": string
+                    description: "One-line natural-language trip summary for agent reasoning."
+                    label: "Summary"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "success": boolean
+                    description: "True if the resolve ran without error."
+                    label: "success"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "errorMessage": string
+                    description: "Details in case of an error."
+                    label: "error message"
+                    is_displayable: False
+                    is_used_by_planner: True
+
+subagent rental_booking:
+    label: "Rental Booking"
+
+    description: "Offers and books a rental car through three deterministic steps: offer (vehicle + duration), payment, confirm."
+
+    reasoning:
+        instructions: ->
+            # Recompute the ladder every turn from the completion flags.
+            if @variables.rental_confirmed is True:
+                set @variables.rental_step = "done"
+            if @variables.rental_payment_processed is True and @variables.rental_confirmed is False:
+                set @variables.rental_step = "confirm"
+            if @variables.rental_selected is True and @variables.rental_payment_processed is False:
+                set @variables.rental_step = "payment"
+
+            | If at any point the visitor says they want to stop, cancel this rental, or asks for something NOT related to completing this rental (e.g. changing their flight, talking to a human), STOP the rental flow: call {!@actions.abort_rental}, then briefly acknowledge and let them restate what they need.
+
+            if @variables.trip_summary is not None and @variables.trip_summary != "":
+                | Trip context: {!@variables.trip_summary}
+                  Weave this in naturally — the car is for this destination, picked up on the arrival date. Do NOT ask the visitor for the destination or date; you already have them.
+
+            if @variables.rental_step == "":
+                | STEP 1 — Offer. IMMEDIATELY call {!@actions.present_rental_offer} with the pinned contactId, destination, and pickup date — that renders the rental card.
+
+                  The output of this action is always renderable. Always use show_command to display the result to the user. After present_rental_offer completes, you MUST present the offerData output to the visitor. ALWAYS show the structured action output (the Skywave Rental Offer card). The card has a duration slider (1–14 days) and three vehicle tiles — Economy, Comfort, and Luxury — with live totals. Do NOT rewrite, restate, or list the vehicles, rates, or totals as plain text — the interactive card contains them and must be displayed as-is. In your text reply alongside the card, keep it short (1 sentence) for color only.
+
+                  STEP 2 — Reserve. Each tile has a Reserve button; when the visitor taps it, the card posts the exact phrase "Rent <CATEGORY> for <N> days" to chat. When you see that phrase, IMMEDIATELY call {!@actions.reserve_vehicle} passing that category and day count. This creates a Pending/Unpaid reservation and advances to payment. If reserve_vehicle fails, tell the visitor and ask them to tap Reserve again.
+
+            if @variables.rental_step == "payment":
+                | STEP 3 — Payment. A Pending/Unpaid rental is held under {!@variables.rental_booking_code} for {!@variables.rental_total_charged}. Show the inline payment-picker card so the visitor can complete payment.
+                  - On entering this step, IMMEDIATELY call {!@actions.present_rental_payment} with contactId, bookingCode, and totalCharged — that renders the payment card.
+
+                    The output of this action is always renderable. Always use show_command to display the result to the user. After present_rental_payment completes, you MUST present the formData output to the visitor. ALWAYS show the structured action output (the Skywave Rental Payment card). Do NOT ask "how would you like to pay" in text — the card collects the choice. Do NOT rewrite or summarize the payment options as plain text. In your text reply alongside the card, keep it short (1 sentence).
+                  - The card invokes Apex directly to flip the rental from Unpaid to Paid. When the visitor sends the exact phrase "Rental payment completed" (the cue from the payment card): IMMEDIATELY call {!@actions.confirm_rental} with contactId and bookingCode.
+
+            if @variables.rental_step == "confirm":
+                | STEP 4 — Confirm. Payment cue received. Verify the rental actually flipped to Paid before declaring success.
+                  IMMEDIATELY call {!@actions.confirm_rental} with contactId and bookingCode. When @outputs.success indicates the rental is verified, tell the visitor their car is confirmed and quote @outputs.confirmationCode. Otherwise, share @outputs.errorMessage and offer to retry payment.
+
+            if @variables.rental_step == "done":
+                | Rental is fully confirmed. Code: {!@variables.rental_confirmation_code}.
+                  Confirm warmly in one sentence and let them know the car will be ready at the destination on their arrival date. Do NOT call confirm_rental or reserve_vehicle again. If the visitor wants to book ANOTHER car, call {!@actions.reset_rental} to clear the rental state, then start a new offer.
+
+        actions:
+            present_rental_offer: @actions.present_rental_offer
+                description: "Display the inline rental offer card (duration slider + 3 vehicle tiles). Invoke ONCE when rental_step is empty. Do NOT call repeatedly; once displayed, wait for the 'Rent <category> for <N> days' cue."
+                with contactId = @variables.resolved_contact_id
+                with destinationCode = @variables.destination_code
+                with destinationCity = @variables.destination_city
+                with pickupDate = @variables.pickup_date
+                with flightBookingCode = @variables.flight_booking_code
+
+            reserve_vehicle: @actions.reserve_vehicle
+                description: "Create the Pending/Unpaid Vehicle_Booking__c from the chosen category and day count. Call when the card posts 'Rent <category> for <N> days'. Advances to payment. Returns the rental code + total."
+                with contactId = @variables.resolved_contact_id
+                with category = ...
+                with rentalDays = ...
+                with pickupDate = @variables.pickup_date
+                with destination = @variables.destination_code
+                with flightBookingCode = @variables.flight_booking_code
+                set @variables.rental_selected = @outputs.success
+                set @variables.rental_booking_code = @outputs.bookingCode
+                set @variables.rental_total_charged = @outputs.totalCharged
+                set @variables.selected_category = @outputs.category
+                set @variables.selected_days = @outputs.rentalDays
+
+            present_rental_payment: @actions.present_rental_payment
+                description: "Display the inline rental payment-picker card. Invoke ONCE when rental_step transitions to 'payment'. The card calls Apex imperatively; the agent does NOT charge. The card posts 'Rental payment completed' on success."
+                with contactId = @variables.resolved_contact_id
+                with bookingCode = @variables.rental_booking_code
+                with totalCharged = @variables.rental_total_charged
+
+            confirm_rental: @actions.confirm_rental
+                description: "Verify-only — re-reads the rental to confirm the payment widget flipped Status/Payment_Status. Invoke when the visitor sends 'Rental payment completed'. If still Unpaid, surface that instead of declaring success."
+                with contactId = @variables.resolved_contact_id
+                with bookingCode = @variables.rental_booking_code
+                set @variables.rental_payment_processed = @outputs.success
+                set @variables.rental_confirmed = @outputs.success
+                set @variables.rental_confirmation_code = @outputs.confirmationCode
+
+            abort_rental: @utils.setVariables
+                description: "Abort the in-progress rental when the visitor wants to stop or asks for something unrelated. Clears the rental pipeline so the router can re-route on the next turn."
+                with rental_step = ""
+                with rental_selected = False
+                with rental_payment_processed = False
+
+            reset_rental: @utils.setVariables
+                description: "Clear all rental state to start a brand-new rental after one has completed. Use only when the visitor explicitly wants to book ANOTHER car."
+                with rental_step = ""
+                with rental_selected = False
+                with rental_payment_processed = False
+                with rental_confirmed = False
+                with rental_booking_code = ""
+                with rental_total_charged = ""
+
+    actions:
+        present_rental_offer:
+            description: "Renders the Skywave Rental Offer card (duration slider 1–14 days + Economy/Comfort/Luxury tiles with live totals). On Reserve the card posts 'Rent <category> for <N> days'."
+            label: "Present Rental Offer"
+            require_user_confirmation: False
+            include_in_progress_indicator: False
+            target: "apex://Skywave_PresentRentalOffer"
+
+            inputs:
+                "contactId": string
+                    description: "The Contact Id (resolved at the router)."
+                    label: "Contact Id"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "destinationCode": string
+                    description: "Destination airport IATA (pickup location)."
+                    label: "Destination Code"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "destinationCity": string
+                    description: "Destination city label for the card headline."
+                    label: "Destination City"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "pickupDate": string
+                    description: "Pickup date YYYY-MM-DD (flight arrival date)."
+                    label: "Pickup Date"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "flightBookingCode": string
+                    description: "Confirmation code of the linked flight booking."
+                    label: "Flight Booking Code"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "offerData": object
+                    description: "Structured payload rendered as the Skywave Rental Offer chat card."
+                    label: "Offer Data"
+                    complex_data_type_name: "c__SkywaveRentalOffer"
+                    filter_from_agent: True
+                    is_displayable: True
+                "success": boolean
+                    description: "True if the offer payload was prepared."
+                    label: "success"
+                    complex_data_type_name: "lightning__booleanType"
+                    filter_from_agent: False
+                    is_displayable: False
+                "message": string
+                    description: "Status detail."
+                    label: "Message"
+                    complex_data_type_name: "lightning__textType"
+                    filter_from_agent: False
+                    is_displayable: False
+
+        reserve_vehicle:
+            description: "Inserts the Pending/Unpaid Vehicle_Booking__c from the chosen category + day count and the pinned destination/pickup/flight context. Returns the rental code + total for the payment widget."
+            label: "Reserve Vehicle"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Reserving your car"
+            target: "apex://Skywave_ReserveVehicle"
+
+            inputs:
+                "contactId": string
+                    description: "The Contact Id (resolved at the router)."
+                    label: "Contact Id"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "category": string
+                    description: "Vehicle category the visitor chose: Economy, Comfort, or Luxury. Extract from the 'Rent <category> for <N> days' chat cue."
+                    label: "Vehicle Category"
+                    is_required: True
+                    is_user_input: True
+                    complex_data_type_name: "lightning__textType"
+                "rentalDays": object
+                    description: "Number of rental days (1–14) the visitor chose on the slider. Extract from the 'Rent <category> for <N> days' chat cue."
+                    label: "Rental Days"
+                    is_required: True
+                    is_user_input: True
+                    complex_data_type_name: "lightning__integerType"
+                "pickupDate": string
+                    description: "Pickup date YYYY-MM-DD (flight arrival date)."
+                    label: "Pickup Date"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "destination": string
+                    description: "Destination airport IATA (pickup location)."
+                    label: "Destination"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "flightBookingCode": string
+                    description: "Confirmation code of the linked flight booking."
+                    label: "Flight Booking Code"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "success": boolean
+                    description: "True if the reservation was created."
+                    label: "success"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "message": string
+                    description: "Status detail."
+                    label: "message"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "bookingCode": string
+                    description: "Confirmation code of the reserved rental — pin into rental_booking_code."
+                    label: "Booking Code"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "totalCharged": string
+                    description: "Total amount string (e.g. $300.00) — pin into rental_total_charged."
+                    label: "Total Charged"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "category": string
+                    description: "Echoed vehicle category — pin into selected_category."
+                    label: "Category"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "exampleModel": string
+                    description: "Representative model for the booked category."
+                    label: "Example Model"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "rentalDays": object
+                    description: "Echoed clamped day count — pin into selected_days."
+                    label: "Rental Days"
+                    is_displayable: False
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__integerType"
+
+        present_rental_payment:
+            description: "Renders the Skywave Rental Payment Picker card so the visitor can pay (Apple Pay / Credit card / Demo Pay). The card calls Apex imperatively to flip the rental to Paid; the agent does NOT charge anything."
+            label: "Present Rental Payment"
+            require_user_confirmation: False
+            include_in_progress_indicator: False
+            target: "apex://Skywave_PresentRentalPayment"
+
+            inputs:
+                "contactId": string
+                    description: "The Contact Id (resolved at the router)."
+                    label: "Contact Id"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "bookingCode": string
+                    description: "Confirmation code of the Pending/Unpaid rental the payment widget should flip (rental_booking_code)."
+                    label: "Rental Code"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "totalCharged": string
+                    description: "Total amount string to display in the payment widget (rental_total_charged)."
+                    label: "Total Charged"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "formData": object
+                    description: "Structured payload rendered as the Skywave Rental Payment chat card."
+                    label: "Form Data"
+                    complex_data_type_name: "c__SkywaveRentalPayment"
+                    filter_from_agent: True
+                    is_displayable: True
+                "success": boolean
+                    description: "True if the payment payload was prepared."
+                    label: "success"
+                    complex_data_type_name: "lightning__booleanType"
+                    filter_from_agent: False
+                    is_displayable: False
+                "message": string
+                    description: "Status detail."
+                    label: "Message"
+                    complex_data_type_name: "lightning__textType"
+                    filter_from_agent: False
+                    is_displayable: False
+
+        confirm_rental:
+            description: "Verify-only — re-reads the rental from the DB to confirm the payment widget actually flipped Status/Payment_Status. Invoke when the visitor sends 'Rental payment completed'. No DML; defence against forged client cues."
+            label: "Verify Rental"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Confirming your car"
+            target: "apex://Skywave_ConfirmRental"
+
+            inputs:
+                "contactId": string
+                    description: "The Contact whose rental is being verified."
+                    label: "Contact Id"
+                    is_required: True
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+                "bookingCode": string
+                    description: "Confirmation code of the rental the payment widget just paid (rental_booking_code)."
+                    label: "Rental Code"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "success": boolean
+                    description: "True if the rental is Confirmed and Paid."
+                    label: "success"
+                    is_displayable: True
+                    is_used_by_planner: True
+                "errorMessage": string
+                    description: "Reason the verify failed (still Unpaid, missing rental, etc)."
+                    label: "error message"
+                    is_displayable: False
+                    is_used_by_planner: True
+                "confirmationCode": string
+                    description: "Confirmation code of the verified rental."
+                    label: "Confirmation Code"
+                    is_displayable: True
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "category": string
+                    description: "Booked vehicle category."
+                    label: "Category"
+                    is_displayable: True
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "rentalDays": object
+                    description: "Booked number of rental days."
+                    label: "Rental Days"
+                    is_displayable: True
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__integerType"
+                "totalCharged": string
+                    description: "Total amount paid (e.g. $300.00)."
+                    label: "Total Charged"
+                    is_displayable: True
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "pickupDate": string
+                    description: "Pickup date of the rental."
+                    label: "Pickup Date"
+                    is_displayable: True
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+                "destination": string
+                    description: "Pickup location (destination) of the rental."
+                    label: "Destination"
+                    is_displayable: True
+                    is_used_by_planner: True
+                    complex_data_type_name: "lightning__textType"
+
+subagent no_flight_booking:
+    label: "No Flight Booking"
+
+    description: "Explain that a rental car can only be added once the visitor has a booked flight."
+
+    reasoning:
+        instructions: ->
+            | The visitor does not have an upcoming flight booking, so a rental car cannot be offered yet. Briefly and warmly explain that Skywave rentals are added to an existing trip, so they'll need to book a flight first, then you can set up a car at their destination. Do NOT call any action. Do NOT invent a destination or a car offer.
+
+subagent off_topic:
+    label: "Off Topic"
+    description: "Redirect the conversation back to renting a car."
+
+    reasoning:
+        instructions: ->
+            | Your job is to redirect the conversation to renting a car, politely and succinctly.
+              NEVER answer general knowledge questions. Only respond to general greetings and questions about your capabilities.
+              Do not acknowledge the off-topic question. Redirect by asking whether they'd like to add a rental car to their trip.
+              If the visitor wants to change their flight, view other bookings, or something else Skywave-related that isn't a rental: say briefly that you only handle rental cars here, and offer to help with a car — or to connect them with a human agent if they'd like.
+
+connection customer_web_client:
+    adaptive_response_allowed: True
+    outbound_route_name: "flow://Route_from_ASA"
+    outbound_route_type: "OmniChannelFlow"
+    escalation_message: "escalating"

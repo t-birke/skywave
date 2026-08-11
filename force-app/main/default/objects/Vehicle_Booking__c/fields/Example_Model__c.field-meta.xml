@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Example_Model__c</fullName>
+    <label>Example Model</label>
+    <description>Representative vehicle model for the booked category (e.g. "VW Polo or similar").</description>
+    <type>Text</type>
+    <length>120</length>
+    <required>false</required>
+</CustomField>

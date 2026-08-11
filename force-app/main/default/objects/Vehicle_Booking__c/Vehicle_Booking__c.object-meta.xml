@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Vehicle Booking</label>
+    <pluralLabel>Vehicle Bookings</pluralLabel>
+    <description>Rental-car bookings made by the Skywave Rental Car Agent. One per reservation, linked to the customer Contact and (optionally) the flight Booking the trip is tied to.</description>
+    <nameField>
+        <label>Vehicle Booking Number</label>
+        <type>AutoNumber</type>
+        <displayFormat>VB-{00000}</displayFormat>
+        <startingNumber>1</startingNumber>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ReadWrite</sharingModel>
+    <visibility>Public</visibility>
+    <enableSearch>true</enableSearch>
+    <enableReports>true</enableReports>
+    <enableActivities>true</enableActivities>
+    <enableHistory>true</enableHistory>
+</CustomObject>

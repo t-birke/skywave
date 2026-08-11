@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>66.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>Skywave Rental Offer Renderer</masterLabel>
+    <description>Rental offer card in Agentforce chat: a duration slider (1-14 days) plus three vehicle tiles (Economy / Comfort / Luxury) with live totals. Reserve posts "Rent &lt;category&gt; for &lt;N&gt; days".</description>
+    <targets>
+        <target>lightning__AgentforceOutput</target>
+        <target>lightning__AgentforceInput</target>
+        <target>lightningSnapin__ChatMessage</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__AgentforceOutput">
+            <sourceType name="c__SkywaveRentalOffer"/>
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>

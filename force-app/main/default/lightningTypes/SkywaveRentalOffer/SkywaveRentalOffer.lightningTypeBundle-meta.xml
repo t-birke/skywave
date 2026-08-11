@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningTypeBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>66.0</apiVersion>
+    <description>Custom Lightning Type for the Skywave Rental Offer renderer (duration slider + 3 vehicle tiles).</description>
+    <isExposed>true</isExposed>
+    <masterLabel>Skywave Rental Offer</masterLabel>
+</LightningTypeBundle>

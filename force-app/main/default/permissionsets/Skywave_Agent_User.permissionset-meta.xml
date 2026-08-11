@@ -91,6 +91,48 @@
         <apexClass>Skywave_ChangeSeat</apexClass>
         <enabled>true</enabled>
     </classAccesses>
+    <!-- Rental Car agent: invocables the Einstein Agent User runs, plus the
+         renderer DTOs and shared catalogue/engine those invocables call. -->
+    <classAccesses>
+        <apexClass>Skywave_ResolveRentalContext</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_PresentRentalOffer</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_RentalOfferData</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_ReserveVehicle</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_PresentRentalPayment</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_RentalPaymentData</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_ConfirmRental</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_ProcessRentalPayment</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_RentalCatalog</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>Skywave_RentalEngine</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
     <fieldPermissions>
         <editable>true</editable>
         <field>Booking_Segment__c.Seat_Number__c</field>
@@ -193,6 +235,15 @@
         <allowRead>true</allowRead>
         <modifyAllRecords>false</modifyAllRecords>
         <object>Booking_Segment__c</object>
+        <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>Vehicle_Booking__c</object>
         <viewAllRecords>true</viewAllRecords>
     </objectPermissions>
     <!-- Publish-only on the demo monitor PE so AckProfileForm/SaveProfile/ChangeSeat
