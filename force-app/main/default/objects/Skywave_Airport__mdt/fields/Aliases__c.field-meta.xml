@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Aliases__c</fullName>
+    <label>Aliases</label>
+    <description>Comma-separated alternate tokens that resolve to this airport — e.g. the IATA metropolitan-area code (NYC for JFK, LON for LHR) and common city-name variants. Consumed by Skywave_Airports.resolveCode so flight search accepts metro codes and city names, not just the specific airport code.</description>
+    <length>255</length>
+    <required>false</required>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

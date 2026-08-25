@@ -44,16 +44,7 @@ global with sharing class Skywave_WebsiteFlightSearch {
         if (travelDate < Date.today()) { errorOut(res, 400, 'date_in_past'); return; }
 
         try {
-            List<Map<String, Object>> options = new List<Map<String, Object>>();
-            options.addAll(directFlights(origin, destination, travelDate));
-
-            // Through-hub connection (origin -> JFK -> destination) when
-            // there are no direct flights AND neither leg of the journey
-            // is itself JFK — same rule as Skywave_FlightSearch.
-            if (options.isEmpty() && origin != Skywave_Itinerary.HUB && destination != Skywave_Itinerary.HUB) {
-                Map<String, Object> conn = connectionFlight(origin, destination, travelDate);
-                if (conn != null) options.add(conn);
-            }
+            List<Object> options = searchOptions(origin, destination, travelDate);
 
             res.statusCode = 200;
             res.responseBody = Blob.valueOf(JSON.serialize(new Map<String, Object>{
@@ -67,6 +58,26 @@ global with sharing class Skywave_WebsiteFlightSearch {
                 '\n' + e.getStackTraceString());
             errorOut(res, 500, 'search_failed');
         }
+    }
+
+    /**
+     * Option-building engine shared by the REST post() above (and callable for
+     * tests). Resolves origin/destination through Skywave_Airports.resolveCode
+     * first — so an IATA metro code (NYC) or city name maps to the served
+     * airport (NYC -> JFK) via the Aliases__c SSOT, not just an exact airport
+     * code — then returns direct flights, else one through-hub connection (same
+     * rule as Skywave_FlightSearch).
+     */
+    public static List<Object> searchOptions(String origin, String destination, Date travelDate) {
+        origin = Skywave_Airports.resolveCode(origin);
+        destination = Skywave_Airports.resolveCode(destination);
+        List<Object> options = new List<Object>();
+        options.addAll(directFlights(origin, destination, travelDate));
+        if (options.isEmpty() && origin != Skywave_Itinerary.HUB && destination != Skywave_Itinerary.HUB) {
+            Map<String, Object> conn = connectionFlight(origin, destination, travelDate);
+            if (conn != null) options.add(conn);
+        }
+        return options;
     }
 
     private static List<Map<String, Object>> directFlights(String origin, String destination, Date travelDate) {

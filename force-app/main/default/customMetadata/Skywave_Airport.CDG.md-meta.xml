@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>Paris</label>
+    <protected>false</protected>
+    <values><field>Code__c</field><value xsi:type="xsd:string">CDG</value></values>
+    <values><field>City__c</field><value xsi:type="xsd:string">Paris</value></values>
+    <values><field>Aliases__c</field><value xsi:type="xsd:string">PAR</value></values>
+    <values><field>Airport_Name__c</field><value xsi:type="xsd:string">Paris Charles de Gaulle</value></values>
+    <values><field>Latitude__c</field><value xsi:type="xsd:double">49.01</value></values>
+    <values><field>Longitude__c</field><value xsi:type="xsd:double">2.55</value></values>
+    <values><field>Active__c</field><value xsi:type="xsd:boolean">true</value></values>
+</CustomMetadata>

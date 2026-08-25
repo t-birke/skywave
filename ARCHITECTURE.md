@@ -675,8 +675,14 @@ A second `get_bookings` fires once post-confirm so a just-made booking shows up.
 
 **Booking pipeline.** Search → select → profile → payment → confirm, gated by a
 `booking_step` string. The Booking__c is inserted at the *profile* gate
-(`Skywave_AckProfileForm`), not at confirm — see memory. Connecting flights:
-Skywave is a JFK hub; `Skywave_Itinerary` resolves a single OR compound flight
+(`Skywave_AckProfileForm`), not at confirm — see memory. **Airport resolution:**
+both search paths run origin/destination through `Skywave_Airports.resolveCode`
+first, so an IATA metro code (`NYC`, `LON`, `PAR`…) or a city name resolves to
+the served airport (`NYC → JFK`) — the LLM naturally emits metro codes, and
+`Flight__c` only stores specific airport codes. Metro/variant tokens live in the
+`Skywave_Airport__mdt.Aliases__c` SSOT (no hardcoded list); unknown tokens pass
+through so search stays the authoritative "do we fly there?" gate. Connecting
+flights: Skywave is a JFK hub; `Skywave_Itinerary` resolves a single OR compound flight
 key (`SW3001+SW4017`); when a direct O&D search is empty, `Skywave_FlightSearch`
 returns one through-JFK connection as a compound key that threads unchanged
 through the card → BookFlight → per-leg `Booking_Segment__c` rows. Action

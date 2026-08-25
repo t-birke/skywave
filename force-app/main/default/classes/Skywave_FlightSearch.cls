@@ -90,8 +90,12 @@ public with sharing class Skywave_FlightSearch {
                       'ORDER BY Scheduled_Departure_Time__c ' +
                       'LIMIT 10';
 
-        String origin = req.origin;
-        String destination = req.destination;
+        // Resolve caller tokens (airport code, IATA metro code like NYC, or a
+        // city name) to the served airport code before matching. Skywave serves
+        // one airport per metro, so NYC -> JFK is unambiguous. See
+        // Skywave_Airports.resolveCode (Aliases__c SSOT).
+        String origin = Skywave_Airports.resolveCode(req.origin);
+        String destination = Skywave_Airports.resolveCode(req.destination);
 
         List<Flight__c> flights = Database.query(query);
         List<FlightOption> options = new List<FlightOption>();
@@ -123,10 +127,10 @@ public with sharing class Skywave_FlightSearch {
         // single connection origin -> JFK -> destination and present it as
         // ONE option with a compound flight key (e.g. SW3001+SW4017). The
         // card and booking pipeline thread the compound key through unchanged.
-        if (options.isEmpty() && req.origin != Skywave_Itinerary.HUB
-                && req.destination != Skywave_Itinerary.HUB) {
+        if (options.isEmpty() && origin != Skywave_Itinerary.HUB
+                && destination != Skywave_Itinerary.HUB) {
             Skywave_Itinerary.Resolved conn =
-                Skywave_Itinerary.findConnection(req.origin, req.destination, req.fareClass, travelDate);
+                Skywave_Itinerary.findConnection(origin, destination, req.fareClass, travelDate);
             if (conn != null && conn.isConnection) {
                 Skywave_Itinerary.Leg first = conn.legs[0];
                 Skywave_Itinerary.Leg last = conn.legs[conn.legs.size() - 1];

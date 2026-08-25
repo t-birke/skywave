@@ -7,7 +7,8 @@
  * starting airport: every airport in the network connects to the JFK
  * hub in both directions, so any of them is a valid origin.
  *
- * Keep this list in sync with scripts/apex/seedSkywaveRouteNetwork.apex.
+ * Geography is stored in the Skywave_Airport__mdt CMDT (SSOT); this class is a
+ * thin cached accessor over it. Routes still live as Flight__c data.
  */
 public with sharing class Skywave_Airports {
 
@@ -15,49 +16,82 @@ public with sharing class Skywave_Airports {
         public String code;
         public String city;
         public String name;
+        public String aliases;   // comma-separated metro codes / city-name variants
         public Double lat;
         public Double lon;
-        public Airport(String code, String city, String name, Decimal lat, Decimal lon) {
-            this.code = code; this.city = city; this.name = name;
+        public Airport(String code, String city, String name, String aliases, Decimal lat, Decimal lon) {
+            this.code = code; this.city = city; this.name = name; this.aliases = aliases;
             this.lat = lat.doubleValue(); this.lon = lon.doubleValue();
         }
     }
 
-    // IATA -> city/name/coordinates. Keep in sync with the master schedule
-    // seeder. Cities are the human-friendly name (no state/country) so the
-    // website's autocomplete can filter on either "Paris" or "CDG".
-    public static final List<Airport> ALL = new List<Airport>{
-        new Airport('JFK', 'New York', 'John F. Kennedy International', 40.64, -73.78),
-        new Airport('LAX', 'Los Angeles', 'Los Angeles International', 33.94, -118.41),
-        new Airport('ORD', 'Chicago', 'Chicago O\'Hare International', 41.98, -87.90),
-        new Airport('SFO', 'San Francisco', 'San Francisco International', 37.62, -122.38),
-        new Airport('DFW', 'Dallas', 'Dallas/Fort Worth International', 32.90, -97.04),
-        new Airport('ATL', 'Atlanta', 'Hartsfield-Jackson Atlanta International', 33.64, -84.43),
-        new Airport('SEA', 'Seattle', 'Seattle-Tacoma International', 47.45, -122.31),
-        new Airport('MIA', 'Miami', 'Miami International', 25.80, -80.29),
-        new Airport('BOS', 'Boston', 'Boston Logan International', 42.36, -71.01),
-        new Airport('DEN', 'Denver', 'Denver International', 39.86, -104.67),
-        new Airport('IAD', 'Washington', 'Washington Dulles International', 38.95, -77.46),
-        new Airport('YYZ', 'Toronto', 'Toronto Pearson International', 43.68, -79.63),
-        new Airport('PHX', 'Phoenix', 'Phoenix Sky Harbor International', 33.43, -112.01),
-        new Airport('LHR', 'London', 'London Heathrow', 51.47, -0.45),
-        new Airport('CDG', 'Paris', 'Paris Charles de Gaulle', 49.01, 2.55),
-        new Airport('FCO', 'Rome', 'Rome Fiumicino', 41.80, 12.25),
-        new Airport('MUC', 'Munich', 'Munich Franz Josef Strauss', 48.35, 11.79),
-        new Airport('HND', 'Tokyo', 'Tokyo Haneda', 35.55, 139.78),
-        new Airport('BKK', 'Bangkok', 'Bangkok Suvarnabhumi', 13.69, 100.75),
-        new Airport('SIN', 'Singapore', 'Singapore Changi', 1.36, 103.99),
-        new Airport('CPT', 'Cape Town', 'Cape Town International', -33.97, 18.60),
-        new Airport('RAK', 'Marrakesh', 'Marrakesh Menara', 31.61, -8.04),
-        new Airport('NBO', 'Nairobi', 'Nairobi Jomo Kenyatta International', -1.32, 36.93),
-        new Airport('GIG', 'Rio de Janeiro', 'Rio de Janeiro Galeão International', -22.81, -43.25),
-        new Airport('MEX', 'Mexico City', 'Mexico City International', 19.44, -99.07),
-        new Airport('EZE', 'Buenos Aires', 'Buenos Aires Ezeiza International', -34.82, -58.54),
-        new Airport('SYD', 'Sydney', 'Sydney Kingsford Smith', -33.95, 151.18),
-        new Airport('AKL', 'Auckland', 'Auckland International', -37.01, 174.79),
-        new Airport('DXB', 'Dubai', 'Dubai International', 25.25, 55.36),
-        new Airport('IST', 'Istanbul', 'Istanbul Airport', 41.28, 28.75)
-    };
+    // Airport network geography — code, city, name, lat/lon — now lives in the
+    // Skywave_Airport__mdt CMDT (single source of truth, deployed as metadata; no
+    // seed). This cached accessor preserves the long-standing Skywave_Airports.ALL
+    // API, so every consumer (website picker getAirports, demo monitor getAirportGeo,
+    // rental agent action, nearest() geolocation) reads the SSOT unchanged.
+    private static List<Airport> allCache;
+    public static List<Airport> ALL {
+        get {
+            if (allCache == null) {
+                allCache = new List<Airport>();
+                for (Skywave_Airport__mdt m : [
+                        SELECT Code__c, City__c, Airport_Name__c, Aliases__c, Latitude__c, Longitude__c
+                        FROM Skywave_Airport__mdt
+                        WHERE Active__c = true
+                        ORDER BY City__c
+                ]) {
+                    allCache.add(new Airport(
+                        m.Code__c, m.City__c, m.Airport_Name__c, m.Aliases__c,
+                        m.Latitude__c, m.Longitude__c));
+                }
+            }
+            return allCache;
+        }
+    }
+
+    /**
+     * Resolve a caller-supplied location token to the served IATA airport code.
+     *
+     * Accepts an airport code (SFO), an IATA metropolitan-area code (NYC, LON,
+     * PAR…), or a city name (New York, "new york city") — case- and
+     * spacing-insensitive. Skywave serves exactly one airport per metro, so the
+     * mapping is unambiguous (NYC -> JFK). The metro/variant tokens live in the
+     * Skywave_Airport__mdt.Aliases__c SSOT, never a hardcoded list here.
+     *
+     * When nothing matches, the normalized input is returned unchanged so a
+     * genuinely unserved location still falls through to an empty search —
+     * search_flights stays the authoritative "do we fly there?" gate.
+     */
+    public static String resolveCode(String input) {
+        if (String.isBlank(input)) return input;
+        String norm = normalizeToken(input);
+
+        // 1. Already a served airport code — return canonical (before aliases,
+        //    so an exact code always wins).
+        for (Airport a : ALL) {
+            if (normalizeToken(a.code) == norm) return a.code;
+        }
+        // 2. City name or a metro/variant alias.
+        for (Airport a : ALL) {
+            if (normalizeToken(a.city) == norm) return a.code;
+            if (String.isNotBlank(a.aliases)) {
+                for (String alias : a.aliases.split(',')) {
+                    if (normalizeToken(alias) == norm) return a.code;
+                }
+            }
+        }
+        // 3. Unknown — pass through uppercased; the flight query will find
+        //    nothing and the agent will report we don't serve it.
+        return input.trim().toUpperCase();
+    }
+
+    // Uppercase + strip everything but letters/digits, so "New York",
+    // "new york", "NYC" and "N.Y.C." all compare cleanly.
+    private static String normalizeToken(String s) {
+        if (s == null) return '';
+        return s.toUpperCase().replaceAll('[^A-Z0-9]', '');
+    }
 
     /**
      * Nearest network airport IATA code to the given coordinate, or null
