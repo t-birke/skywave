@@ -603,7 +603,7 @@ function ensureWarmingBubble() {
 // token lives in web storage). On reload it SILENTLY RESUMES the prior
 // conversation — history is re-rendered but NO new welcome message is sent, so
 // the pre-warm's welcome gate (onEmbeddedMessagingFirstBotMessageSent) never
-// fires and we'd sit on the loading bubble until the 90s safety net. ECv2
+// fires and we'd sit on the loading bubble until the safety net. ECv2
 // exposes no event for "you just resumed an existing conversation", so we leave
 // our own breadcrumb: a timestamped localStorage marker written when a
 // conversation first starts. On a later load a *fresh* marker means "resume,
@@ -617,6 +617,9 @@ const CONV_MARKER_KEY = 'sw_chat_conv_v1';
 // The marker is refreshed on every conversation start / resume, so within an
 // active session (reloads) it never goes stale; 2h only bounds a truly idle gap.
 const CONV_MARKER_TTL_MS = 2 * 60 * 60 * 1000;  // 2h — the ECv2 conversation timeout
+// Reveal the FAB even if the agent's welcome (onEmbeddedMessagingFirstBotMessageSent)
+// never lands — the worst-case wait a visitor stares at the loading bubble.
+const WARM_SAFETY_TIMEOUT_MS = 30000;  // 30s
 function markConversationStarted() {
     try { localStorage.setItem(CONV_MARKER_KEY, String(Date.now())); } catch (_) { /* storage disabled */ }
 }
@@ -647,7 +650,7 @@ function maybePreWarm() {
     // it (with history) the moment the visitor opens the FAB and sends NO new
     // welcome — so there's nothing to gate on. Reveal the real FAB immediately
     // instead of pre-warming (which would just launch→resume the same
-    // conversation and then wait out the full 90s safety net for a welcome that
+    // conversation and then wait out the full safety net for a welcome that
     // never comes).
     if (hasResumableConversation()) {
         markConversationStarted();         // refresh the TTL for the next reload
@@ -672,11 +675,12 @@ function preWarmChat() {
     // exactly at welcome time (ConversationStarted fires ~40s too early).
     window.addEventListener('onEmbeddedMessagingFirstBotMessageSent', onWelcomeReady, { once: true });
     // Safety net: never leave the chat permanently hidden if that event never
-    // fires (agent failure / platform event-name change) — reveal after 90s.
+    // fires (agent failure / platform event-name change) — reveal after the
+    // WARM_SAFETY_TIMEOUT_MS cap.
     warmSafetyTimer = setTimeout(() => {
-        console.warn('[esw] FirstBotMessageSent not seen in 90s — revealing FAB anyway');
+        console.warn(`[esw] FirstBotMessageSent not seen in ${WARM_SAFETY_TIMEOUT_MS / 1000}s — revealing FAB anyway`);
         onWelcomeReady();
-    }, 90000);
+    }, WARM_SAFETY_TIMEOUT_MS);
     console.log('[esw] pre-warming conversation (hidden)…');
     // launchChat() MAXIMIZES the window; on mobile the maximized ECv2 window is
     // a full-screen overlay that locks background scroll — so even though our
