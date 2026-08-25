@@ -681,8 +681,12 @@ first, so an IATA metro code (`NYC`, `LON`, `PAR`…) or a city name resolves to
 the served airport (`NYC → JFK`) — the LLM naturally emits metro codes, and
 `Flight__c` only stores specific airport codes. Metro/variant tokens live in the
 `Skywave_Airport__mdt.Aliases__c` SSOT (no hardcoded list); unknown tokens pass
-through so search stays the authoritative "do we fly there?" gate. Connecting
-flights: Skywave is a JFK hub; `Skywave_Itinerary` resolves a single OR compound flight
+through so search stays the authoritative "do we fly there?" gate. The agent
+grounds its own destination *suggestions* on the live network via the
+`Skywave_GetNetwork` action (`get_network` in the booking subagent), sourced
+from the same CMDT — so adding an airport surfaces it in suggestions with no
+agent republish, and there's no memorised destination list in the prompt.
+Connecting flights: Skywave is a JFK hub; `Skywave_Itinerary` resolves a single OR compound flight
 key (`SW3001+SW4017`); when a direct O&D search is empty, `Skywave_FlightSearch`
 returns one through-JFK connection as a compound key that threads unchanged
 through the card → BookFlight → per-leg `Booking_Segment__c` rows. Action

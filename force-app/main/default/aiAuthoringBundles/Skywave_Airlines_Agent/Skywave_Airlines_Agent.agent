@@ -434,18 +434,9 @@ subagent flight_booking:
 
                   VAGUE REQUESTS — when the visitor's intent is travel-flavoured but unspecific ("surprise me", "anywhere warm", "I want to go somewhere", "take me on a trip"), DO NOT ask for clarification. PROPOSE a destination yourself, derived from their survey preferences (vibe + region) plus their home airport. Example: "Sure — I see you like beaches and Latin America. How about a flight to Rio de Janeiro? Tell me a date and I'll show you your options." Then wait for the date and fare class. If you have NO survey preferences (visitor skipped survey or had no cookie), pick a popular Skywave destination as the suggestion and explicitly invite them to suggest a different one ("…or somewhere else if you have a place in mind"). Never refuse to suggest.
 
-                  SKYWAVE NETWORK — only ever book cities Skywave actually serves. Skywave is a New York JFK hub carrier. search_flights handles routing for you: if there is no direct flight between the requested origin and destination, it automatically returns a single connecting itinerary through the JFK hub (shown on the card as "1 stop · JFK") with the through-fare and total duration. So you do NOT need to force JFK as origin — pass the visitor's real origin and the engine will connect them. Just make sure BOTH the origin and the destination are airports in the list below; never invent a city we don't fly to.
+                  SKYWAVE NETWORK — only ever book cities Skywave actually serves. Skywave is a New York JFK hub carrier. search_flights handles routing for you: if there is no direct flight between the requested origin and destination, it automatically returns a single connecting itinerary through the JFK hub (shown on the card as "1 stop · JFK") with the through-fare and total duration. So you do NOT need to force JFK as origin — pass the visitor's real origin and the engine will connect them. search_flights is the AUTHORITATIVE "do we fly there" gate: if it returns no options for a route, Skywave does not serve it — say so plainly and offer an alternative. Never invent a city we don't fly to.
 
-                  Bookable destinations by region (IATA in brackets) — map the visitor's vibe/region to the closest match here, never invent a city we don't fly to:
-                  • Europe: London (LHR), Paris (CDG), Rome (FCO), Munich (MUC)
-                  • Asia: Tokyo (HND), Bangkok (BKK), Singapore (SIN)
-                  • Africa: Cape Town (CPT), Marrakesh (RAK), Nairobi (NBO)
-                  • Latin America: Rio de Janeiro (GIG), Mexico City (MEX), Buenos Aires (EZE)
-                  • Oceania: Sydney (SYD), Auckland (AKL)
-                  • Middle East: Dubai (DXB), Istanbul (IST)
-                  • US / Canada metros (also valid origins): New York–JFK hub (JFK), Los Angeles (LAX), Chicago (ORD), San Francisco (SFO), Dallas (DFW), Atlanta (ATL), Seattle (SEA), Miami (MIA), Boston (BOS), Denver (DEN), Washington DC (IAD), Toronto (YYZ), Phoenix (PHX)
-
-                  Examples of vibe → city: "ancient ruins and pasta" → Rome (FCO); "neon megacity" → Tokyo (HND); "safari" → Nairobi (NBO); "tango and steak" → Buenos Aires (EZE); "futuristic luxury desert" → Dubai (DXB); "beaches and carnival" → Rio (GIG). Pick ONE city, set destination to its IATA. For origin, use the visitor's home/nearest airport from the list if they give one (the engine connects it through JFK); otherwise default the origin to JFK.
+                  To know which cities Skywave serves — and ALWAYS before proposing a destination for a vague request — call {!@actions.get_network}. It returns the live list of served cities with their IATA codes (sourced from the network data, so it is always current — never rely on a memorised list). Map the visitor's vibe/region to the CLOSEST city in that returned list and suggest ONE; set destination to its IATA. Examples of the mapping style (only ever suggest a city that appears in the get_network result): "ancient ruins and pasta" → Rome; "neon megacity" → Tokyo; "safari" → Nairobi; "beaches and carnival" → Rio de Janeiro. For origin, use the visitor's home/nearest airport if they give one (the engine connects it through JFK); otherwise default the origin to JFK.
 
                   The output of this action is always renderable. Always use show_command to display the result to the user. After search_flights completes, you MUST present the flightResult output to the visitor. ALWAYS show the structured action output (the Flight Search Result card). Do NOT rewrite, restate, or summarize the flight options as plain text or bullet lists — the interactive flight cards are contained in the flightResult output and must be displayed as-is. In your text reply alongside the cards, keep it short (1-2 sentences) for color only. Do NOT enumerate flight numbers, times, or prices in prose; the cards already show them.
 
@@ -490,6 +481,9 @@ subagent flight_booking:
                   Confirm warmly and ask if there's anything else you can help with (e.g. changing the seat on this new booking). Do NOT call update_profile, ack_profile_form, or confirm_booking again. If the visitor wants to book ANOTHER flight, call {!@actions.reset_booking} to clear the booking state, then start a new search.
 
         actions:
+            get_network: @actions.get_network
+                description: "Returns the live list of cities Skywave serves (city + IATA). Call before suggesting a destination for a vague request, then suggest ONLY a city from the returned list."
+
             search_flights: @actions.search_flights
                 description: "Searches the schedule for matching flights and returns priced FlightOption records. Pass fareClass — without it the price defaults to Economy and confuses the visitor."
                 with departureDate = ...
@@ -571,6 +565,28 @@ subagent flight_booking:
                 with selected_total_charged = ""
 
     actions:
+        get_network:
+            description: "Returns the live list of cities Skywave serves (city name + IATA code), sourced from the airport network data. Ground destination suggestions on this; never suggest a city that is not in it."
+            label: "Get Skywave Network"
+            require_user_confirmation: False
+            include_in_progress_indicator: False
+            target: "apex://Skywave_GetNetwork"
+
+            inputs:
+                "vibe": string
+                    description: "Optional: the visitor's expressed vibe or region. Does not change the result."
+                    label: "Vibe"
+                    is_required: False
+                    is_user_input: False
+                    complex_data_type_name: "lightning__textType"
+
+            outputs:
+                "network": string
+                    description: "Comma-separated list of bookable cities with IATA codes"
+                    label: "Network"
+                    is_displayable: False
+                    is_used_by_planner: True
+
         search_flights:
             description: "Searches available flight itineraries"
             label: "Search Flights"

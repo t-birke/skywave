@@ -4,6 +4,10 @@
     <hasActivationRequired>false</hasActivationRequired>
     <label>Skywave Agent User</label>
     <classAccesses>
+        <apexClass>Skywave_GetNetwork</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
         <apexClass>Skywave_ResolveContact</apexClass>
         <enabled>true</enabled>
     </classAccesses>
