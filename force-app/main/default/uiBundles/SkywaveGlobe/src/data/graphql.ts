@@ -39,20 +39,27 @@ export function sinceIso(hoursAgo: number, nowMs: number): string {
 }
 
 /**
- * The running user's 18-char Id, via the OIDC userinfo endpoint (the SDK's
- * authenticated fetch resolves it against the org). Used to scope the globe to
- * the presenter's OWN active Demo_Session__c (multi-tenancy). Returns null in
- * dev (where /services/oauth2 isn't proxied) or on any failure, so callers can
- * fall back to an unscoped query rather than break.
+ * The running user's 18-char Id, used to scope the globe to the presenter's
+ * OWN active Demo_Session__c (multi-tenancy). Returns null in dev (where the
+ * endpoint isn't proxied) or on any failure, so callers can fall back to an
+ * unscoped query rather than break.
+ *
+ * Resolved via the Connect API "who am I" (`/services/data/.../chatter/users/me`),
+ * which authenticates against the SAME in-org session the Data SDK uses for
+ * UI API. We deliberately do NOT use the OAuth `/services/oauth2/userinfo`
+ * endpoint: it requires a Bearer token with the `openid` scope, which the
+ * in-org UIBundle session doesn't carry, so it 401s and we'd silently drop the
+ * owner filter — making the globe (and its join QR) resolve the newest active
+ * session across ALL presenters instead of this one's.
  */
 export async function currentUserId(): Promise<string | null> {
   try {
     const sdk = await createDataSDK();
     if (!sdk.fetch) return null;
-    const res = await sdk.fetch('/services/oauth2/userinfo');
+    const res = await sdk.fetch(`${API}/chatter/users/me`);
     if (!res.ok) return null;
     const j = await res.json();
-    return (j && j.user_id) || null;
+    return (j && j.id) || null;
   } catch {
     return null;
   }
