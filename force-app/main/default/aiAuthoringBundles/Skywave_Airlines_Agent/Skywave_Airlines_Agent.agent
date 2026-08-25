@@ -20,6 +20,12 @@ variables:
     ContactId: linked string
         source: @MessagingEndUser.ContactId
         description: "MessagingEndUser ContactId"
+    EndUserId: linked string
+        source: @MessagingSession.MessagingEndUserId
+        description: "MessagingSession MessagingEndUserId. Passed to the Skywave_Destination_Expert connected sub-agent (a separate agent that does not inherit this session's linked vars)."
+    RoutableId: linked string
+        source: @MessagingSession.Id
+        description: "MessagingSession Id. Passed to the Skywave_Destination_Expert connected sub-agent (a separate agent that does not inherit this session's linked vars)."
     Session_Key: linked string
         source: @MessagingEndUser.MessagingPlatformKey
         description: "Verified-session key (User Verification), format ...AUTH/<config>/uid:<deviceId>. Skywave_ResolveSession extracts the deviceId and resolves the Contact by Session_Id__c (same key the website uses). Primary identity path; Conversation_Id is the fallback."
@@ -218,6 +224,9 @@ start_agent agent_router:
 
             go_to_profile_management: @utils.transition to @subagent.profile_management
                 description: "Update the traveler's own profile (first name, last name, email, phone, or avatar) on their Contact — not tied to a booking"
+
+            go_to_Skywave_Destination_Expert: @utils.transition to @connected_subagent.Skywave_Destination_Expert
+                description: "Hand off to the Destination Expert connected sub-agent for insider tips about a destination city. Use when the visitor asks for things to do / recommendations / insider tips about a city, or accepts an offer of destination tips after booking a flight."
 
     actions:
         resolve_contact:
@@ -1195,3 +1204,13 @@ modality voice:
     outbound_speed: 1.0
     outbound_stability: 0.65
     outbound_similarity: 0.75
+
+connected_subagent Skywave_Destination_Expert:
+    label: "Skywave Destination Expert"
+    target: "agent://Skywave_Destination_Expert"
+    loading_text: "Collaborating with Destination Agent"
+    description: "A connected sub-agent for Skywave that shares three insider tips about the traveller's destination city. Pure LLM — no data lookups. Invoked by the Skywave Airlines agent after a flight is booked."
+    inputs:
+        RoutableId: string = @variables.RoutableId
+        EndUserId: string = @variables.EndUserId
+        ContactId: string = @variables.ContactId

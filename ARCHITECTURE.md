@@ -71,7 +71,7 @@ Contact), so each presenter's session has its own seat state.
 | Path | What it holds |
 |------|---------------|
 | `force-app/main/default/` | All Salesforce metadata (the bulk of the system) |
-| ├ `aiAuthoringBundles/` | The `.agent` files — airlines chat, voice, and the **rental-car connected sub-agent** (`Skywave_Rental_Agent`, §3c''') |
+| ├ `aiAuthoringBundles/` | The `.agent` files — airlines chat, voice, the **rental-car sub-agent** (`Skywave_Rental_Agent`, §3c'''), and the **destination-expert connected sub-agent** (`Skywave_Destination_Expert`, §3c'''') |
 | ├ `classes/` | ~50 Apex classes: agent actions, REST endpoints, controllers, seeders |
 | ├ `triggers/` | 4 triggers (Demo_Session, Contact-update PE, phone-digits, VoiceCall resolve) |
 | ├ `lwc/` | Chat/voice cards (CLT renderers), demo monitor, survey author, contact card |
@@ -739,6 +739,36 @@ No profile step: the rental option only appears after a flight is booked, so the
 Contact profile is already complete. Guest-runtime Apex (`Skywave_ProcessRentalPayment`
 + the two renderer DTOs) is granted on `Skywave_Embedded_Messaging`; the agent-run
 invocables + engine/catalogue on `Skywave_Agent_User`; full FLS on `Skywave_Demo_Admin`.
+
+### 3c''''. Destination Expert (connected sub-agent — agent-to-agent)
+
+`Skywave_Destination_Expert` is a **deliberately minimal, pure-LLM** Agent Script
+service agent: given a destination city it returns **exactly three insider tips**
+(one sight, one place to eat/drink, one local tip), then hands back. No Apex, no
+Flows, no CLT cards — a single `start_agent` topic with reasoning instructions only.
+It reads the city from the conversation; an optional `destination_city` var lets the
+parent seed it.
+
+**Wired into the Airlines agent** (`si`, Airlines v49) as a `connected_subagent`
+(Agentforce multi-agent): a `connected_subagent Skywave_Destination_Expert` block
+(`target: "agent://Skywave_Destination_Expert"`) + a router action
+`go_to_Skywave_Destination_Expert: @utils.transition to @connected_subagent.Skywave_Destination_Expert`.
+A connected sub-agent runs in a separate context and does **not** inherit the parent's
+session-linked vars, so identity is passed via the block's `inputs:` (each bound
+`= @variables.X` — an *unbound* input is a hard compile error); this is why the
+Airlines agent gained `EndUserId` (`@MessagingSession.MessagingEndUserId`) and
+`RoutableId` (`@MessagingSession.Id`).
+
+> **A2A does not support CLTs today.** Agent-to-agent only relays text, so a connected
+> sub-agent that renders CLT cards is broken over A2A. That's why the Destination Expert
+> is pure-LLM (and works), and why the CLT-heavy Rental agent (§3c''') — though built to
+> be a connected sub-agent — is **not** wired into the Airlines agent on `si`. Its
+> connected-sub-agent route was removed from Airlines v49 to avoid a dead path.
+
+Still open (behavioural): the **proactive** "want insider tips about &lt;destination&gt;?"
+offer at the end of the booking flow. Today the hand-off fires when the visitor *asks*
+for tips/recommendations about a city. Spec: `specs/Skywave_Destination_Expert-AgentSpec.md`
+(authored on the golden_template branch).
 
 ### 3d. IP geolocation → home airport (web)
 

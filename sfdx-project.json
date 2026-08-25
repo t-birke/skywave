@@ -31,6 +31,11 @@
             "replaceWithEnv": "AGENT_USER"
         },
         {
+            "filename": "force-app/main/default/aiAuthoringBundles/Skywave_Destination_Expert/Skywave_Destination_Expert.agent",
+            "stringToReplace": "skywaveserviceagent@example.com",
+            "replaceWithEnv": "AGENT_USER"
+        },
+        {
             "filename": "force-app/main/default/flows/Skywave_Route_to_Agent.flow-meta.xml",
             "stringToReplace": "%%SF_SKYWAVE_FLOW_AGENT_ID%%",
             "replaceWithEnv": "SF_SKYWAVE_FLOW_AGENT_ID"
