@@ -1,0 +1,137 @@
+<template>
+    <div class="skywave-header">
+        <!-- Top bar: always visible -->
+        <div class="topbar">
+            <template if:true={showBackButton}>
+                <button
+                    class="icon-btn"
+                    type="button"
+                    onclick={onBackClick}
+                    title="Back"
+                    aria-label="Back"
+                >
+                    <lightning-icon
+                        icon-name="utility:back"
+                        variant="inverse"
+                        size="x-small"
+                    ></lightning-icon>
+                </button>
+            </template>
+
+            <span class="brand">
+                <svg
+                    class="plane"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    focusable="false"
+                >
+                    <path d="M2 21l21-9L2 3v7l15 2-15 2v7z"></path>
+                </svg>
+                <span class="wordmark">Skywave</span>
+            </span>
+
+            <span class="spacer"></span>
+
+            <!-- Re-open / hide the suggested-prompts panel -->
+            <template if:true={showSuggestionsToggle}>
+                <button
+                    class="icon-btn"
+                    type="button"
+                    onclick={onToggleSuggestions}
+                    title={suggestionsToggleLabel}
+                    aria-label={suggestionsToggleLabel}
+                >
+                    <lightning-icon
+                        icon-name={suggestionsToggleIcon}
+                        variant="inverse"
+                        size="x-small"
+                    ></lightning-icon>
+                </button>
+            </template>
+
+            <button
+                class="end-session"
+                type="button"
+                onclick={onEndSessionClick}
+                aria-label="End session"
+            >
+                End Session
+            </button>
+
+            <button
+                class="icon-btn"
+                type="button"
+                onclick={onMinimizeClick}
+                title="Minimize"
+                aria-label="Minimize conversation"
+            >
+                <lightning-icon
+                    icon-name="utility:minimize_window"
+                    variant="inverse"
+                    size="x-small"
+                ></lightning-icon>
+            </button>
+
+            <template if:true={showCloseButton}>
+                <button
+                    class="icon-btn"
+                    type="button"
+                    onclick={onCloseClick}
+                    title="Close"
+                    aria-label="Close conversation"
+                >
+                    <lightning-icon
+                        icon-name="utility:close"
+                        variant="inverse"
+                        size="x-small"
+                    ></lightning-icon>
+                </button>
+            </template>
+        </div>
+
+        <!-- Loading state (until the bot is live) -->
+        <template if:true={isLoading}>
+            <div class="stage stage-loading">
+                <div
+                    class="dots"
+                    role="status"
+                    aria-label="Connecting to your Skywave assistant"
+                >
+                    <span></span><span></span><span></span>
+                </div>
+                <p class="loading-text">
+                    Connecting you to your Skywave assistant&hellip;
+                </p>
+            </div>
+        </template>
+
+        <!-- Greeting / suggested-prompts panel -->
+        <template if:true={showPanel}>
+            <div class="stage stage-welcome">
+                <template if:true={isFirstGreeting}>
+                    <h2 class="greeting">
+                        <span class="hello">Hello,</span><br />how can I help
+                        you today?
+                    </h2>
+                </template>
+                <template if:false={isFirstGreeting}>
+                    <h2 class="greeting subtle">Suggested prompts</h2>
+                </template>
+
+                <div class="starters">
+                    <template for:each={utterances} for:item="u">
+                        <button
+                            key={u.id}
+                            class="starter"
+                            type="button"
+                            data-text={u.text}
+                            onclick={onUtteranceClick}
+                        >
+                            {u.text}
+                        </button>
+                    </template>
+                </div>
+            </div>
+        </template>
+    </div>
+</template>

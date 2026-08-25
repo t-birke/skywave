@@ -4,6 +4,11 @@
     <clientVersion>WebV2</clientVersion>
     <deploymentFeature>EmbeddedMessaging</deploymentFeature>
     <deploymentType>Web</deploymentType>
+    <embeddedServiceCustomComponents>
+        <componentBundleType>LightningComponentBundle</componentBundleType>
+        <customComponent>skywaveChatHeader</customComponent>
+        <customComponentType>MIAW_Header</customComponentType>
+    </embeddedServiceCustomComponents>
     <embeddedServiceForms>
         <displayContext>Conversation</displayContext>
         <embeddedServiceFormFields>

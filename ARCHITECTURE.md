@@ -293,6 +293,35 @@ from the internal `build-data360-demo` skill; see memory `skywave-tracking-tier5
 > JWK, `_ISSUER` matching the auth config). Revert = drop `<embeddedConfig>` from
 > the channel + redeploy (back to unauth, custom client usable again).
 
+> **Custom ECv2 conversation-window header (`skywaveChatHeader` LWC).** The
+> official ECv2 widget's header is replaced by a Skywave-branded LWC (target
+> `lightningSnapin__MessagingHeader`), selected under the `Skywave_MIAW`
+> deployment's **Customize UI Components** in Setup. It renders three phases:
+> a branded loading state → a "how can I help you today?" greeting with four
+> tappable sample utterances. The panel auto-collapses to the slim bar once the
+> visitor sends a starter, and a header chevron toggle re-opens/hides it.
+> Utterances are sent via `configuration.util.sendTextMessage(text)` (a Promise,
+> **not** a `dispatchMessagingEvent`). End Session calls
+> `configuration.util.endSession()` (verified users) else dispatches
+> `CLOSE_CONVERSATION`.
+>
+> **Reveal gate.** The header target gets **no** first-bot-message event —
+> confirmed against the platform source: `MESSAGING_EVENT.PARTICIPANT_JOINED` and
+> `conversationStatus === "OPEN"` both fire at bot **join**, a beat before the
+> welcome renders; the exact `onEmbeddedMessagingFirstBotMessageSent` is a
+> **host-page** window event unreachable from inside the ESW iframe (LWS blocks a
+> cross-iframe relay), and the only in-iframe component that sees message content
+> is the separate `MessagingTextMessageBubble` target. So the loader reveals a
+> short **settle (1 s)** after the bot goes live, opportunistically reveals if the
+> host event ever reaches the iframe, and has a **20 s** safety-reveal so it never
+> strands the visitor. Registration IS source-carried — the `Skywave_MIAW` ESD
+> metadata holds an `<embeddedServiceCustomComponents>` block
+> (`customComponent=skywaveChatHeader`, `customComponentType=MIAW_Header`), so a
+> deploy picks it up. But the deployment must be **Published** (Setup → Skywave
+> MIAW → Publish; *Save* on the component picker is not enough) for the ESW site
+> to serve it — republish after any component code change, then hard-refresh
+> (iframe assets are CDN-cached).
+
 The official ECv2 embedded client dies on **iOS Safari** in a "too many HTTP
 redirects" loop: its session cookie is set on `*.my.site.com` but the host
 page is `*.herokuapp.com` — different public-suffix domains, so the cookie
