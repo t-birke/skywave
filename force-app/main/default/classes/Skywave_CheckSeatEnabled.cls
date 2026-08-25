@@ -59,12 +59,16 @@ public with sharing class Skywave_CheckSeatEnabled {
                 // Malformed id or no access — fall through to the global fallback.
             }
         }
-        // 2. Fallback: global active session (preview / unresolved visitor).
+        // 2. Fallback (preview / unresolved visitor): read the SAME session the
+        //    website's no-`ds` requests resolve to — the configured walk-up
+        //    session if one is pinned (Skywave_RestUtil.getActiveDemoSessionId),
+        //    else the newest active session. Keeping this in lock-step with the
+        //    REST fallback means a single-user demo's seat gate reads the same
+        //    curated session the visitor is actually bound to.
+        Id fallbackId = Skywave_RestUtil.getActiveDemoSessionId();
+        if (fallbackId == null) return false;
         List<Demo_Session__c> active = [
-            SELECT State__c FROM Demo_Session__c
-            WHERE Active__c = true
-            ORDER BY Started__c DESC NULLS LAST
-            LIMIT 1
+            SELECT State__c FROM Demo_Session__c WHERE Id = :fallbackId LIMIT 1
         ];
         return !active.isEmpty() && active[0].State__c == SEAT_ON;
     }

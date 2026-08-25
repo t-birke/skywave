@@ -53,8 +53,13 @@ the stage list and the rationale (it replaced a manual "check state" button).
 **Multi-tenancy.** Many presenters can run the demo at once, each isolated.
 The tenant key is the `Demo_Session__c` Id, stamped into the presenter's QR as
 `?ds=` and echoed as the `ds` body field on every REST call
-(`Skywave_RestUtil.getDemoSessionId(ds)` resolves it, falling back to the
-global most-recent-active session when absent). The presenter link is the
+(`Skywave_RestUtil.getDemoSessionId(ds)` resolves it). When `ds` is absent —
+the common single-user case of hitting `app.skywave.flights` directly — it
+falls back via `getActiveDemoSessionId()`: a configured walk-up session
+(`Skywave_Preflight_Config.Default.Fallback_Demo_Session_Id__c`, read through
+`Skywave_DemoConfig`) if one is pinned to a curated, reliable session (e.g. one
+kept at `agent_seat_pass`), otherwise the global most-recent-active session
+(legacy behavior; the default for fresh/single-tenant installs). The presenter link is the
 record's standard `OwnerId`; `Demo_Session__c.Active_Owner_Key__c` (unique,
 kept in sync with `OwnerId`+`Active__c` by `Demo_Session_Trigger`) makes
 "one active session per owner" a database invariant — a second active row for

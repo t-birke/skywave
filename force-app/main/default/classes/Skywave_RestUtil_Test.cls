@@ -47,6 +47,39 @@ private class Skywave_RestUtil_Test {
     }
 
     @IsTest
+    static void getActiveDemoSessionId_prefersConfiguredFallback() {
+        // A curated (inactive) session pinned via config must win over the
+        // newest-active session — the single-user walk-up guarantee.
+        Demo_Session__c pinned = new Demo_Session__c(State__c='agent_seat_pass', Started__c=System.now());
+        insert pinned;
+        Skywave_DemoConfig.testFallbackId = pinned.Id;
+        System.assertEquals(pinned.Id, Skywave_RestUtil.getActiveDemoSessionId(),
+            'configured fallback session must be preferred over newest-active');
+        System.assertEquals(pinned.Id, Skywave_RestUtil.getDemoSessionId(null),
+            'no ds → configured fallback');
+    }
+
+    @IsTest
+    static void getActiveDemoSessionId_stalePinFallsBackToActive() {
+        // A configured id whose record no longer exists must degrade to newest-active.
+        Demo_Session__c gone = new Demo_Session__c(State__c='idle', Started__c=System.now());
+        insert gone;
+        Id staleId = gone.Id;
+        delete gone;
+        Skywave_DemoConfig.testFallbackId = staleId;
+        Id resolved = Skywave_RestUtil.getActiveDemoSessionId();
+        System.assertNotEquals(null, resolved, 'must fall back to the seeded active session');
+        System.assertNotEquals(staleId, resolved, 'stale pin must not be returned');
+    }
+
+    @IsTest
+    static void demoConfig_cmdtReadDoesNotThrow() {
+        // Exercises the live CMDT read path (value depends on org config).
+        Skywave_DemoConfig.testFallbackId = null;
+        Skywave_DemoConfig.fallbackDemoSessionId();
+    }
+
+    @IsTest
     static void getDemoSessionId_fallsBackWhenBlankOrGarbage() {
         Id active = Skywave_RestUtil.getActiveDemoSessionId();
         System.assertEquals(active, Skywave_RestUtil.getDemoSessionId(null), 'blank ds → active fallback');

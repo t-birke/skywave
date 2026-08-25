@@ -8,11 +8,31 @@
 public without sharing class Skywave_RestUtil {
 
     /**
-     * Returns the Id of the most-recent Active Demo_Session__c, or null if none.
-     * This is the multi-tenant fallback used when a request carries no `ds`
-     * tenant key (legacy QR / direct visit / single-tenant install).
+     * Returns the Demo_Session__c Id a request falls back to when it carries no
+     * `ds` tenant key (legacy QR / direct visit / single-tenant install), or
+     * null if none resolves.
+     *
+     * Resolution order:
+     *   1. The configured walk-up fallback
+     *      (Skywave_Preflight_Config.Default.Fallback_Demo_Session_Id__c), when
+     *      set AND the record still exists. Most presenters run a single-user
+     *      demo and just hit app.skywave.flights with no `ds`; pinning that
+     *      case to a curated session (e.g. one kept at agent_seat_pass) makes
+     *      the walk-up experience reliable instead of resolving to whichever
+     *      session started most recently across ALL presenters.
+     *   2. Otherwise the most-recently-started active session (the legacy
+     *      behavior) — so fresh installs / single-tenant orgs that never
+     *      configure a fallback are unaffected.
      */
     public static Id getActiveDemoSessionId() {
+        Id pinned = Skywave_DemoConfig.fallbackDemoSessionId();
+        if (pinned != null) {
+            List<Demo_Session__c> cfg = [
+                SELECT Id FROM Demo_Session__c WHERE Id = :pinned LIMIT 1
+            ];
+            if (!cfg.isEmpty()) return cfg[0].Id;
+            // Configured id no longer exists (reseed / delete) — fall through.
+        }
         List<Demo_Session__c> active = [
             SELECT Id FROM Demo_Session__c
             WHERE Active__c = true

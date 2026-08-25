@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Fallback_Demo_Session_Id__c</fullName>
+    <description>Optional 18-char Demo_Session__c Id used as the walk-up fallback when a website request carries no `ds` tenant key (single-user demos hitting app.skywave.flights directly). When set to an existing session, Skywave_RestUtil.getActiveDemoSessionId() returns it instead of the most-recently-started active session across ALL presenters — so single-user runs land on a reliable, curated session (e.g. one kept at agent_seat_pass). Blank (or a stale/invalid Id) → the legacy newest-active behavior, so fresh installs and single-tenant orgs are unaffected. Org-specific; set per install, not shipped in source.</description>
+    <label>Fallback Demo Session Id</label>
+    <length>18</length>
+    <required>false</required>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>
