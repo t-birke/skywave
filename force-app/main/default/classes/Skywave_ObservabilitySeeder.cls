@@ -50,15 +50,15 @@ public with sharing class Skywave_ObservabilitySeeder {
     // Session outcome (STDM ssot__AiAgentSessionEndType__c). The Optimization
     // "Session Outcome" is a derived field: Deflected comes from a Deflection
     // score 4-5, Abandoned from Abandonment=TRUE / Deflection <3, and Escalated
-    // from this end-type = 'escalated' (lowercase — the live-verified value the
-    // escalation signal reads). The deflection/abandonment SCORES are seeded
+    // from this end-type = 'Escalated' (capitalised STDM enum — no escalation tag
+    // exists, so the escalation signal reads the end-type). The deflection/abandonment SCORES are seeded
     // separately per session (Ingestion API, scripts/datacloud/hero_obs/
     // seed_heroes.py outcomes) keyed off this end-type. Target mix across the
     // synthetic population: ~60% Deflected / ~30% Abandoned / ~10% Escalated.
     // Story: bookings deflect (agent resolved); seat-change requests fail — most
     // visitors abandon, ~a quarter escalate.
     private static final String OUTCOME_COMPLETED = 'Completed';   // -> Deflected (score 4-5)
-    private static final String OUTCOME_ESCALATED = 'escalated';   // -> Escalated (lowercase, load-bearing)
+    private static final String OUTCOME_ESCALATED = 'Escalated';   // -> Escalated (capitalised STDM enum; drives Escalation Rate)
     private static final String OUTCOME_ABANDONED = 'Abandoned';   // -> Abandoned (score <3 / Abandonment TRUE)
     // Share of seat-failure sessions that end abandoned (rest escalate) — tuned
     // so the population lands near ~30% Abandoned / ~10% Escalated.

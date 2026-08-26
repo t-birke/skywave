@@ -238,11 +238,11 @@ def _hero3_seat_upgrade():
 # hero = (key, start_offset_minutes_from_now, end_type, [moments])
 HEROES = [
     # end_type drives Session Outcome: Completed->Deflected, Abandoned->Abandoned,
-    # 'escalated' (lowercase, load-bearing)->Escalated. Deflection/abandonment
-    # scores are seeded per-session by seed_heroes.py `outcomes`.
+    # 'Escalated'->Escalated (capitalised STDM enum; drives Escalation Rate).
+    # Deflection/abandonment scores are seeded per-session by seed_heroes.py `outcomes`.
     ("hero1", 45,  "Abandoned", [_hero1_booking(), _hero1_seat_change()]),
     ("hero2", 165, "Completed", [_hero2_booking()]),
-    ("hero3", 300, "escalated", [_hero3_seat_upgrade()]),
+    ("hero3", 300, "Escalated", [_hero3_seat_upgrade()]),
 ]
 INTENT_VALUES = ["Flight Search and Booking", "Seat Change Requests", "Seat Upgrade Requests"]
 
@@ -470,6 +470,7 @@ def generate(org_id, planner_id, user_ids, agent_version="v50", now=None):
                 "AiAgentMomentId": moment_id, "AiAgentTagId": intent_tag_id[mo["intent"]],
                 "AiAgentTagDefinitionAssociationId": intent_def_assoc,
                 "AssociationReasonText": "Categorized as " + mo["intent"] + ".",
+                "ValueText": mo["intent"], "SourceType": "PROMPT_TEMPLATE",
                 "AiAgentSessionStartTimestamp": _iso(session_start), "CreatedDate": _iso(moment_end),
                 "DataSourceId": DATA_SOURCE_PREFIX, "ExternalSourceId": ES})
             rows["AiAgentTagAssociation"].append({
@@ -477,6 +478,7 @@ def generate(org_id, planner_id, user_ids, agent_version="v50", now=None):
                 "AiAgentMomentId": moment_id, "AiAgentTagId": score_tag_id[mo["score"]],
                 "AiAgentTagDefinitionAssociationId": score_def_assoc,
                 "AssociationReasonText": mo["reason"],
+                "ValueText": str(mo["score"]), "SourceType": "PROMPT_TEMPLATE",
                 "AiAgentSessionStartTimestamp": _iso(session_start), "CreatedDate": _iso(moment_end),
                 "DataSourceId": DATA_SOURCE_PREFIX, "ExternalSourceId": ES})
 

@@ -269,9 +269,15 @@ OBJECTS = [
     {
         "object": "AiAgentTagAssociation",
         "pk": "Id",
+        # ValueText + SourceType mirror the real analyzer output: the Optimization/
+        # Analytics KPIs (Engagement/Success/etc.) read the denormalized ValueText__c
+        # (score value: "0".."5", "true"/"false") and SourceType__c='PROMPT_TEMPLATE',
+        # NOT the joined tag-row value. Without them the associations are invisible
+        # to those metrics (they only saw the ~real analyzer-scored sessions).
         "cols": ["Id", "AiAgentSessionId", "AiAgentMomentId", "AiAgentTagId",
-                 "AiAgentTagDefinitionAssociationId", "AssociationReasonText",
-                 "AiAgentSessionStartTimestamp", "CreatedDate", "DataSourceId", "ExternalSourceId"],
+                 "AiAgentTagDefinitionAssociationId", "AssociationReasonText", "ValueText",
+                 "SourceType", "AiAgentSessionStartTimestamp", "CreatedDate", "DataSourceId",
+                 "ExternalSourceId"],
         "datetimes": ["AiAgentSessionStartTimestamp", "CreatedDate"],
         "dmo": "ssot__AiAgentTagAssociation__dlm",
         "map": [
@@ -282,6 +288,8 @@ OBJECTS = [
             ("AiAgentTagId", "ssot__AiAgentTagId__c"),
             ("AiAgentTagDefinitionAssociationId", "ssot__AiAgentTagDefinitionAssociationId__c"),
             ("AssociationReasonText", "ssot__AssociationReasonText__c"),
+            ("ValueText", "ValueText__c"),
+            ("SourceType", "SourceType__c"),
             ("AiAgentSessionStartTimestamp", "AiAgentSessionStartTimestamp__c"),
             ("CreatedDate", "ssot__CreatedDate__c"),
         ],

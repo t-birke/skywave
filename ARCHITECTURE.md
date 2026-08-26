@@ -1126,8 +1126,20 @@ regenerates unified ids, so `seed_heroes.py outcomes` (re)creates **session-leve
 score associations (null moment) for every synthetic session via the Ingestion API —
 querying the live session ids fresh and deriving each session's scores from its
 end-type. Target mix ≈ **60 % Deflected / 30 % Abandoned / 10 % Escalated**, tuned by
-the SObject seeder's end-type distribution (`SEAT_ABANDON_PCT`, ~10 % `escalated`).
+the SObject seeder's end-type distribution (`SEAT_ABANDON_PCT`, ~10 % `Escalated`).
 Must re-run after any reseed/full-refresh (it's a workflow step + a reseed step).
+
+🔑 **The KPIs read the association's own `ValueText__c` + `SourceType__c`, not the
+joined tag-row value** — matching the real analyzer output (`ValueText__c` = the score
+`"0".."5"` / `"true"/"false"`, `SourceType__c='PROMPT_TEMPLATE'`). Without them,
+Engagement/Success only count the ~9 real analyzer-scored sessions (~0.6%). Both are on
+the `AiAgentTagAssociation` ingestion schema + generator. **Reinstall gotcha:** those two
+DLO→DMO field mappings must be added **manually in the Data Cloud UI** (the mapping is
+create-only, can't be API-edited once it has dependents): `ValueText__c → ValueText__c`
+and `SourceType__c → SourceType__c` on the `Skywave_Hero_TagAssoc_*` DLO →
+`ssot__AiAgentTagAssociation__dlm`. **Escalation** has no score tag — it reads end-type
+`Escalated`; no real escalated session exists in-org to A/B against, so if Escalation
+Rate stays 0 the driver is a transfer/routing signal that can't be synthesised.
 
 **Assessments are pre-baked and realistic across all sessions.** The Optimization
 analyzer never scores synthetic (`Salesforce_Home`) data, so the seeder writes the

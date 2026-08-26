@@ -225,11 +225,14 @@ def cmd_outcomes(dc, target_org):
         else:  # Completed / Deflected
             dv, av, outcome = _pick(sid, ["5", "5", "4"]), "FALSE", "Deflected"
         counts[outcome] += 1
+        # ValueText + SourceType mirror the analyzer output — the KPIs read these,
+        # not the joined tag value. Abandonment ValueText is lowercase (true/false).
         if dv in defl_tag:
             rows.append({"Id": hero_story._uid("score", sid, "defl"), "AiAgentSessionId": sid,
                          "AiAgentMomentId": "", "AiAgentTagId": defl_tag[dv],
                          "AiAgentTagDefinitionAssociationId": defl_da,
                          "AssociationReasonText": "Deflection score %s: %s." % (dv, outcome),
+                         "ValueText": dv, "SourceType": "PROMPT_TEMPLATE",
                          "AiAgentSessionStartTimestamp": now_iso, "CreatedDate": now_iso,
                          "DataSourceId": hero_story.DATA_SOURCE_PREFIX, "ExternalSourceId": org_id})
         if av in aband_tag:
@@ -237,6 +240,7 @@ def cmd_outcomes(dc, target_org):
                          "AiAgentMomentId": "", "AiAgentTagId": aband_tag[av],
                          "AiAgentTagDefinitionAssociationId": aband_da,
                          "AssociationReasonText": "Abandonment=%s." % av,
+                         "ValueText": av.lower(), "SourceType": "PROMPT_TEMPLATE",
                          "AiAgentSessionStartTimestamp": now_iso, "CreatedDate": now_iso,
                          "DataSourceId": hero_story.DATA_SOURCE_PREFIX, "ExternalSourceId": org_id})
     print("  outcome mix: %s" % counts)
