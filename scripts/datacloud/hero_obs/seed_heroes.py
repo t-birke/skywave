@@ -215,12 +215,20 @@ def cmd_outcomes(dc, target_org):
     now_iso = hero_story._iso(__import__("datetime").datetime.now(__import__("datetime").timezone.utc))
     ta_obj = next(o for o in S.OBJECTS if o["object"] == "AiAgentTagAssociation")
     rows = []
+    del_ids = []   # escalated sessions: delete any stale deflection/abandonment score assoc
     counts = {"Deflected": 0, "Abandoned": 0, "Escalated": 0}
     for sid, end_type, start_ts in sessions:
         et = (end_type or "").lower()
         if "escal" in et:
-            dv, av, outcome = "4", "FALSE", "Escalated"
-        elif et.startswith("aband"):
+            # Escalated: end-type ('Escalated') is the SOLE classifier. Do NOT give it a
+            # deflection/abandonment score — a deflection 4-5 reads as "resolved by agent"
+            # and reclassifies the session as Deflected, suppressing Escalation Rate.
+            # Purge any score assoc left from a prior run (UPSERT never deletes).
+            counts["Escalated"] += 1
+            del_ids.append(hero_story._uid("score", sid, "defl"))
+            del_ids.append(hero_story._uid("score", sid, "aband"))
+            continue
+        if et.startswith("aband"):
             dv, av, outcome = _pick(sid, ["0", "1", "1", "2"]), "TRUE", "Abandoned"
         else:  # Completed / Deflected
             dv, av, outcome = _pick(sid, ["5", "5", "4"]), "FALSE", "Deflected"
@@ -247,6 +255,17 @@ def cmd_outcomes(dc, target_org):
     if rows:
         job = dc.ingest_csv("AiAgentTagAssociation", conn_name("AiAgentTagAssociation"), to_csv(ta_obj, rows))
         print("  pushed %d score associations (job=%s)" % (len(rows), job))
+    if del_ids:
+        # one open ingest job per source at a time — let the upsert job drain
+        # before opening the delete job (else it 409s past the retry window).
+        if rows:
+            time.sleep(90)
+        buf = io.StringIO(); w = csv.writer(buf); w.writerow(["Id"])
+        for i in del_ids:
+            w.writerow([i])
+        job = dc.ingest_csv("AiAgentTagAssociation", conn_name("AiAgentTagAssociation"),
+                            buf.getvalue().encode(), operation="delete")
+        print("  deleted %d escalated-session score associations (job=%s)" % (len(del_ids), job))
 
 
 def cmd_verify(dc, target_org):
