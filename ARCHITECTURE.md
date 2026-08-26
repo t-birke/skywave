@@ -1077,25 +1077,43 @@ call the run endpoint — SalesforceDotCom streams reject non-interactive tokens
 the same wall `Skywave_DataStreamRunner` documents). The `.claude/skills/skywave-
 install` skill conducts the gates; `install.sh` owns the scripted steps.
 
-**Three high-fidelity "hero" sessions sit at the top of the list.** The bulk of
-the 400 are intentionally lo-fi (2-step turns, no real actions) — enough to drive
-the aggregate charts. But the first chunk of the seed also builds **3 fully-scripted
-sessions** (`seedHeroSessions()`) that a presenter can drill into. They are dated
-**day `-1`, a few hours apart** (18:40 / 16:20 / 14:05) so they are always the three
-most recent rows; the rest of the population is pushed to `-15..-2`. Each hero
-replays a real `Skywave_Airlines_Agent` trace (captured from the AIPlatform DMO)
-turn-by-turn with the genuine step choreography — `VARIABLE_UPDATE_STEP` → `TOPIC_STEP`
-→ `LLM_STEP` → `ACTION_STEP` (with the agent's **real** action names: `resolve_session`,
-`get_bookings`, `search_flights`, `book_flight`, `present_profile_form`,
-`ack_profile_form`, `present_payment_form`, `confirm_booking`, `check_seat_enabled`,
-`get_segment_count`, `present_seat_map`) → `TRUST_GUARDRAILS_STEP` — with realistic
-per-step timings (sub-second actions, a deliberately slow ~18 s failed `present_seat_map`,
-15–35 s user think-time gaps) and populated `Error_Message__c` on the failing steps.
-The three tell the Chapter-6 story: **#1** a booking that *Completes* (Q5) then a seat
-change that fails and is *Abandoned*; **#2** a clean booking that *Completes* (Q5);
-**#3** a seat upgrade that fails and is *Escalated* (Q1).
+**Three high-fidelity "hero" sessions sit at the top of the list — pushed straight
+into the DMOs (Path 5), NOT through the SObject seeder.** The ~400 SObject sessions
+are intentionally lo-fi (2-step turns, no real actions) — enough to drive the
+aggregate charts — and they can never be otherwise, because **custom SObject
+`DateTime` fields truncate to whole seconds on save** (verified: writing `…:56.789`
+persists as `…:56.000`). A real trace has *sub-second, random* step timings, so the
+three drill-down "hero" sessions are written **natively into the STDM DMOs with true
+millisecond precision via the Data Cloud Ingestion API** (`scripts/datacloud/hero_obs/`,
+the "Path 5" of the `agentforce-observability-data` skill) — bypassing the SObject
+layer entirely. They carry a distinct `ssot__DataSourceId__c` (`Skywave_Hero_*`) so
+they coexist cleanly with the SObject (`Salesforce_Home`) and real (`AIPlatform`) rows.
 
-**Assessments are pre-baked and realistic across all 403 rows.** The Optimization
+Each hero replays a real `Skywave_Airlines_Agent` trace turn-by-turn with the genuine
+step choreography — `VARIABLE_UPDATE_STEP` → `TOPIC_STEP` → `LLM_STEP` → `ACTION_STEP`
+(the agent's **real** action names: `resolve_session`, `get_bookings`, `search_flights`,
+`book_flight`, `present_profile_form`, `ack_profile_form`, `present_payment_form`,
+`confirm_booking`, `check_seat_enabled`, `get_segment_count`, `present_seat_map`) →
+`TRUST_GUARDRAILS_STEP` — with **real millisecond durations** sampled from a live
+session (actions ~150–650 ms, LLM ~0.5–1.5 s, a deliberately hung ~18 s failed
+`present_seat_map`, 15–35 s user think-time gaps) and populated `Error_Message__c`
+on the failing steps. Timings are RNG-seeded (deterministic) and row Ids are stable,
+so the daily re-push UPSERTs the same rows with today-relative timestamps rather than
+duplicating. They are dated **day `-1`, hours apart** (18:40 / 16:20 / 14:05) so they
+top the list; the SObject population is pushed to `-15..-2`. The three tell the
+Chapter-6 story: **#1** a booking that *Completes* (Q5) then a seat change that fails
+and is *Abandoned* (Q1); **#2** a clean booking that *Completes* (Q5); **#3** a seat
+upgrade that fails and is *Escalated* (Q1).
+
+The module: `dc_ingest.py` (client-credentials → CDP edge client), `stdm_schema.py`
+(the 11-object DLO→DMO field-map spec), `hero_story.py` (the 3 scripted sessions +
+generator), `seed_heroes.py` (`setup` = one-time source/stream/mapping stand-up;
+`push` = generate + ingest, run daily; `verify`/`teardown`). Auth reuses the
+`Skywave_Heroku_Relay` client-credentials + cdp scopes (`.secrets/dc.env`, or `DC_*`
+env vars in CI). The daily `refresh-observability` workflow re-runs `push` as its
+third step (pure REST — no browser, unlike the SObject Full-Refresh).
+
+**Assessments are pre-baked and realistic across all sessions.** The Optimization
 analyzer never scores synthetic (`Salesforce_Home`) data, so the seeder writes the
 assessment fields directly: **Session Outcome** (`AI_Agent_Session_End_Type__c` → STDM
 `ssot__AiAgentSessionEndType__c`) uses the real enum — `Completed` for successful

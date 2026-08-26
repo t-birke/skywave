@@ -19,12 +19,17 @@ name: refresh-observability
 # drives via Playwright. Salesforce can't schedule a browser, so the scheduler
 # lives here and we run the same browser flow the human runs.
 #
-# Two steps, in order (the CRM fix is invisible on the dashboards until the
-# streams re-ingest it, so both must run together):
+# Three steps, in order (the CRM fix is invisible on the dashboards until the
+# streams re-ingest it, so the first two must run together):
 #   1. scripts/apex/freshenObservabilityDates.apex  — realign the 2 stored
 #      End_Timestamp fields to their TODAY()-relative formula Start (idempotent).
 #   2. scripts/refreshDataStreams.mjs               — Full-Refresh the 13 streams
-#      so Data Cloud re-ingests today's rolling-window values.
+#      so Data Cloud re-ingests today's rolling-window values (the ~400 lo-fi
+#      background sessions).
+#   3. scripts/datacloud/hero_obs/seed_heroes.py push — re-push the 3 high-fidelity
+#      drill-down "hero" traces into the STDM DMOs (Path 5, true millisecond
+#      timings; pure REST). They don't auto-roll, so re-pushing keeps them
+#      dated "yesterday" (UPSERT, stable Ids). Needs the DC_* secrets below.
 # See ARCHITECTURE.md §3f.
 #
 # AUTH — DELIBERATELY NOT the same app/user as release-notes.yml (SECRETS.md).
@@ -41,6 +46,13 @@ name: refresh-observability
 #   SF_REFRESH_USERNAME       skywave.refresh.bot@skywave-interactive.demo (not secret; kept as a secret for parity)
 #   SF_JWT_KEY                PEM private key (contents of secrets/jwt.key) — SHARED with release-notes (one keypair)
 #   SF_INSTANCE_URL           optional login URL (default https://login.salesforce.com works for this SDO)
+#   DC_CONSUMER_KEY           Skywave_Heroku_Relay consumer key (client-credentials + cdp scopes) — hero push
+#   DC_CONSUMER_SECRET        its consumer secret (fetch-once from App Manager) — hero push
+#   DC_LOGIN_URL              token host (https://login.salesforce.com)
+#   DC_INSTANCE_URL           si's my.salesforce.com instance URL (client-credentials token host)
+# MIRROR SYNC: the personal-account mirror (t-birke/skywave-observability-refresh)
+# must also carry scripts/datacloud/hero_obs/*.py + the 4 DC_* secrets, and run the
+# one-time `seed_heroes.py setup` against the org before the first scheduled push.
 #
 # If the refresh clicks ever fail (missing Data Cloud/UI access, app not authorized,
 # or a Lightning DOM change), this workflow files a failure issue (below).
@@ -108,6 +120,20 @@ jobs:
 
       - name: Full-Refresh observability data streams (Playwright)
         run: node scripts/refreshDataStreams.mjs --target-org ci
+
+      - name: Re-push high-fidelity hero sessions (Data Cloud Ingestion API)
+        # The 3 drill-down "hero" traces are written straight into the STDM DMOs
+        # (Path 5, TRUE millisecond step timings — the SObject/QBrix path can only
+        # do whole seconds). Unlike the SObject rows they don't auto-roll, so
+        # re-push them daily: the generator recomputes today-relative timestamps
+        # and UPSERTs stable Ids (no duplication). Pure REST, no browser.
+        # One-time source setup (`seed_heroes.py setup`) is an install step, not here.
+        run: python3 scripts/datacloud/hero_obs/seed_heroes.py push --target-org ci
+        env:
+          DC_CONSUMER_KEY: ${{ secrets.DC_CONSUMER_KEY }}
+          DC_CONSUMER_SECRET: ${{ secrets.DC_CONSUMER_SECRET }}
+          DC_LOGIN_URL: ${{ secrets.DC_LOGIN_URL }}
+          DC_INSTANCE_URL: ${{ secrets.DC_INSTANCE_URL }}
 
       - name: Cleanup
         if: always()

@@ -176,7 +176,14 @@ public with sharing class Skywave_ObservabilitySeeder {
         public void execute(QueueableContext qc) {
             if (done == 0) {
                 seedTagDefinitions();   // create defs + intent tags + 1..5 score tags
-                seedHeroSessions();     // 3 high-fidelity traces that top the list
+                // NOTE: the 3 high-fidelity "hero" sessions are no longer seeded
+                // here. Custom SObject DateTime fields truncate to whole seconds,
+                // so the SDO path can't show the sub-second, random step timings a
+                // real trace has. The heroes are now pushed straight into the STDM
+                // DMOs (with true millisecond timings) via the Data Cloud Ingestion
+                // API — see scripts/datacloud/hero_obs/. This seeder produces only
+                // the lo-fi background population; hero code below is retained for
+                // reference but intentionally not called.
             } else {
                 loadTagMaps();          // reload them from the DB for this chunk
             }

@@ -77,3 +77,7 @@ docs/ecv2-reference/raw-assets/embedded-messaging-styling.min.css
 docs/ecv2-reference/raw-assets/iframe-shell.html
 docs/ecv2-reference/raw-assets/*-extract.txt
 __pycache__/
+
+# Data Cloud hero-session ingestion (org-specific state)
+scripts/datacloud/hero_obs/source_state.json
+scripts/datacloud/hero_obs/out/
