@@ -47,6 +47,18 @@ public with sharing class Skywave_ObservabilitySeeder {
     public static final String AGENT_API_NAME = 'Skywave_Airlines_Agent';
     private static final Integer CHUNK_SIZE = 100;
 
+    // Session outcome (STDM ssot__AiAgentSessionEndType__c) — the enum the
+    // Agentforce session surface reads. Valid values are Completed / Escalated
+    // / Abandoned / Failed (capitalised); the old lowercase 'resolved' was
+    // stale and never mapped to a recognised outcome. The Chapter-6 story:
+    // bookings COMPLETE; seat-change requests mostly get ABANDONED (the visitor
+    // gives up, as in the reference session) and the rest ESCALATE to a human.
+    private static final String OUTCOME_COMPLETED = 'Completed';
+    private static final String OUTCOME_ESCALATED = 'Escalated';
+    private static final String OUTCOME_ABANDONED = 'Abandoned';
+    // Share of seat-failure sessions that end abandoned (rest escalate).
+    private static final Integer SEAT_ABANDON_PCT = 65;
+
     // The Intent dimension. Naming MUST be AIE_Request_Category_<AgentApiName>
     // with Source_Type 'Generated' (matches the analyzer's own output schema).
     private static final String AIE_INTENT_DEF =
@@ -164,6 +176,7 @@ public with sharing class Skywave_ObservabilitySeeder {
         public void execute(QueueableContext qc) {
             if (done == 0) {
                 seedTagDefinitions();   // create defs + intent tags + 1..5 score tags
+                seedHeroSessions();     // 3 high-fidelity traces that top the list
             } else {
                 loadTagMaps();          // reload them from the DB for this chunk
             }
@@ -292,7 +305,7 @@ public with sharing class Skywave_ObservabilitySeeder {
         List<SDO_Analytics_AIAgentTagAssociation_v2__c> tagAssocs = new List<SDO_Analytics_AIAgentTagAssociation_v2__c>();
 
         for (Integer i = 0; i < count; i++) {
-            Integer daysBack = 1 + rand(14);                 // 1..14 days ago (never future)
+            Integer daysBack = 2 + rand(14);                 // 2..15 days ago; the 3 hero sessions (day 1) always sort above these
             Integer hourOfDay = 8 + rand(12);
             Integer minute = rand(60);
             DateTime sessionStart = DateTime.newInstance(
@@ -310,9 +323,11 @@ public with sharing class Skywave_ObservabilitySeeder {
 
             DateTime cursor = sessionStart;
             DateTime sessionEnd = sessionStart;
+            Boolean sessionHasSeatFail = false;   // drives the escalated/abandoned outcome
 
             for (Integer m = 0; m < momentCount; m++) {
                 Archetype arch = pickArchetype(arches, totalWeight);
+                if (arch.bucket == 'seat') sessionHasSeatFail = true;
                 List<String> intents = INTENTS.get(arch.bucket);
                 String intentValue = intents[rand(intents.size())];
                 List<String> sample = pickSample(arch.bucket);
@@ -432,10 +447,10 @@ public with sharing class Skywave_ObservabilitySeeder {
                 moments.add(moment);
 
                 tagAssocs.add(makeTagAssoc(intentTagIdByValue.get(intentValue),
-                    AIE_INTENT_DEF, sessionUuid, momentUuid, 'Intent: ' + intentValue,
+                    AIE_INTENT_DEF, sessionUuid, momentUuid, 'Categorized as ' + intentValue + '.',
                     startDays, sessionEnd));
                 tagAssocs.add(makeTagAssoc(qualityScoreTagIdByValue.get(String.valueOf(score)),
-                    'Quality_Score', sessionUuid, momentUuid, 'Quality score ' + score,
+                    'Quality_Score', sessionUuid, momentUuid, qualityReason(arch.bucket, score),
                     startDays, sessionEnd));
             }
 
@@ -444,8 +459,11 @@ public with sharing class Skywave_ObservabilitySeeder {
             s.External_ID__c = sessionUuid;
             s.Demo_Identifier__c = DEMO_TAG;
             s.AI_Agent_Channel_Type__c = 'SCRT2 - EmbeddedMessaging';
-            // Outcome: escalate if any seat-failure moment, else resolved.
-            s.AI_Agent_Session_End_Type__c = 'resolved';
+            // Outcome: seat-change requests fail in this demo — most visitors
+            // abandon, the rest escalate; every other intent completes.
+            s.AI_Agent_Session_End_Type__c = !sessionHasSeatFail
+                ? OUTCOME_COMPLETED
+                : (rand(100) < SEAT_ABANDON_PCT ? OUTCOME_ABANDONED : OUTCOME_ESCALATED);
             s.Individual__c = 'NOT_SET';
             s.Previous_Session_Id__c = 'NOT_SET';
             s.Session_Owner_Object__c = 'NOT_SET';
@@ -516,6 +534,549 @@ public with sharing class Skywave_ObservabilitySeeder {
         Database.insert(moments, false);
         Database.insert(momentInts, false);
         Database.insert(tagAssocs, false);
+    }
+
+    // ======================================================================
+    //  HERO SESSIONS — three fully-scripted, high-fidelity traces that sit at
+    //  the TOP of the session list (most recent, a few hours apart yesterday)
+    //  and show the real per-turn step choreography — VARIABLE_UPDATE_STEP,
+    //  TOPIC_STEP, LLM_STEP, ACTION_STEP (with the agent's REAL action names
+    //  and realistic sub-second/second timings), TRUST_GUARDRAILS_STEP — plus
+    //  populated assessments (outcome, quality score, quality reasoning) and
+    //  moment request/response summaries. Modeled field-for-field on a real
+    //  Skywave_Airlines_Agent session captured from the AIPlatform DMO.
+    //
+    //    #1 Combined  — a booking that COMPLETES (Q5) then a seat CHANGE that
+    //                   fails; the visitor gives up -> ABANDONED.
+    //    #2 Booking   — a clean end-to-end booking -> COMPLETED (Q5).
+    //    #3 Seat fail — a seat UPGRADE that never applies -> ESCALATED (Q1).
+    //  The story: flight booking works well; seat assignment does not.
+    // ======================================================================
+
+    private class StepSpec {
+        String stype; String name; Integer offSec; Integer durSec;
+        String inVal; String outVal; String errMsg;
+        StepSpec(String t, String n, Integer o, Integer d) {
+            stype = t; name = n; offSec = o; durSec = d;
+        }
+    }
+    private class TurnSpec {
+        String topic; String userText; String agentText; Integer gapAfterSec;
+        List<StepSpec> steps;
+        TurnSpec(String tp, String u, String a, Integer gap, List<StepSpec> s) {
+            topic = tp; userText = u; agentText = a; gapAfterSec = gap; steps = s;
+        }
+    }
+    private class MomentSpec {
+        String intentValue; Integer score;
+        String requestSummary; String responseSummary; String qualityReason;
+        List<TurnSpec> turns;
+        MomentSpec(String iv, Integer sc, String rq, String rs, String qr, List<TurnSpec> t) {
+            intentValue = iv; score = sc; requestSummary = rq;
+            responseSummary = rs; qualityReason = qr; turns = t;
+        }
+    }
+
+    // ---- step / turn factories (keep the scripts below readable) ----------
+    private static StepSpec vu(Integer off) {
+        return new StepSpec('VARIABLE_UPDATE_STEP', '__state_update_action__', off, 0);
+    }
+    private static StepSpec topStep(String name) {                 // spans the whole turn
+        return new StepSpec('TOPIC_STEP', name, 0, -1);
+    }
+    private static StepSpec llmStep(String name, Integer off) {
+        return new StepSpec('LLM_STEP', name, off, 1);
+    }
+    private static StepSpec actStep(String name, Integer off, Integer dur, String inv, String outv) {
+        StepSpec s = new StepSpec('ACTION_STEP', name, off, dur);
+        s.inVal = inv; s.outVal = outv; return s;
+    }
+    private static StepSpec actErr(String name, Integer off, Integer dur, String inv, String outv, String err) {
+        StepSpec s = actStep(name, off, dur, inv, outv); s.errMsg = err; return s;
+    }
+    private static StepSpec guardStep(Integer off) {
+        StepSpec s = new StepSpec('TRUST_GUARDRAILS_STEP', 'InstructionAdherence', off, 1);
+        s.inVal = '{"guardrail":"InstructionAdherence"}';
+        s.outVal = '{"isPassed":true,"result":"PASSED"}';
+        return s;
+    }
+    private static TurnSpec turn(String topic, String userText, String agentText,
+                                 Integer gapAfter, List<StepSpec> steps) {
+        return new TurnSpec(topic, userText, agentText, gapAfter, steps);
+    }
+
+    private static void seedHeroSessions() {
+        String plannerId = resolvePlannerId();
+        List<Id> endUserIds = resolveMessagingEndUserIds();
+
+        List<SDO_Analytics_AIAgentSession_v2__c> sessions = new List<SDO_Analytics_AIAgentSession_v2__c>();
+        List<SDO_Analytics_AIAgentSessionParticipa_v2__c> participants = new List<SDO_Analytics_AIAgentSessionParticipa_v2__c>();
+        List<SDO_Analytics_AiAgentInteraction_v2__c> interactions = new List<SDO_Analytics_AiAgentInteraction_v2__c>();
+        List<SDO_Analytics_AIAgentInteractionMessa_v2__c> messages = new List<SDO_Analytics_AIAgentInteractionMessa_v2__c>();
+        List<SDO_Analytics_AIAgentInteractionStep_v2__c> steps = new List<SDO_Analytics_AIAgentInteractionStep_v2__c>();
+        List<SDO_Analytics_AIAgentMoment_v2__c> moments = new List<SDO_Analytics_AIAgentMoment_v2__c>();
+        List<SDO_Analytics_AIAgentMomentInteractio_v2__c> momentInts = new List<SDO_Analytics_AIAgentMomentInteractio_v2__c>();
+        List<SDO_Analytics_AIAgentTagAssociation_v2__c> tagAssocs = new List<SDO_Analytics_AIAgentTagAssociation_v2__c>();
+
+        // All three land yesterday (day 1), a few hours apart, so they are the
+        // three most recent sessions and top the list. #1 latest -> very top.
+        buildHeroSession(1, 18, 40, endUserForIndex(endUserIds, 0), plannerId, OUTCOME_ABANDONED,
+            new List<MomentSpec>{ momentBookingLondonTokyo(), momentSeatChangeAbandoned() },
+            sessions, participants, interactions, messages, steps, moments, momentInts, tagAssocs);
+        buildHeroSession(1, 16, 20, endUserForIndex(endUserIds, 1), plannerId, OUTCOME_COMPLETED,
+            new List<MomentSpec>{ momentBookingNyRome() },
+            sessions, participants, interactions, messages, steps, moments, momentInts, tagAssocs);
+        buildHeroSession(1, 14, 5, endUserForIndex(endUserIds, 2), plannerId, OUTCOME_ESCALATED,
+            new List<MomentSpec>{ momentSeatUpgradeEscalated() },
+            sessions, participants, interactions, messages, steps, moments, momentInts, tagAssocs);
+
+        Database.insert(sessions, false);
+        Database.insert(participants, false);
+        Database.insert(interactions, false);
+        Database.insert(messages, false);
+        Database.insert(steps, false);
+        Database.insert(moments, false);
+        Database.insert(momentInts, false);
+        Database.insert(tagAssocs, false);
+    }
+
+    private static void buildHeroSession(
+            Integer daysBack, Integer hour, Integer minute, String endUserId,
+            String plannerId, String endType, List<MomentSpec> momentSpecs,
+            List<SDO_Analytics_AIAgentSession_v2__c> sessions,
+            List<SDO_Analytics_AIAgentSessionParticipa_v2__c> participants,
+            List<SDO_Analytics_AiAgentInteraction_v2__c> interactions,
+            List<SDO_Analytics_AIAgentInteractionMessa_v2__c> messages,
+            List<SDO_Analytics_AIAgentInteractionStep_v2__c> steps,
+            List<SDO_Analytics_AIAgentMoment_v2__c> moments,
+            List<SDO_Analytics_AIAgentMomentInteractio_v2__c> momentInts,
+            List<SDO_Analytics_AIAgentTagAssociation_v2__c> tagAssocs) {
+
+        String sessionUuid = uuid();
+        DateTime sessionStart = DateTime.newInstance(
+            Date.today().addDays(-daysBack), Time.newInstance(hour, minute, 0, 0));
+        Decimal startDays = daysOffset(sessionStart);
+        DateTime cursor = sessionStart;
+        DateTime sessionEnd = sessionStart;
+
+        for (MomentSpec ms : momentSpecs) {
+            String momentUuid = uuid();
+            DateTime momentStart = cursor;
+            DateTime momentEnd = cursor;
+
+            for (TurnSpec ts : ms.turns) {
+                DateTime turnStart = cursor;
+                // Turn length = latest end across the non-topic steps.
+                Integer turnDur = 1;
+                for (StepSpec sp : ts.steps) {
+                    if (sp.stype == 'TOPIC_STEP') continue;
+                    Integer e = sp.offSec + sp.durSec;
+                    if (e > turnDur) turnDur = e;
+                }
+                DateTime turnEnd = turnStart.addSeconds(turnDur);
+                String interactionUuid = uuid();
+                String traceId = uuid();
+                String spanId = uuid();
+                String attr = '{"internalTraceId":"' + traceId.replaceAll('-', '')
+                    + '","internalSpanId":"' + spanId.replaceAll('-', '').substring(0, 16) + '"}';
+
+                SDO_Analytics_AiAgentInteraction_v2__c it = new SDO_Analytics_AiAgentInteraction_v2__c();
+                it.External_ID__c = interactionUuid;
+                it.Demo_Identifier__c = DEMO_TAG;
+                it.AI_Agent_Session__c = sessionUuid;
+                it.Topic_API_Name__c = ts.topic;
+                it.Ai_Agent_Interaction_Type__c = 'TURN';
+                it.Session_Owner__c = endUserId;
+                it.Session_Owner_Object__c = (endUserId == null) ? null : 'MessagingEndUser';
+                it.Start_Days__c = daysOffset(turnStart);
+                it.Start_Time__c = formatTime(turnStart);
+                it.End_Days__c = daysOffset(turnEnd);
+                it.End_Time__c = formatTime(turnEnd);
+                it.Telemetry_Trace__c = traceId;
+                it.Telemetry_Trace_Span__c = spanId;
+                interactions.add(it);
+
+                messages.add(buildMessage(sessionUuid, interactionUuid,
+                    userParticipantPlaceholder(sessionUuid), 'Input', ts.userText, turnStart));
+                messages.add(buildMessage(sessionUuid, interactionUuid,
+                    agentParticipantPlaceholder(sessionUuid), 'Output', ts.agentText, turnEnd));
+
+                String prevStep = null;
+                for (StepSpec sp : ts.steps) {
+                    DateTime ss = turnStart.addSeconds(sp.offSec);
+                    Integer d = (sp.stype == 'TOPIC_STEP') ? (turnDur - sp.offSec) : sp.durSec;
+                    if (d < 0) d = 0;
+                    DateTime se = ss.addSeconds(d);
+                    SDO_Analytics_AIAgentInteractionStep_v2__c step = new SDO_Analytics_AIAgentInteractionStep_v2__c();
+                    step.External_ID__c = uuid();
+                    step.Demo_Identifier__c = DEMO_TAG;
+                    step.AI_Agent_Interaction__c = interactionUuid;
+                    step.Ai_Agent_Interaction_Step_Type__c = sp.stype;
+                    step.Name__c = sp.name;
+                    step.Input_Value__c = sp.inVal != null ? sp.inVal
+                        : (sp.stype == 'LLM_STEP' ? llmInput(ts.topic, ts.userText)
+                        : (sp.stype == 'VARIABLE_UPDATE_STEP' ? '{"variables":"updated"}' : ts.userText));
+                    step.Output_Value__c = sp.outVal != null ? sp.outVal
+                        : (sp.stype == 'VARIABLE_UPDATE_STEP' ? '{"success":true}' : ts.agentText);
+                    if (sp.errMsg != null) step.Error_Message__c = sp.errMsg;
+                    step.Attribute__c = attr;
+                    step.Telemetry_Trace_Span_Id__c = traceId;
+                    if (sp.stype == 'LLM_STEP') {
+                        step.Gen_AI_Gateway_Request__c = 'chatcmpl-' + traceId.replaceAll('-', '').substring(0, 20);
+                        step.Gen_AI_Gateway_Response__c = 'chatcmpl-' + spanId.replaceAll('-', '').substring(0, 20);
+                        step.Generation__c = uuid();
+                        step.Pre_step_Variable__c = uuid();
+                        step.Post_step_Variable__c = uuid();
+                    }
+                    step.Start_Days__c = daysOffset(ss);
+                    step.Start_Time__c = formatTime(ss);
+                    step.End_Days__c = daysOffset(se);
+                    step.End_Time__c = formatTime(se);
+                    step.Previous_Step__c = prevStep;
+                    steps.add(step);
+                    prevStep = step.External_ID__c;
+                }
+
+                SDO_Analytics_AIAgentMomentInteractio_v2__c mi = new SDO_Analytics_AIAgentMomentInteractio_v2__c();
+                mi.External_ID__c = uuid();
+                mi.Demo_Identifier__c = DEMO_TAG;
+                mi.AI_Agent_Moment_Id__c = momentUuid;
+                mi.Interaction_Id__c = interactionUuid;
+                mi.Start_Days__c = daysOffset(turnStart);
+                mi.Start_Time__c = formatTime(turnStart);
+                momentInts.add(mi);
+
+                momentEnd = turnEnd;
+                sessionEnd = turnEnd;
+                cursor = turnEnd.addSeconds(ts.gapAfterSec);
+            }
+
+            SDO_Analytics_AIAgentMoment_v2__c moment = new SDO_Analytics_AIAgentMoment_v2__c();
+            moment.External_ID__c = momentUuid;
+            moment.Demo_Identifier__c = DEMO_TAG;
+            moment.AI_Agent_Session__c = sessionUuid;
+            moment.AI_Agent_API_Name__c = AGENT_API_NAME;
+            moment.AI_Agent_Version_API_Name__c = AGENT_API_NAME;
+            moment.Request_Summary_Text__c = ms.requestSummary;
+            moment.Response_Summary_Text__c = ms.responseSummary;
+            moment.Start_Days__c = daysOffset(momentStart);
+            moment.Start_Time__c = formatTime(momentStart);
+            moment.End_Days__c = daysOffset(momentEnd);
+            moment.End_Time__c = formatTime(momentEnd);
+            moments.add(moment);
+
+            tagAssocs.add(makeTagAssoc(intentTagIdByValue.get(ms.intentValue),
+                AIE_INTENT_DEF, sessionUuid, momentUuid, 'Categorized as ' + ms.intentValue + '.',
+                startDays, momentEnd));
+            tagAssocs.add(makeTagAssoc(qualityScoreTagIdByValue.get(String.valueOf(ms.score)),
+                'Quality_Score', sessionUuid, momentUuid, ms.qualityReason, startDays, momentEnd));
+        }
+
+        // ---- Session row
+        SDO_Analytics_AIAgentSession_v2__c s = new SDO_Analytics_AIAgentSession_v2__c();
+        s.External_ID__c = sessionUuid;
+        s.Demo_Identifier__c = DEMO_TAG;
+        s.AI_Agent_Channel_Type__c = 'SCRT2 - EmbeddedMessaging';
+        s.AI_Agent_Session_End_Type__c = endType;
+        s.Individual__c = 'NOT_SET';
+        s.Previous_Session_Id__c = 'NOT_SET';
+        s.Session_Owner_Object__c = 'NOT_SET';
+        s.Variable__c = 'NOT_SET';
+        s.Start_Days__c = startDays;
+        s.Start_Time__c = formatTime(sessionStart);
+        s.End_Timestamp__c = asGmtInstant(sessionEnd);
+        sessions.add(s);
+
+        // ---- Participants (AGENT + USER), with identities for Analytics.
+        SDO_Analytics_AIAgentSessionParticipa_v2__c agentP = new SDO_Analytics_AIAgentSessionParticipa_v2__c();
+        agentP.External_ID__c = agentParticipantPlaceholder(sessionUuid);
+        agentP.Demo_Identifier__c = DEMO_TAG;
+        agentP.AI_Agent_Session__c = sessionUuid;
+        agentP.AI_Agent_Api_Name__c = AGENT_API_NAME;
+        agentP.AI_Agent_Version_Api_Name__c = AGENT_API_NAME;
+        agentP.AI_Agent_Type__c = 'EinsteinServiceAgent';
+        agentP.AI_Agent_Session_Participant_Role__c = 'AGENT';
+        agentP.Participant_Attribute__c = '{}';
+        if (plannerId != null) {
+            agentP.Participant__c = plannerId;
+            agentP.Participant_Object__c = 'GenAiPlannerDefinition';
+        }
+        agentP.Start_Days__c = startDays;
+        agentP.Start_Time__c = formatTime(sessionStart);
+        agentP.End_Timestamp__c = asGmtInstant(sessionEnd);
+        participants.add(agentP);
+
+        SDO_Analytics_AIAgentSessionParticipa_v2__c userP = new SDO_Analytics_AIAgentSessionParticipa_v2__c();
+        userP.External_ID__c = userParticipantPlaceholder(sessionUuid);
+        userP.Demo_Identifier__c = DEMO_TAG;
+        userP.AI_Agent_Session__c = sessionUuid;
+        userP.AI_Agent_Api_Name__c = AGENT_API_NAME;
+        userP.AI_Agent_Version_Api_Name__c = AGENT_API_NAME;
+        userP.AI_Agent_Type__c = 'EinsteinServiceAgent';
+        userP.AI_Agent_Session_Participant_Role__c = 'USER';
+        userP.Participant_Attribute__c = '{}';
+        if (endUserId != null) {
+            userP.Participant__c = endUserId;
+            userP.Participant_Object__c = 'MessagingEndUser';
+        }
+        userP.Start_Days__c = startDays;
+        userP.Start_Time__c = formatTime(sessionStart);
+        userP.End_Timestamp__c = asGmtInstant(sessionEnd);
+        participants.add(userP);
+
+        // ---- SESSION_END terminator interaction.
+        SDO_Analytics_AiAgentInteraction_v2__c endIt = new SDO_Analytics_AiAgentInteraction_v2__c();
+        endIt.External_ID__c = uuid();
+        endIt.Demo_Identifier__c = DEMO_TAG;
+        endIt.AI_Agent_Session__c = sessionUuid;
+        endIt.Topic_API_Name__c = 'NOT_SET';
+        endIt.Ai_Agent_Interaction_Type__c = 'SESSION_END';
+        endIt.Start_Days__c = daysOffset(sessionEnd);
+        endIt.Start_Time__c = formatTime(sessionEnd);
+        endIt.End_Days__c = daysOffset(sessionEnd);
+        endIt.End_Time__c = formatTime(sessionEnd);
+        endIt.Telemetry_Trace__c = uuid();
+        endIt.Telemetry_Trace_Span__c = uuid();
+        interactions.add(endIt);
+    }
+
+    private static String endUserForIndex(List<Id> ids, Integer idx) {
+        if (ids == null || ids.isEmpty()) return null;
+        return ids[Math.mod(idx, ids.size())];
+    }
+
+    // ---- Hero moment scripts ----------------------------------------------
+    // A clean, end-to-end First Class booking (LHR -> HND). Completes at Q5.
+    private static MomentSpec momentBookingLondonTokyo() {
+        String cid = '003gK00000LpQ1aAAF';
+        List<TurnSpec> turns = new List<TurnSpec>{
+            turn('flight_booking',
+                'I\'d like to book a First Class flight from London to Tokyo for next Monday.',
+                'I found a few First Class options from London Heathrow to Tokyo Haneda for Monday — here are the flights. Tap **Book** on the one you\'d like.',
+                22, new List<StepSpec>{
+                    vu(0), topStep('flight_booking'), llmStep('agent_router', 0),
+                    actStep('resolve_session', 1, 1,
+                        '{"conversationId":"01JHXG7...","sessionKey":"...AUTH/Skywave_MIAW/uid:dvc_8f31a2"}',
+                        '{"success":true,"contactId":"' + cid + '","summary":"Frequent LHR traveller; prefers First cabin","profileEverCollected":true}'),
+                    vu(2),
+                    actStep('get_bookings', 2, 1, '{"contactId":"' + cid + '"}',
+                        '{"success":true,"bookingCount":0,"bookings":[]}'),
+                    vu(3), llmStep('flight_booking', 3),
+                    actStep('search_flights', 4, 1,
+                        '{"origin":"LHR","destination":"HND","departureDate":"2026-06-08","fareClass":"First"}',
+                        '{"success":true,"message":"3 options returned","flightSummary":"3 First Class itineraries LHR-HND from $6,650"}'),
+                    vu(5)
+                }),
+            turn('flight_booking', 'Book flight SW2200',
+                'Great — **SW2200** in First is held for you. Please complete your details so I can issue the ticket.',
+                34, new List<StepSpec>{
+                    vu(0), topStep('flight_booking'), llmStep('flight_booking', 0),
+                    actStep('book_flight', 1, 1,
+                        '{"contactId":"' + cid + '","flightId":"SW2200","fareClass":"First","travelDate":"2026-06-08"}',
+                        '{"success":true,"selectedFlightId":"a08gK000000pQ2rQAE","selectedFareClass":"First","selectedTravelDate":"2026-06-08"}'),
+                    vu(2),
+                    actStep('present_profile_form', 2, 1, '{"contactId":"' + cid + '"}',
+                        '{"success":true,"formData":"<SkywaveProfileForm rendered>"}'),
+                    vu(3)
+                }),
+            turn('flight_booking', 'Profile created',
+                'Thanks! Your booking **SW-3F2K** is reserved for **$6,650.00**. Choose how you\'d like to pay.',
+                26, new List<StepSpec>{
+                    vu(0), topStep('flight_booking'), llmStep('flight_booking', 0),
+                    actStep('ack_profile_form', 1, 1,
+                        '{"contactId":"' + cid + '","flightId":"a08gK000000pQ2rQAE","fareClass":"First","travelDate":"2026-06-08"}',
+                        '{"success":true,"bookingCode":"SW-3F2K","totalCharged":"$6,650.00"}'),
+                    vu(2),
+                    actStep('present_payment_form', 2, 1,
+                        '{"contactId":"' + cid + '","bookingCode":"SW-3F2K","totalCharged":"$6,650.00"}',
+                        '{"success":true,"formData":"<SkywavePaymentForm rendered>"}'),
+                    vu(3)
+                }),
+            turn('flight_booking', 'Payment completed',
+                'Your First Class flight from London to Tokyo is confirmed — total **$6,650.00**, confirmation code **SW-3F2K**. Is there anything else I can help with?',
+                31, new List<StepSpec>{
+                    vu(0), topStep('flight_booking'), llmStep('flight_booking', 0),
+                    actStep('confirm_booking', 1, 2, '{"contactId":"' + cid + '","bookingCode":"SW-3F2K"}',
+                        '{"success":true,"confirmedCount":1,"confirmationCodes":"SW-3F2K","totalCharged":"$6,650.00"}'),
+                    vu(3), guardStep(4)
+                })
+        };
+        return new MomentSpec('Flight Search and Booking', 5,
+            'I want to book a First Class flight from London to Tokyo for next Monday.',
+            'The agent guided the user through the booking process, confirming the First Class flight from London to Tokyo with a total charge of $6,650 and provided a booking code.',
+            'The agent understood the request, searched Skywave flights, captured the traveler profile, took payment, and confirmed the ticket end-to-end — quoting the confirmation code SW-3F2K and the $6,650.00 total. Fully resolved in a clear, on-topic exchange.',
+            turns);
+    }
+
+    // The seat CHANGE that fails — the seat map never loads and the visitor
+    // gives up (mirrors the reference session). Q1, session ends abandoned.
+    private static MomentSpec momentSeatChangeAbandoned() {
+        List<TurnSpec> turns = new List<TurnSpec>{
+            turn('seat_selection', 'Actually, can you change my seat on that booking to 1A?',
+                'Let me pull up the seat map for **SW-3F2K** so you can choose 1A…',
+                20, new List<StepSpec>{
+                    vu(0), topStep('seat_selection'), llmStep('agent_router', 0),
+                    actStep('check_seat_enabled', 1, 1, '{"ignored":""}', '{"success":true,"enabled":true}'),
+                    vu(2), llmStep('seat_selection', 2),
+                    actStep('get_segment_count', 3, 1, '{"bookingCode":"SW-3F2K"}',
+                        '{"success":true,"segmentCount":1}'),
+                    vu(4),
+                    actErr('present_seat_map', 5, 18,
+                        '{"bookingCode":"SW-3F2K","flightNumber":""}',
+                        '{"success":false,"message":"Unable to build seat map"}',
+                        'SegmentResolutionException: no flight segment id returned for booking SW-3F2K. The seat-map service could not resolve the segment automatically, so the seat map was not generated and seat 1A was never assigned.'),
+                    vu(23), guardStep(24)
+                }),
+            turn('seat_selection', 'It\'s still not letting me pick a seat. This is frustrating.',
+                'I\'m sorry — I still can\'t retrieve the seat map for this flight, so I\'m unable to change your seat here. You can try again in a little while, or reach our team by phone and they\'ll move you to 1A.',
+                0, new List<StepSpec>{
+                    vu(0), topStep('seat_selection'), llmStep('seat_selection', 0),
+                    actErr('present_seat_map', 1, 14, '{"bookingCode":"SW-3F2K"}',
+                        '{"success":false,"message":"Unable to build seat map"}',
+                        'SegmentResolutionException: seat-map generation failed again for booking SW-3F2K; segment id unavailable. Seat change not applied.'),
+                    vu(15), guardStep(16)
+                })
+        };
+        return new MomentSpec('Seat Change Requests', 1,
+            'I want to select seat 1A for my flight.',
+            'The agent requested the flight segment ID to assign seat 1A but was unable to retrieve it automatically. The user expressed frustration and ended the interaction.',
+            'The agent recognized the seat-change request and tried to open the seat map, but the flight segment could not be retrieved automatically, so the seat map never loaded and seat 1A was never assigned. The request went unresolved and the visitor abandoned the conversation in frustration.',
+            turns);
+    }
+
+    // A clean end-to-end Business booking (JFK -> FCO). Completes at Q5.
+    private static MomentSpec momentBookingNyRome() {
+        String cid = '003gK00000MxT7bAAF';
+        List<TurnSpec> turns = new List<TurnSpec>{
+            turn('flight_booking', 'Book me a Business class flight from New York to Rome on the 14th.',
+                'Here are Business Class options from New York JFK to Rome Fiumicino on the 14th. Tap **Book** on the one you\'d like.',
+                24, new List<StepSpec>{
+                    vu(0), topStep('flight_booking'), llmStep('agent_router', 0),
+                    actStep('resolve_session', 1, 1,
+                        '{"conversationId":"01JHZP2...","sessionKey":"...AUTH/Skywave_MIAW/uid:dvc_2b70c9"}',
+                        '{"success":true,"contactId":"' + cid + '","summary":"Based in New York; prefers Business cabin","profileEverCollected":true}'),
+                    vu(2),
+                    actStep('get_bookings', 2, 1, '{"contactId":"' + cid + '"}',
+                        '{"success":true,"bookingCount":0,"bookings":[]}'),
+                    vu(3), llmStep('flight_booking', 3),
+                    actStep('search_flights', 4, 1,
+                        '{"origin":"JFK","destination":"FCO","departureDate":"2026-06-14","fareClass":"Business"}',
+                        '{"success":true,"message":"4 options returned","flightSummary":"4 Business itineraries JFK-FCO from $3,180"}'),
+                    vu(5)
+                }),
+            turn('flight_booking', 'Book flight SW1450',
+                '**SW1450** in Business is held for you. Please complete your details so I can issue the ticket.',
+                28, new List<StepSpec>{
+                    vu(0), topStep('flight_booking'), llmStep('flight_booking', 0),
+                    actStep('book_flight', 1, 1,
+                        '{"contactId":"' + cid + '","flightId":"SW1450","fareClass":"Business","travelDate":"2026-06-14"}',
+                        '{"success":true,"selectedFlightId":"a08gK000000pT4kQAE","selectedFareClass":"Business","selectedTravelDate":"2026-06-14"}'),
+                    vu(2),
+                    actStep('present_profile_form', 2, 1, '{"contactId":"' + cid + '"}',
+                        '{"success":true,"formData":"<SkywaveProfileForm rendered>"}'),
+                    vu(3)
+                }),
+            turn('flight_booking', 'Profile created',
+                'Thanks! Your booking **SW-9R7Q** is reserved for **$3,180.00**. Choose how you\'d like to pay.',
+                23, new List<StepSpec>{
+                    vu(0), topStep('flight_booking'), llmStep('flight_booking', 0),
+                    actStep('ack_profile_form', 1, 1,
+                        '{"contactId":"' + cid + '","flightId":"a08gK000000pT4kQAE","fareClass":"Business","travelDate":"2026-06-14"}',
+                        '{"success":true,"bookingCode":"SW-9R7Q","totalCharged":"$3,180.00"}'),
+                    vu(2),
+                    actStep('present_payment_form', 2, 1,
+                        '{"contactId":"' + cid + '","bookingCode":"SW-9R7Q","totalCharged":"$3,180.00"}',
+                        '{"success":true,"formData":"<SkywavePaymentForm rendered>"}'),
+                    vu(3)
+                }),
+            turn('flight_booking', 'Payment completed',
+                'You\'re all set — Business Class from New York to Rome is confirmed for **$3,180.00**, confirmation code **SW-9R7Q**. Anything else I can help with?',
+                18, new List<StepSpec>{
+                    vu(0), topStep('flight_booking'), llmStep('flight_booking', 0),
+                    actStep('confirm_booking', 1, 2, '{"contactId":"' + cid + '","bookingCode":"SW-9R7Q"}',
+                        '{"success":true,"confirmedCount":1,"confirmationCodes":"SW-9R7Q","totalCharged":"$3,180.00"}'),
+                    vu(3), guardStep(4)
+                })
+        };
+        return new MomentSpec('Flight Search and Booking', 5,
+            'Book me a Business class flight from New York to Rome on the 14th.',
+            'The agent searched Skywave flights, collected the traveler\'s details, took payment, and confirmed a Business Class New York–Rome booking for $3,180 with a confirmation code.',
+            'The agent handled the booking cleanly end-to-end — search, profile, payment, and confirmation — and quoted the confirmation code SW-9R7Q and the $3,180.00 total. Fully resolved.',
+            turns);
+    }
+
+    // A seat UPGRADE that never applies — the seat map fails and the agent
+    // hands off to a human. Q1, session ends escalated.
+    private static MomentSpec momentSeatUpgradeEscalated() {
+        String cid = '003gK00000MxT7bAAF';
+        List<TurnSpec> turns = new List<TurnSpec>{
+            turn('seat_selection', 'Can you upgrade my seat to Business on my Rome flight?',
+                'Let me open the seat map so I can move you into Business…',
+                22, new List<StepSpec>{
+                    vu(0), topStep('seat_selection'), llmStep('agent_router', 0),
+                    actStep('resolve_session', 1, 1,
+                        '{"conversationId":"01JJ0T5...","sessionKey":"...AUTH/Skywave_MIAW/uid:dvc_2b70c9"}',
+                        '{"success":true,"contactId":"' + cid + '","summary":"Based in New York; prefers Business cabin"}'),
+                    vu(2),
+                    actStep('get_bookings', 2, 1, '{"contactId":"' + cid + '"}',
+                        '{"success":true,"bookingCount":1,"singleBookingCode":"SW-9R7Q"}'),
+                    vu(3),
+                    actStep('check_seat_enabled', 3, 1, '{"ignored":""}', '{"success":true,"enabled":true}'),
+                    vu(4), llmStep('seat_selection', 4),
+                    actStep('get_segment_count', 5, 1, '{"bookingCode":"SW-9R7Q"}',
+                        '{"success":true,"segmentCount":1}'),
+                    vu(6),
+                    actErr('present_seat_map', 7, 16, '{"bookingCode":"SW-9R7Q"}',
+                        '{"success":false,"message":"Unable to build seat map"}',
+                        'SeatMapUnavailableException: cabin-upgrade seat map could not be generated for booking SW-9R7Q; segment fare-class inventory lookup failed. No seat was reassigned.'),
+                    vu(23), guardStep(24)
+                }),
+            turn('seat_selection', 'Are you able to do the upgrade?',
+                'I\'m sorry — the seat map didn\'t load, so I couldn\'t apply the Business upgrade here. I\'ll connect you with a Skywave agent who can complete the upgrade for you.',
+                0, new List<StepSpec>{
+                    vu(0), topStep('seat_selection'), llmStep('seat_selection', 0),
+                    actErr('present_seat_map', 1, 13, '{"bookingCode":"SW-9R7Q"}',
+                        '{"success":false,"message":"Unable to build seat map"}',
+                        'SeatMapUnavailableException: seat-map generation failed again for booking SW-9R7Q; segment inventory unavailable. Upgrade not applied.'),
+                    vu(14), guardStep(15)
+                })
+        };
+        return new MomentSpec('Seat Upgrade Requests', 1,
+            'Can you upgrade me to a seat in Business for my Rome flight?',
+            'The agent tried to open the seat map to process the upgrade but the seat map failed to load, so the upgrade could not be applied. The visitor was frustrated and the session was escalated to a human agent.',
+            'The agent understood the upgrade request and attempted to load the seat map, but the seat-map service failed and no seat was reassigned, so the Business upgrade was never applied. The request went unresolved and the session was escalated to a human agent.',
+            turns);
+    }
+
+    // Realistic, analyst-style quality reasoning keyed to intent + score —
+    // replaces the old canned "Quality score N". Drives Quality Score Reasoning.
+    private static String qualityReason(String bucket, Integer score) {
+        if (bucket == 'seat') {
+            return 'The agent recognized the seat request but could not retrieve the flight '
+                + 'segment, so the seat map never loaded and no seat was assigned. The request '
+                + 'went unresolved and the visitor was left frustrated.';
+        }
+        if (bucket == 'booking' && score >= 4) {
+            return 'The agent understood the request, searched Skywave flights, and drove the '
+                + 'booking through to a confirmed, paid ticket, quoting the confirmation code '
+                + 'and total. Fully resolved.';
+        }
+        if (score >= 4) {
+            return 'The agent understood the request and resolved it accurately within a couple '
+                + 'of turns, with clear and relevant responses.';
+        }
+        if (score == 3) {
+            return 'The agent stayed on topic and partially addressed the request, but left the '
+                + 'visitor to take the next step rather than fully resolving it.';
+        }
+        return 'The response was only loosely relevant to the request and did not move the '
+            + 'visitor toward a resolution.';
+    }
+
+    private static String llmInput(String topic, String userText) {
+        return '{"stepType":"LLM_STEP","topic":"' + topic
+            + '","model":"llmgateway__OpenAIGPT4Omni","userMessage":'
+            + JSON.serialize(userText) + '}';
     }
 
     // ---- helpers ----------------------------------------------------------

@@ -1077,10 +1077,39 @@ call the run endpoint — SalesforceDotCom streams reject non-interactive tokens
 the same wall `Skywave_DataStreamRunner` documents). The `.claude/skills/skywave-
 install` skill conducts the gates; `install.sh` owns the scripted steps.
 
+**Three high-fidelity "hero" sessions sit at the top of the list.** The bulk of
+the 400 are intentionally lo-fi (2-step turns, no real actions) — enough to drive
+the aggregate charts. But the first chunk of the seed also builds **3 fully-scripted
+sessions** (`seedHeroSessions()`) that a presenter can drill into. They are dated
+**day `-1`, a few hours apart** (18:40 / 16:20 / 14:05) so they are always the three
+most recent rows; the rest of the population is pushed to `-15..-2`. Each hero
+replays a real `Skywave_Airlines_Agent` trace (captured from the AIPlatform DMO)
+turn-by-turn with the genuine step choreography — `VARIABLE_UPDATE_STEP` → `TOPIC_STEP`
+→ `LLM_STEP` → `ACTION_STEP` (with the agent's **real** action names: `resolve_session`,
+`get_bookings`, `search_flights`, `book_flight`, `present_profile_form`,
+`ack_profile_form`, `present_payment_form`, `confirm_booking`, `check_seat_enabled`,
+`get_segment_count`, `present_seat_map`) → `TRUST_GUARDRAILS_STEP` — with realistic
+per-step timings (sub-second actions, a deliberately slow ~18 s failed `present_seat_map`,
+15–35 s user think-time gaps) and populated `Error_Message__c` on the failing steps.
+The three tell the Chapter-6 story: **#1** a booking that *Completes* (Q5) then a seat
+change that fails and is *Abandoned*; **#2** a clean booking that *Completes* (Q5);
+**#3** a seat upgrade that fails and is *Escalated* (Q1).
+
+**Assessments are pre-baked and realistic across all 403 rows.** The Optimization
+analyzer never scores synthetic (`Salesforce_Home`) data, so the seeder writes the
+assessment fields directly: **Session Outcome** (`AI_Agent_Session_End_Type__c` → STDM
+`ssot__AiAgentSessionEndType__c`) uses the real enum — `Completed` for successful
+intents, and for seat-change sessions ~65 % `Abandoned` / the rest `Escalated` (the
+old lowercase `'resolved'` was stale and mapped to no recognised outcome); **Response
+Quality Score** is the per-moment `Quality_Score` tag (booking intents 4–5, seat
+intents 1–2); and **Quality Score Reasoning** (`Association_Reason__c`) is analyst-style
+prose keyed to intent + score — no more canned `"Quality score N"`.
+
 **Dates are a rolling window — they mostly self-freshen.** The seed data is *not*
 stored as absolute dates. Every `SDO_Analytics_*` row carries a fixed relative
 day-offset (`Start_Days__c`/`End_Days__c`/`Created_Days__c`/`Message_Sent_Days__c`,
-a static `-14..-1`) plus an `HH:mm:ss` `*_Time__c` string, and the timestamp the
+`-15..-2` for the bulk population and `-1` for the three hero sessions) plus an
+`HH:mm:ss` `*_Time__c` string, and the timestamp the
 STDM DMOs actually read is a **`TODAY()`-relative formula** —
 `Start_Timestamp__c = DATETIMEVALUE(TEXT(TODAY() + Start_Days__c) + " " + Start_Time__c)`.
 So the whole dataset rolls forward on its own; N days after seeding it still reads
