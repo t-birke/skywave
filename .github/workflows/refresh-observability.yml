@@ -135,6 +135,19 @@ jobs:
           DC_LOGIN_URL: ${{ secrets.DC_LOGIN_URL }}
           DC_INSTANCE_URL: ${{ secrets.DC_INSTANCE_URL }}
 
+      - name: Seed Deflection/Abandonment outcome scores (Data Cloud Ingestion API)
+        # Session-level Deflection/Abandonment score associations for EVERY synthetic
+        # session (the ~400 SObject + 3 hero), so the Optimization Session Outcome /
+        # Deflection / Abandon / Escalation KPIs populate (the analyzer never scores
+        # synthetic data). Queries live session ids fresh (they drift on reseed) and
+        # UPSERTs stable ids. Runs after the stream refresh so it sees the current ids.
+        run: python3 scripts/datacloud/hero_obs/seed_heroes.py outcomes --target-org ci
+        env:
+          DC_CONSUMER_KEY: ${{ secrets.DC_CONSUMER_KEY }}
+          DC_CONSUMER_SECRET: ${{ secrets.DC_CONSUMER_SECRET }}
+          DC_LOGIN_URL: ${{ secrets.DC_LOGIN_URL }}
+          DC_INSTANCE_URL: ${{ secrets.DC_INSTANCE_URL }}
+
       - name: Cleanup
         if: always()
         run: rm -f "$RUNNER_TEMP/jwt.key"

@@ -155,6 +155,93 @@ def cmd_push(dc, target_org):
     print("push: submitted (async — rows land in the DMOs within ~1-4 min).")
 
 
+def _edge_rows(dc, sql):
+    st, r = dc.query(sql)
+    return (r.get("data") if isinstance(r, dict) else None) or []
+
+
+def cmd_outcomes(dc, target_org):
+    """Seed per-session Deflection + Abandonment score associations so the
+    Optimization dashboard's Session Outcome / Deflection / Abandon / Escalation
+    KPIs populate (the analyzer never scores synthetic data). Session-level
+    associations (null moment) via the Ingestion API — the stable path. Derives
+    each session's scores from its end-type:
+       Completed -> Deflected (deflection 4-5, abandonment FALSE)
+       Abandoned -> Abandoned (deflection 0-2, abandonment TRUE)
+       escalated -> Escalated (via end-type; deflection 4, abandonment FALSE)
+    Re-run after any SObject reseed (session unified ids change) — the daily
+    cron runs it too (idempotent UPSERT keyed on stable UUID5 ids)."""
+    import hashlib
+    org_id = sf_json(target_org, org_display=True)["result"]["id"]
+    agent = hero_story.AGENT_API_NAME
+
+    # Resolve the platform std_ Deflection/Abandonment tag graph (org-specific ids).
+    def _def_id(kind):
+        rows = _edge_rows(dc, "SELECT ssot__Id__c FROM ssot__AiAgentTagDefinition__dlm "
+                          "WHERE ssot__DeveloperName__c = 'std_%s_Score_%s_V1'" % (kind, agent))
+        return rows[0][0] if rows else None
+    defl_def, aband_def = _def_id("Deflection"), _def_id("Abandonment")
+    if not defl_def or not aband_def:
+        raise RuntimeError("std_ Deflection/Abandonment tag defs not found for " + agent)
+
+    def _val_map(def_id):
+        m = {}
+        for v, tid in _edge_rows(dc, "SELECT ssot__Value__c, ssot__Id__c FROM ssot__AiAgentTag__dlm "
+                                 "WHERE ssot__AiAgentTagDefinitionId__c = '%s'" % def_id):
+            m.setdefault(v, tid)   # any one tag row per value
+        return m
+    defl_tag, aband_tag = _val_map(defl_def), _val_map(aband_def)
+
+    def _defassoc(def_id):
+        rows = _edge_rows(dc, "SELECT ssot__Id__c FROM ssot__AiAgentTagDefinitionAssociation__dlm "
+                          "WHERE ssot__AiAgentTagDefinitionId__c = '%s' AND ssot__AiAgentApiName__c = '%s'"
+                          % (def_id, agent))
+        return rows[0][0] if rows else ""
+    defl_da, aband_da = _defassoc(defl_def), _defassoc(aband_def)
+
+    # Live synthetic sessions (ids drift on reseed — always query fresh).
+    sessions = _edge_rows(dc, "SELECT ssot__Id__c, ssot__AiAgentSessionEndType__c, ssot__StartTimestamp__c "
+                          "FROM ssot__AiAgentSession__dlm WHERE ssot__DataSourceId__c = 'Salesforce_Home' "
+                          "OR ssot__DataSourceId__c LIKE 'Skywave_Hero%'")
+    print("  scoring %d synthetic sessions (defl_def=%s aband_def=%s)" % (len(sessions), defl_def, aband_def))
+
+    def _pick(sid, choices):
+        h = int(hashlib.md5(sid.encode()).hexdigest(), 16)
+        return choices[h % len(choices)]
+
+    now_iso = hero_story._iso(__import__("datetime").datetime.now(__import__("datetime").timezone.utc))
+    ta_obj = next(o for o in S.OBJECTS if o["object"] == "AiAgentTagAssociation")
+    rows = []
+    counts = {"Deflected": 0, "Abandoned": 0, "Escalated": 0}
+    for sid, end_type, start_ts in sessions:
+        et = (end_type or "").lower()
+        if "escal" in et:
+            dv, av, outcome = "4", "FALSE", "Escalated"
+        elif et.startswith("aband"):
+            dv, av, outcome = _pick(sid, ["0", "1", "1", "2"]), "TRUE", "Abandoned"
+        else:  # Completed / Deflected
+            dv, av, outcome = _pick(sid, ["5", "5", "4"]), "FALSE", "Deflected"
+        counts[outcome] += 1
+        if dv in defl_tag:
+            rows.append({"Id": hero_story._uid("score", sid, "defl"), "AiAgentSessionId": sid,
+                         "AiAgentMomentId": "", "AiAgentTagId": defl_tag[dv],
+                         "AiAgentTagDefinitionAssociationId": defl_da,
+                         "AssociationReasonText": "Deflection score %s: %s." % (dv, outcome),
+                         "AiAgentSessionStartTimestamp": now_iso, "CreatedDate": now_iso,
+                         "DataSourceId": hero_story.DATA_SOURCE_PREFIX, "ExternalSourceId": org_id})
+        if av in aband_tag:
+            rows.append({"Id": hero_story._uid("score", sid, "aband"), "AiAgentSessionId": sid,
+                         "AiAgentMomentId": "", "AiAgentTagId": aband_tag[av],
+                         "AiAgentTagDefinitionAssociationId": aband_da,
+                         "AssociationReasonText": "Abandonment=%s." % av,
+                         "AiAgentSessionStartTimestamp": now_iso, "CreatedDate": now_iso,
+                         "DataSourceId": hero_story.DATA_SOURCE_PREFIX, "ExternalSourceId": org_id})
+    print("  outcome mix: %s" % counts)
+    if rows:
+        job = dc.ingest_csv("AiAgentTagAssociation", conn_name("AiAgentTagAssociation"), to_csv(ta_obj, rows))
+        print("  pushed %d score associations (job=%s)" % (len(rows), job))
+
+
 def cmd_verify(dc, target_org):
     prefix = hero_story.DATA_SOURCE_PREFIX
     for dmo in ["ssot__AiAgentSession__dlm", "ssot__AiAgentInteraction__dlm",
@@ -193,12 +280,13 @@ def cmd_teardown(dc, target_org):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("command", choices=["setup", "push", "verify", "teardown"])
+    ap.add_argument("command", choices=["setup", "push", "outcomes", "verify", "teardown"])
     ap.add_argument("--target-org", default="si")
     args = ap.parse_args()
     dc = DC()
     print("[dc] core=%s cdp=%s" % (dc.core_url, dc.cdp_url))
-    {"setup": cmd_setup, "push": cmd_push, "verify": cmd_verify, "teardown": cmd_teardown}[args.command](dc, args.target_org)
+    {"setup": cmd_setup, "push": cmd_push, "outcomes": cmd_outcomes,
+     "verify": cmd_verify, "teardown": cmd_teardown}[args.command](dc, args.target_org)
 
 
 if __name__ == "__main__":

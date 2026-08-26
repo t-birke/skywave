@@ -47,17 +47,22 @@ public with sharing class Skywave_ObservabilitySeeder {
     public static final String AGENT_API_NAME = 'Skywave_Airlines_Agent';
     private static final Integer CHUNK_SIZE = 100;
 
-    // Session outcome (STDM ssot__AiAgentSessionEndType__c) — the enum the
-    // Agentforce session surface reads. Valid values are Completed / Escalated
-    // / Abandoned / Failed (capitalised); the old lowercase 'resolved' was
-    // stale and never mapped to a recognised outcome. The Chapter-6 story:
-    // bookings COMPLETE; seat-change requests mostly get ABANDONED (the visitor
-    // gives up, as in the reference session) and the rest ESCALATE to a human.
-    private static final String OUTCOME_COMPLETED = 'Completed';
-    private static final String OUTCOME_ESCALATED = 'Escalated';
-    private static final String OUTCOME_ABANDONED = 'Abandoned';
-    // Share of seat-failure sessions that end abandoned (rest escalate).
-    private static final Integer SEAT_ABANDON_PCT = 65;
+    // Session outcome (STDM ssot__AiAgentSessionEndType__c). The Optimization
+    // "Session Outcome" is a derived field: Deflected comes from a Deflection
+    // score 4-5, Abandoned from Abandonment=TRUE / Deflection <3, and Escalated
+    // from this end-type = 'escalated' (lowercase — the live-verified value the
+    // escalation signal reads). The deflection/abandonment SCORES are seeded
+    // separately per session (Ingestion API, scripts/datacloud/hero_obs/
+    // seed_heroes.py outcomes) keyed off this end-type. Target mix across the
+    // synthetic population: ~60% Deflected / ~30% Abandoned / ~10% Escalated.
+    // Story: bookings deflect (agent resolved); seat-change requests fail — most
+    // visitors abandon, ~a quarter escalate.
+    private static final String OUTCOME_COMPLETED = 'Completed';   // -> Deflected (score 4-5)
+    private static final String OUTCOME_ESCALATED = 'escalated';   // -> Escalated (lowercase, load-bearing)
+    private static final String OUTCOME_ABANDONED = 'Abandoned';   // -> Abandoned (score <3 / Abandonment TRUE)
+    // Share of seat-failure sessions that end abandoned (rest escalate) — tuned
+    // so the population lands near ~30% Abandoned / ~10% Escalated.
+    private static final Integer SEAT_ABANDON_PCT = 75;
 
     // The Intent dimension. Naming MUST be AIE_Request_Category_<AgentApiName>
     // with Source_Type 'Generated' (matches the analyzer's own output schema).

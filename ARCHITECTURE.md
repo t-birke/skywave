@@ -1108,10 +1108,26 @@ upgrade that fails and is *Escalated* (Q1).
 The module: `dc_ingest.py` (client-credentials → CDP edge client), `stdm_schema.py`
 (the 11-object DLO→DMO field-map spec), `hero_story.py` (the 3 scripted sessions +
 generator), `seed_heroes.py` (`setup` = one-time source/stream/mapping stand-up;
-`push` = generate + ingest, run daily; `verify`/`teardown`). Auth reuses the
-`Skywave_Heroku_Relay` client-credentials + cdp scopes (`.secrets/dc.env`, or `DC_*`
-env vars in CI). The daily `refresh-observability` workflow re-runs `push` as its
-third step (pure REST — no browser, unlike the SObject Full-Refresh).
+`push` = generate + ingest the 3 heroes, run daily; `outcomes` = score EVERY
+synthetic session for the Optimization KPIs, run daily; `verify`/`teardown`). Auth
+reuses the `Skywave_Heroku_Relay` client-credentials + cdp scopes (`.secrets/dc.env`,
+or `DC_*` env vars in CI). The daily `refresh-observability` workflow re-runs `push`
++ `outcomes` as its 3rd/4th steps (pure REST — no browser, unlike the SObject
+Full-Refresh).
+
+**Session Outcome / Deflection / Abandon / Escalation KPIs (Optimization).** These
+are NOT driven by `ssot__AiAgentSessionEndType__c` alone — the Optimization *Session
+Outcome* is derived from two platform-provisioned **Predefined** score tags,
+`std_Deflection_Score_<agent>_V1` (Number 0–5) and `std_Abandonment_Score_<agent>_V1`
+(TRUE/FALSE/Unsure): **Deflected** = deflection 4–5; **Abandoned** = abandonment TRUE
+or deflection < 3; **Escalated** = end-type `escalated` (lowercase). The analyzer
+never scores synthetic data and the associations orphan whenever an SObject reseed
+regenerates unified ids, so `seed_heroes.py outcomes` (re)creates **session-level**
+score associations (null moment) for every synthetic session via the Ingestion API —
+querying the live session ids fresh and deriving each session's scores from its
+end-type. Target mix ≈ **60 % Deflected / 30 % Abandoned / 10 % Escalated**, tuned by
+the SObject seeder's end-type distribution (`SEAT_ABANDON_PCT`, ~10 % `escalated`).
+Must re-run after any reseed/full-refresh (it's a workflow step + a reseed step).
 
 **Assessments are pre-baked and realistic across all sessions.** The Optimization
 analyzer never scores synthetic (`Salesforce_Home`) data, so the seeder writes the
