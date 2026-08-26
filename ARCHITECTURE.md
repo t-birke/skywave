@@ -1079,10 +1079,13 @@ install` skill conducts the gates; `install.sh` owns the scripted steps.
 
 **Three high-fidelity "hero" sessions sit at the top of the list — pushed straight
 into the DMOs (Path 5), NOT through the SObject seeder.** The ~400 SObject sessions
-are intentionally lo-fi (2-step turns, no real actions) — enough to drive the
-aggregate charts — and they can never be otherwise, because **custom SObject
-`DateTime` fields truncate to whole seconds on save** (verified: writing `…:56.789`
-persists as `…:56.000`). A real trace has *sub-second, random* step timings, so the
+carry real TOPIC + ACTION step names (a real subagent topic + a per-bucket action —
+`search_flights`, `change_seat`, etc., with an `Error_Message__c` on the seat action)
+so they count toward **Engagement Rate** (a non-system topic was invoked) and **Success
+Rate** (an interaction executed an action with no error; seat's action errors → failure,
+on-story). But their *timings* are whole-second and can never be otherwise, because
+**custom SObject `DateTime` fields truncate to whole seconds on save** (verified: writing
+`…:56.789` persists as `…:56.000`). A real trace has *sub-second, random* step timings, so the
 three drill-down "hero" sessions are written **natively into the STDM DMOs with true
 millisecond precision via the Data Cloud Ingestion API** (`scripts/datacloud/hero_obs/`,
 the "Path 5" of the `agentforce-observability-data` skill) — bypassing the SObject

@@ -392,21 +392,41 @@ public with sharing class Skywave_ObservabilitySeeder {
                         agentParticipantPlaceholder(sessionUuid), 'Output', pair[1],
                         turnEnd));
 
-                    // steps: main turn gets 2, follow-up gets 1
-                    Integer stepN = (t == 0) ? 2 : 1;
-                    String[] stepTypes = new String[]{ 'TOPIC_STEP', 'LLM_STEP', 'ACTION_STEP' };
+                    // Steps drive two dashboard KPIs, so they carry REAL names:
+                    //  - Engagement Rate counts sessions that invoked a non-system
+                    //    TOPIC, so TOPIC_STEP.Name is the real subagent topic (not
+                    //    the literal "TOPIC_STEP").
+                    //  - Success Rate counts interactions that executed an ACTION
+                    //    with no error (Is_Interaction_With_Errors keys on a non-
+                    //    empty Error_Message != 'NOT_SET'). So the MAIN turn fires a
+                    //    real action: no error for the working buckets (=success),
+                    //    a real error for the seat bucket (=failure, on-story), and
+                    //    off_topic fires none (conversational redirect = unsuccessful).
+                    // Build the (type,name,error) sequence for this turn.
+                    String actionName = actionForBucket(arch.bucket);
+                    List<String> stTypes = new List<String>{ 'TOPIC_STEP', 'LLM_STEP' };
+                    List<String> stNames = new List<String>{ arch.topic, (t == 0 ? 'agent_router' : arch.topic) };
+                    List<String> stErrs  = new List<String>{ null, null };
+                    if (t == 0 && actionName != null) {
+                        stTypes.add('ACTION_STEP');
+                        stNames.add(actionName);
+                        stErrs.add(arch.bucket == 'seat'
+                            ? 'SeatChangeException: unable to update the seat assignment — the flight segment could not be resolved, so no seat was changed.'
+                            : null);
+                    }
                     String prevStep = null;
                     DateTime sc = turnStart;
-                    for (Integer sIdx = 0; sIdx < stepN; sIdx++) {
-                        DateTime ss = sc, se = sc.addSeconds(2);
+                    for (Integer sIdx = 0; sIdx < stTypes.size(); sIdx++) {
+                        DateTime ss = sc, se = sc.addSeconds(1);
                         SDO_Analytics_AIAgentInteractionStep_v2__c step = new SDO_Analytics_AIAgentInteractionStep_v2__c();
                         step.External_ID__c = uuid();
                         step.Demo_Identifier__c = DEMO_TAG;
                         step.AI_Agent_Interaction__c = interactionUuid;
-                        step.Ai_Agent_Interaction_Step_Type__c = stepTypes[Math.mod(sIdx, 3)];
-                        step.Name__c = stepTypes[Math.mod(sIdx, 3)];
+                        step.Ai_Agent_Interaction_Step_Type__c = stTypes[sIdx];
+                        step.Name__c = stNames[sIdx];
                         step.Input_Value__c = pair[0];
                         step.Output_Value__c = pair[1];
+                        if (stErrs[sIdx] != null) step.Error_Message__c = stErrs[sIdx];
                         step.Telemetry_Trace_Span_Id__c = traceId;
                         step.Start_Days__c = daysOffset(ss);
                         step.Start_Time__c = formatTime(ss);
@@ -1111,6 +1131,18 @@ public with sharing class Skywave_ObservabilitySeeder {
                                  'I am sorry for the inconvenience. I was unable to resolve this for you.' };
         }
         return new String[]{ 'Okay.', 'Understood. Anything else I can help with?' };
+    }
+
+    // Real action fired on the main turn per intent bucket — drives Success Rate
+    // (an interaction that executes an action without an error = successful).
+    // off_topic returns null (a conversational redirect fires no action).
+    private static String actionForBucket(String bucket) {
+        if (bucket == 'booking') return 'search_flights';
+        if (bucket == 'seat')    return 'change_seat';           // seat action carries an error -> failed
+        if (bucket == 'loyalty') return 'get_mileage_balance';
+        if (bucket == 'support') return 'create_case';
+        if (bucket == 'name')    return 'update_passenger_name';
+        return null;
     }
 
     private static SDO_Analytics_AIAgentInteractionMessa_v2__c buildMessage(
