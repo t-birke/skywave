@@ -7,8 +7,11 @@ the custom-SObject (Path 4 / SDO QBrix) path cannot represent.
 Subcommands:
   setup     Create the 11 IngestApi sources/schemas/streams/DLO->DMO mappings
             (idempotent; state cached in source_state.json).
-  push      Generate the 3 heroes (today-relative, ms-precise) and ingest them.
-            Re-run daily to keep them dated "yesterday" (UPSERT, stable Ids).
+  push      Generate the 3 heroes (now-relative, ms-precise) and ingest them.
+            Re-run daily to keep them the most-recent sessions (UPSERT, stable Ids).
+  outcomes  Seed session-level Deflection/Abandonment score associations for EVERY
+            synthetic session so the Optimization Session Outcome / Deflection /
+            Abandon / Escalation KPIs populate. Run daily + after any reseed.
   verify    Query the DMOs for the hero rows (counts + sample step timings).
   teardown  Remove the hero sources (mappings -> streams -> connections).
 
