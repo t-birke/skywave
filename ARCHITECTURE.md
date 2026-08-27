@@ -1123,8 +1123,9 @@ are NOT driven by `ssot__AiAgentSessionEndType__c` alone — the Optimization *S
 Outcome* is derived from two platform-provisioned **Predefined** score tags,
 `std_Deflection_Score_<agent>_V1` (Number 0–5) and `std_Abandonment_Score_<agent>_V1`
 (TRUE/FALSE/Unsure): **Deflected** = deflection 4–5; **Abandoned** = abandonment TRUE
-or deflection < 3; **Escalated** = the session invoked the **`__human__` system topic**
-(NOT the end-type — see below). The analyzer
+or deflection < 3; **Escalated** = the session's `agent_router` LLM step invoked the
+**`escalate_to_human`** transition tool (NOT the end-type, NOT the `__human__` topic —
+see below). The analyzer
 never scores synthetic data and the associations orphan whenever an SObject reseed
 regenerates unified ids, so `seed_heroes.py outcomes` (re)creates **session-level**
 score associations (null moment) for every synthetic session via the Ingestion API —
@@ -1141,12 +1142,19 @@ the `AiAgentTagAssociation` ingestion schema + generator. **Reinstall gotcha:** 
 DLO→DMO field mappings must be added **manually in the Data Cloud UI** (the mapping is
 create-only, can't be API-edited once it has dependents): `ValueText__c → ValueText__c`
 and `SourceType__c → SourceType__c` on the `Skywave_Hero_TagAssoc_*` DLO →
-`ssot__AiAgentTagAssociation__dlm`. **Escalation** is driven by the **`__human__`
-system topic**, NOT the end-type (A/B-confirmed against the live Voice agent: its
-escalated sessions are all end-type `NOT_SET` yet escalate via a `__human__`
-interaction). So escalated sessions append a `__human__` TURN interaction (the seeder
-for the bulk, hero3's final turn for the ingested set), and carry no deflection score
-(a deflection 4-5 would reclassify them Deflected).
+`ssot__AiAgentTagAssociation__dlm`. **Escalation Rate** counts sessions whose
+`agent_router` `LLM_STEP` output JSON carries **`"gen_ai.output.tool_names":
+"escalate_to_human"`** — the router invoking the escalation transition tool. This is
+NOT the end-type and NOT the bare `__human__` topic (both A/B-disproven against the
+live agents: `Skywave_Voice_Agent` renders 23 % escalation with **every** session
+end-type `NOT_SET`, and only its `escalate_to_human` tool-call turns — not all its
+`__human__` turns — are counted; `Skywave_Airlines_Agent` had 53 end-type `Escalated`
++ 52 `__human__` sessions yet 0 % until the tool call was added). So escalated sessions
+append a `__human__` TURN interaction whose `agent_router` step emits that JSON (the
+SObject seeder `escalationRouterOutput()` for the bulk 51, hero3's final turn for the
+ingested set), and carry no deflection score (a deflection 4-5 would reclassify them
+Deflected). The step payloads are **double-quote JSON**, matching live AIPlatform rows
+(not python-repr) — required for the `tool_names` extraction to parse.
 
 **Assessments are pre-baked and realistic across all sessions.** The Optimization
 analyzer never scores synthetic (`Salesforce_Home`) data, so the seeder writes the

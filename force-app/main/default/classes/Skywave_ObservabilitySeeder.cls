@@ -47,18 +47,22 @@ public with sharing class Skywave_ObservabilitySeeder {
     public static final String AGENT_API_NAME = 'Skywave_Airlines_Agent';
     private static final Integer CHUNK_SIZE = 100;
 
-    // Session outcome (STDM ssot__AiAgentSessionEndType__c). The Optimization
-    // "Session Outcome" is a derived field: Deflected comes from a Deflection
-    // score 4-5, Abandoned from Abandonment=TRUE / Deflection <3, and Escalated
-    // from this end-type = 'Escalated' (capitalised STDM enum — no escalation tag
-    // exists, so the escalation signal reads the end-type). The deflection/abandonment SCORES are seeded
-    // separately per session (Ingestion API, scripts/datacloud/hero_obs/
-    // seed_heroes.py outcomes) keyed off this end-type. Target mix across the
-    // synthetic population: ~60% Deflected / ~30% Abandoned / ~10% Escalated.
-    // Story: bookings deflect (agent resolved); seat-change requests fail — most
-    // visitors abandon, ~a quarter escalate.
+    // Session outcome (STDM ssot__AiAgentSessionEndType__c). Each KPI reads a
+    // DIFFERENT signal — the end-type itself drives NONE of them:
+    //   * Deflection Rate  <- std_Deflection_Score tag (4-5 = deflected)
+    //   * Abandon Rate     <- std_Abandonment_Score tag (true)
+    //   * Escalation Rate  <- an agent_router LLM step whose output JSON carries
+    //                         "gen_ai.output.tool_names":"escalate_to_human"
+    //                         (the transition tool; see the escalation block below)
+    // The deflection/abandonment SCORES are seeded separately per session
+    // (Ingestion API, scripts/datacloud/hero_obs/seed_heroes.py outcomes) keyed
+    // off this end-type. Escalated sessions get NO deflection/abandonment score
+    // (a deflection 4-5 would reclassify them as Deflected). We keep the end-type
+    // enum for the Optimization "Session Outcome" display. Target mix: ~60%
+    // Deflected / ~30% Abandoned / ~10% Escalated. Story: bookings deflect;
+    // seat-change requests fail — most visitors abandon, ~a quarter escalate.
     private static final String OUTCOME_COMPLETED = 'Completed';   // -> Deflected (score 4-5)
-    private static final String OUTCOME_ESCALATED = 'Escalated';   // -> Escalated (capitalised STDM enum; drives Escalation Rate)
+    private static final String OUTCOME_ESCALATED = 'Escalated';   // -> Escalated (escalate_to_human router tool call drives Escalation Rate)
     private static final String OUTCOME_ABANDONED = 'Abandoned';   // -> Abandoned (score <3 / Abandonment TRUE)
     // Share of seat-failure sessions that end abandoned (rest escalate) — tuned
     // so the population lands near ~30% Abandoned / ~10% Escalated.
@@ -493,11 +497,15 @@ public with sharing class Skywave_ObservabilitySeeder {
                 ? OUTCOME_COMPLETED
                 : (rand(100) < SEAT_ABANDON_PCT ? OUTCOME_ABANDONED : OUTCOME_ESCALATED);
 
-            // Escalated sessions hand off to a human. The Escalation Rate counts
-            // sessions that invoked the '__human__' system topic (the transfer to
-            // a live agent) — NOT the end-type (verified against the live Voice
-            // agent: its escalated sessions are all end-type NOT_SET yet escalate
-            // via a '__human__' interaction). So append that interaction here.
+            // Escalated sessions hand off to a human. The Analytics Escalation
+            // Rate counts sessions whose agent_router LLM step invoked the
+            // 'escalate_to_human' transition tool — recorded as
+            // "gen_ai.output.tool_names":"escalate_to_human" in that step's output
+            // JSON. NOT the session end-type and NOT the '__human__' topic on its
+            // own (verified against the live agents: Voice sessions escalate with
+            // end-type NOT_SET, and only the tool-call — not every __human__ turn —
+            // is counted). So append a '__human__' interaction whose router step
+            // carries that tool call.
             if (endType == OUTCOME_ESCALATED) {
                 DateTime hStart = sessionEnd.addSeconds(3 + rand(20));
                 DateTime hEnd = hStart.addSeconds(2 + rand(3));
@@ -524,8 +532,15 @@ public with sharing class Skywave_ObservabilitySeeder {
                 messages.add(buildMessage(sessionUuid, humanInt,
                     agentParticipantPlaceholder(sessionUuid), 'Output',
                     'I\'m sorry for the trouble — I\'m connecting you with a Skywave agent now.', hEnd));
-                String[] hTypes = new String[]{ 'TOPIC_STEP', 'LLM_STEP', 'TOPIC_STEP' };
-                String[] hNames = new String[]{ 'escalation', 'agent_router', '__human__' };
+                // Step spine: VARIABLE_UPDATE -> agent_router LLM (invokes the
+                // 'escalate_to_human' transition tool) -> __human__ topic. The
+                // ROUTER step's output JSON — "gen_ai.output.tool_names":
+                // "escalate_to_human" — is the EXACT signal the Analytics
+                // Escalation Rate KPI reads (verified against the live agents: an
+                // agent_router LLM_STEP whose output names 'escalate_to_human';
+                // NOT the session end-type and NOT the __human__ topic alone).
+                String[] hTypes = new String[]{ 'VARIABLE_UPDATE_STEP', 'LLM_STEP', 'TOPIC_STEP' };
+                String[] hNames = new String[]{ '__state_update_action__', 'agent_router', '__human__' };
                 String hPrev = null;
                 DateTime hsc = hStart;
                 for (Integer k = 0; k < hTypes.size(); k++) {
@@ -536,8 +551,16 @@ public with sharing class Skywave_ObservabilitySeeder {
                     hStep.AI_Agent_Interaction__c = humanInt;
                     hStep.Ai_Agent_Interaction_Step_Type__c = hTypes[k];
                     hStep.Name__c = hNames[k];
-                    hStep.Input_Value__c = 'escalate to human';
-                    hStep.Output_Value__c = 'transferring to a human agent';
+                    if (hTypes[k] == 'LLM_STEP') {
+                        hStep.Input_Value__c = llmInput('__human__', 'I still need help — connect me to a person.');
+                        hStep.Output_Value__c = escalationRouterOutput(hTrace);
+                        hStep.Gen_AI_Gateway_Request__c = 'chatcmpl-' + hTrace.replaceAll('-', '').substring(0, 20);
+                        hStep.Gen_AI_Gateway_Response__c = 'chatcmpl-' + humanInt.replaceAll('-', '').substring(0, 20);
+                        hStep.Generation__c = uuid();
+                    } else {
+                        hStep.Input_Value__c = '';
+                        hStep.Output_Value__c = '';
+                    }
                     hStep.Telemetry_Trace_Span_Id__c = hTrace;
                     hStep.Start_Days__c = daysOffset(hss);
                     hStep.Start_Time__c = formatTime(hss);
@@ -1169,6 +1192,18 @@ public with sharing class Skywave_ObservabilitySeeder {
         return '{"stepType":"LLM_STEP","topic":"' + topic
             + '","model":"llmgateway__OpenAIGPT4Omni","userMessage":'
             + JSON.serialize(userText) + '}';
+    }
+
+    // The agent_router LLM output for an escalation turn. The load-bearing field
+    // is gen_ai.output.tool_names = 'escalate_to_human' — the Analytics Escalation
+    // Rate KPI counts sessions whose router LLM output names that transition tool
+    // (exact real-agent shape; a JSON parse of this field is what the KPI reads).
+    private static String escalationRouterOutput(String trace) {
+        String id = 'chatcmpl-' + trace.replaceAll('-', '').substring(0, 24);
+        return '{"gen_ai.response.finish_reasons":"tool_calls",'
+            + '"gen_ai.output.tool_names":"escalate_to_human",'
+            + '"gen_ai.response.id":"' + id + '",'
+            + '"mgr.output.payload_type":"llm_event"}';
     }
 
     // ---- helpers ----------------------------------------------------------

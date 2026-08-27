@@ -16,20 +16,25 @@ live AIPlatform rows):
     "reasoning") -> LLM_STEP(<subagent>) -> ACTION_STEP(s), with instantaneous
     VARIABLE_UPDATE_STEP ("variable assignment") steps interspersed and a
     TRUST_GUARDRAILS_STEP at the end.
-  * Real payload shapes (python-repr dicts, NOT plain JSON):
-      LLM input  = {'af.request_id':..,'gen_ai.request.model':'llmgateway__GPT41',
-                    'gen_ai.input.messages':'<json messages>','gen_ai.request.id':..,
-                    'af.prompt_template_dev_name':'Atlas__AgentGraphReasoningPrompt'}
-      LLM output = {'gen_ai.response.finish_reasons':'tool_calls',
-                    'gen_ai.response.id':'chatcmpl-..','mgr.output.payload_type':'llm_event'}
-      ACTION in  = {'af.request_id':..,'mgr.tool.argument_keys':'<comma keys>'}
-      ACTION out = {'mgr.output.payload_type':'tool_event','mgr.tool.status':'success|error',..}
+  * Real payload shapes — compact double-quote JSON (verified against live
+    AIPlatform rows; NOT python-repr):
+      LLM input  = {"af.request_id":..,"gen_ai.request.model":"llmgateway__GPT41",
+                    "gen_ai.input.messages":"<json messages>","gen_ai.request.id":..,
+                    "af.prompt_template_dev_name":"Atlas__AgentGraphReasoningPrompt"}
+      LLM output = {"gen_ai.response.finish_reasons":"tool_calls",
+                    "gen_ai.output.tool_names":"go_to_flight_booking|escalate_to_human",
+                    "gen_ai.response.id":"chatcmpl-..","mgr.output.payload_type":"llm_event"}
+      ACTION in  = {"af.request_id":..,"mgr.tool.argument_keys":"<comma keys>"}
+      ACTION out = {"mgr.output.payload_type":"tool_event","mgr.tool.status":"success|error",..}
       VARIABLE_UPDATE_STEP in/out = '' (empty)
+
+  gen_ai.output.tool_names on the agent_router LLM step is load-bearing: the
+  Escalation Rate KPI counts sessions whose router invoked 'escalate_to_human'.
 
 Story (unchanged): flight booking works well; seat assignment does not.
   #1 booking COMPLETES (Q5) then a seat CHANGE fails -> ABANDONED (Q1 seat moment)
   #2 a clean end-to-end booking -> COMPLETED (Q5)
-  #3 a seat UPGRADE that never applies -> ESCALATED (Q1)
+  #3 a seat UPGRADE that never applies -> ESCALATED via escalate_to_human (Q1)
 """
 import datetime as _dt
 import json
@@ -52,9 +57,15 @@ SYS_PROMPT = ("Specialized Topic Agent\n# TOOL USAGE PROTOCOL\n"
               "You are a support agent for Skywave Airlines. Greet the visitor and "
               "assist with their flight bookings and related inquiries.")
 
-# Router transition tool per subagent topic (what the router LLM invokes).
+# Router transition tool per subagent topic (what the router LLM invokes) —
+# surfaced as gen_ai.output.tool_names in the agent_router LLM output. The
+# '__human__' topic routes via 'escalate_to_human', which is the EXACT signal the
+# Escalation Rate KPI counts (verified against the live agents: an agent_router
+# LLM_STEP whose output JSON carries "gen_ai.output.tool_names":"escalate_to_human"
+# — NOT the session end-type and NOT the __human__ topic on its own).
 ROUTER_TOOL = {"flight_management": "go_to_flight_booking",
-               "seat_selection": "go_to_seat_selection"}
+               "seat_selection": "go_to_seat_selection",
+               "__human__": "escalate_to_human"}
 
 # Real @InvocableVariable input names per action -> mgr.tool.argument_keys.
 ARG_KEYS = {
@@ -232,12 +243,15 @@ def _hero3_seat_upgrade():
                 "I'm sorry — the seat map didn't load, so I couldn't apply the Business "
                 "upgrade here. I'll connect you with a Skywave agent who can complete the "
                 "upgrade for you.", 9, [], [act_err("present_seat_map", err2)]),
-            # The '__human__' system topic is the signal the Escalation Rate counts
-            # (verified against the live Voice agent) — the actual transfer to a human.
+            # The escalation TURN: the agent_router LLM invokes 'escalate_to_human'
+            # (topic '__human__' -> ROUTER_TOOL['__human__']). That router step's
+            # output JSON — "gen_ai.output.tool_names":"escalate_to_human" — is the
+            # EXACT signal the Escalation Rate KPI counts. Mirrors the live agents'
+            # __human__ interaction shape (VARIABLE_UPDATE_STEP + agent_router LLM).
             turn("__human__", "Yes, please connect me.",
                  "Connecting you with a Skywave agent who can complete the Business upgrade — "
                  "one moment.", 0,
-                 [vu(), topic("__human__"), llm("agent_router"), llm("escalation")]),
+                 [vu(), llm("agent_router")]),
         ])
 
 
@@ -267,12 +281,12 @@ def _hex(rng, n):
     return "".join(rng.choice("0123456789abcdef") for _ in range(n))
 
 
-def _pyrepr(pairs):
-    """Format ordered (k, v) pairs as a python-repr dict (single quotes) — the
-    real STDM step payload shape."""
-    def esc(s):
-        return str(s).replace("\\", "\\\\").replace("'", "\\'")
-    return "{" + ", ".join("'%s': '%s'" % (esc(k), esc(v)) for k, v in pairs) + "}"
+def _obj(pairs):
+    """Format ordered (k, v) pairs as compact double-quote JSON — the real STDM
+    step payload shape (verified against live AIPlatform rows: the payloads are
+    JSON, not python-repr). Values that are already JSON strings (e.g.
+    gen_ai.input.messages) get correctly nested-escaped by json.dumps."""
+    return json.dumps({k: v for k, v in pairs}, separators=(",", ":"))
 
 
 def _llm_messages(user_text, router_tool):
@@ -286,7 +300,7 @@ def _llm_messages(user_text, router_tool):
 
 
 def _llm_input(rng, user_text, router_tool):
-    return _pyrepr([
+    return _obj([
         ("af.request_id", _hex(rng, 32)),
         ("gen_ai.request.model", LLM_MODEL),
         ("gen_ai.input.messages", _llm_messages(user_text, router_tool)),
@@ -295,20 +309,31 @@ def _llm_input(rng, user_text, router_tool):
     ])
 
 
-def _llm_output(rng):
-    return _pyrepr([
-        ("gen_ai.response.finish_reasons", "tool_calls"),
+def _llm_output(rng, router_tool=None):
+    """Router LLM output. When the router invokes a transition/escalation tool it
+    finishes with 'tool_calls' and names the tool in gen_ai.output.tool_names — the
+    field the Escalation Rate KPI reads (tool == 'escalate_to_human'). A plain
+    subagent/wrap-up LLM step finishes with 'stop' and carries no tool_names."""
+    if router_tool:
+        return _obj([
+            ("gen_ai.response.finish_reasons", "tool_calls"),
+            ("gen_ai.output.tool_names", router_tool),
+            ("gen_ai.response.id", "chatcmpl-" + _hex(rng, 24)),
+            ("mgr.output.payload_type", "llm_event"),
+        ])
+    return _obj([
+        ("gen_ai.response.finish_reasons", "stop"),
         ("gen_ai.response.id", "chatcmpl-" + _hex(rng, 24)),
         ("mgr.output.payload_type", "llm_event"),
     ])
 
 
 def _act_input(rng, arg_keys, req_id):
-    return _pyrepr([("af.request_id", req_id), ("mgr.tool.argument_keys", arg_keys)])
+    return _obj([("af.request_id", req_id), ("mgr.tool.argument_keys", arg_keys)])
 
 
 def _act_output(status):
-    return _pyrepr([
+    return _obj([
         ("mgr.output.payload_type", "tool_event"),
         ("mgr.tool.status", status),
         ("mgr.tool.has_structured_output", "True" if status == "success" else "False"),
@@ -417,13 +442,13 @@ def generate(org_id, planner_id, user_ids, agent_version="v50", now=None):
                                  "act_slow": "ACTION_STEP", "guard": "TRUST_GUARDRAILS_STEP"}[kind]
                     if kind == "llm":
                         router_tool = ROUTER_TOOL.get(tn["topic"]) if name == "agent_router" else None
-                        inp, outp = _llm_input(rng, tn["user"], router_tool), _llm_output(rng)
+                        inp, outp = _llm_input(rng, tn["user"], router_tool), _llm_output(rng, router_tool)
                     elif kind in ("act", "act_slow"):
                         inp = _act_input(rng, ak or "", req_id)
                         outp = _act_output("error" if kind == "act_slow" else "success")
                     elif kind == "guard":
-                        inp = "{'mgr.output.payload_type': 'guardrail_event'}"
-                        outp = "{'mgr.guardrail.passed': 'True', 'mgr.guardrail.name': 'InstructionAdherence'}"
+                        inp = '{"mgr.output.payload_type":"guardrail_event"}'
+                        outp = '{"mgr.guardrail.passed":"True","mgr.guardrail.name":"InstructionAdherence"}'
                     else:  # vu, topic -> empty like real
                         inp, outp = "", ""
                     rows["AiAgentInteractionStep"].append({
