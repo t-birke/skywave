@@ -231,7 +231,13 @@ def _hero3_seat_upgrade():
             _routing_turn("seat_selection", "Are you able to do the upgrade?",
                 "I'm sorry — the seat map didn't load, so I couldn't apply the Business "
                 "upgrade here. I'll connect you with a Skywave agent who can complete the "
-                "upgrade for you.", 0, [], [act_err("present_seat_map", err2)]),
+                "upgrade for you.", 9, [], [act_err("present_seat_map", err2)]),
+            # The '__human__' system topic is the signal the Escalation Rate counts
+            # (verified against the live Voice agent) — the actual transfer to a human.
+            turn("__human__", "Yes, please connect me.",
+                 "Connecting you with a Skywave agent who can complete the Business upgrade — "
+                 "one moment.", 0,
+                 [vu(), topic("__human__"), llm("agent_router"), llm("escalation")]),
         ])
 
 

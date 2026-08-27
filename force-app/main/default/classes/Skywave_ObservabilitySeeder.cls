@@ -487,15 +487,75 @@ public with sharing class Skywave_ObservabilitySeeder {
             }
 
             // ---- Session row
+            // Outcome: seat-change requests fail in this demo — most visitors
+            // abandon, the rest escalate; every other intent completes.
+            String endType = !sessionHasSeatFail
+                ? OUTCOME_COMPLETED
+                : (rand(100) < SEAT_ABANDON_PCT ? OUTCOME_ABANDONED : OUTCOME_ESCALATED);
+
+            // Escalated sessions hand off to a human. The Escalation Rate counts
+            // sessions that invoked the '__human__' system topic (the transfer to
+            // a live agent) — NOT the end-type (verified against the live Voice
+            // agent: its escalated sessions are all end-type NOT_SET yet escalate
+            // via a '__human__' interaction). So append that interaction here.
+            if (endType == OUTCOME_ESCALATED) {
+                DateTime hStart = sessionEnd.addSeconds(3 + rand(20));
+                DateTime hEnd = hStart.addSeconds(2 + rand(3));
+                String humanInt = uuid();
+                String hTrace = uuid();
+                SDO_Analytics_AiAgentInteraction_v2__c hIt = new SDO_Analytics_AiAgentInteraction_v2__c();
+                hIt.External_ID__c = humanInt;
+                hIt.Demo_Identifier__c = DEMO_TAG;
+                hIt.AI_Agent_Session__c = sessionUuid;
+                hIt.Topic_API_Name__c = '__human__';
+                hIt.Ai_Agent_Interaction_Type__c = 'TURN';
+                hIt.Session_Owner__c = endUserId;
+                hIt.Session_Owner_Object__c = (endUserId == null) ? null : 'MessagingEndUser';
+                hIt.Start_Days__c = daysOffset(hStart);
+                hIt.Start_Time__c = formatTime(hStart);
+                hIt.End_Days__c = daysOffset(hEnd);
+                hIt.End_Time__c = formatTime(hEnd);
+                hIt.Telemetry_Trace__c = hTrace;
+                hIt.Telemetry_Trace_Span__c = uuid();
+                interactions.add(hIt);
+                messages.add(buildMessage(sessionUuid, humanInt,
+                    userParticipantPlaceholder(sessionUuid), 'Input',
+                    'This still isn\'t working — can I talk to a person?', hStart));
+                messages.add(buildMessage(sessionUuid, humanInt,
+                    agentParticipantPlaceholder(sessionUuid), 'Output',
+                    'I\'m sorry for the trouble — I\'m connecting you with a Skywave agent now.', hEnd));
+                String[] hTypes = new String[]{ 'TOPIC_STEP', 'LLM_STEP', 'TOPIC_STEP' };
+                String[] hNames = new String[]{ 'escalation', 'agent_router', '__human__' };
+                String hPrev = null;
+                DateTime hsc = hStart;
+                for (Integer k = 0; k < hTypes.size(); k++) {
+                    DateTime hss = hsc, hse = hsc.addSeconds(1);
+                    SDO_Analytics_AIAgentInteractionStep_v2__c hStep = new SDO_Analytics_AIAgentInteractionStep_v2__c();
+                    hStep.External_ID__c = uuid();
+                    hStep.Demo_Identifier__c = DEMO_TAG;
+                    hStep.AI_Agent_Interaction__c = humanInt;
+                    hStep.Ai_Agent_Interaction_Step_Type__c = hTypes[k];
+                    hStep.Name__c = hNames[k];
+                    hStep.Input_Value__c = 'escalate to human';
+                    hStep.Output_Value__c = 'transferring to a human agent';
+                    hStep.Telemetry_Trace_Span_Id__c = hTrace;
+                    hStep.Start_Days__c = daysOffset(hss);
+                    hStep.Start_Time__c = formatTime(hss);
+                    hStep.End_Days__c = daysOffset(hse);
+                    hStep.End_Time__c = formatTime(hse);
+                    hStep.Previous_Step__c = hPrev;
+                    steps.add(hStep);
+                    hPrev = hStep.External_ID__c;
+                    hsc = hse;
+                }
+                sessionEnd = hEnd;
+            }
+
             SDO_Analytics_AIAgentSession_v2__c s = new SDO_Analytics_AIAgentSession_v2__c();
             s.External_ID__c = sessionUuid;
             s.Demo_Identifier__c = DEMO_TAG;
             s.AI_Agent_Channel_Type__c = 'SCRT2 - EmbeddedMessaging';
-            // Outcome: seat-change requests fail in this demo — most visitors
-            // abandon, the rest escalate; every other intent completes.
-            s.AI_Agent_Session_End_Type__c = !sessionHasSeatFail
-                ? OUTCOME_COMPLETED
-                : (rand(100) < SEAT_ABANDON_PCT ? OUTCOME_ABANDONED : OUTCOME_ESCALATED);
+            s.AI_Agent_Session_End_Type__c = endType;
             s.Individual__c = 'NOT_SET';
             s.Previous_Session_Id__c = 'NOT_SET';
             s.Session_Owner_Object__c = 'NOT_SET';
