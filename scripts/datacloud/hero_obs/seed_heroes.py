@@ -252,20 +252,21 @@ def cmd_outcomes(dc, target_org):
                          "AiAgentSessionStartTimestamp": now_iso, "CreatedDate": now_iso,
                          "DataSourceId": hero_story.DATA_SOURCE_PREFIX, "ExternalSourceId": org_id})
     print("  outcome mix: %s" % counts)
-    if rows:
-        job = dc.ingest_csv("AiAgentTagAssociation", conn_name("AiAgentTagAssociation"), to_csv(ta_obj, rows))
-        print("  pushed %d score associations (job=%s)" % (len(rows), job))
+    # One open ingest job per source at a time. Push the SMALL delete FIRST (it
+    # drains in ~30s), then the large upsert — the upsert's job-create 409-retries
+    # ride out the delete's drain. (Doing it the other way round, the big upsert
+    # stays open past the delete's retry window and the delete 409s out.)
     if del_ids:
-        # one open ingest job per source at a time — let the upsert job drain
-        # before opening the delete job (else it 409s past the retry window).
-        if rows:
-            time.sleep(90)
         buf = io.StringIO(); w = csv.writer(buf); w.writerow(["Id"])
         for i in del_ids:
             w.writerow([i])
         job = dc.ingest_csv("AiAgentTagAssociation", conn_name("AiAgentTagAssociation"),
                             buf.getvalue().encode(), operation="delete")
         print("  deleted %d escalated-session score associations (job=%s)" % (len(del_ids), job))
+        time.sleep(45)
+    if rows:
+        job = dc.ingest_csv("AiAgentTagAssociation", conn_name("AiAgentTagAssociation"), to_csv(ta_obj, rows))
+        print("  pushed %d score associations (job=%s)" % (len(rows), job))
 
 
 def cmd_verify(dc, target_org):
