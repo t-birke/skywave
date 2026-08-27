@@ -639,6 +639,34 @@ public with sharing class Skywave_ObservabilitySeeder {
             endIt.Telemetry_Trace__c = uuid();
             endIt.Telemetry_Trace_Span__c = uuid();
             interactions.add(endIt);
+
+            // ---- Session-closure step. The SESSION_END interaction carries a
+            // SESSION_END-type step whose Name encodes HOW the session closed.
+            // THIS is what the Analytics Escalation Rate reads: the Escalation
+            // Status calc (semantic model Service_Agent_Analytics_SDM_e11) counts a
+            // session as escalated iff it has a SESSION_END-type interaction step
+            // named 'CLOSED_TRANSFERRED' (verified by retrieving the model formula:
+            // FIXED per session, MAX(IF stepType='SESSION_END' ... AND
+            // step.Name='CLOSED_TRANSFERRED')). Resolved/abandoned sessions get a
+            // different closure code so they never read as escalated. (The
+            // escalate_to_human router tool-call in the __human__ turn above is
+            // realistic trace detail but does NOT drive the KPI.)
+            SDO_Analytics_AIAgentInteractionStep_v2__c closeStep =
+                new SDO_Analytics_AIAgentInteractionStep_v2__c();
+            closeStep.External_ID__c = uuid();
+            closeStep.Demo_Identifier__c = DEMO_TAG;
+            closeStep.AI_Agent_Interaction__c = endIt.External_ID__c;
+            closeStep.Ai_Agent_Interaction_Step_Type__c = 'SESSION_END';
+            closeStep.Name__c = endType == OUTCOME_ESCALATED ? 'CLOSED_TRANSFERRED'
+                : (endType == OUTCOME_ABANDONED ? 'CLOSED_USER_REQUEST' : 'CLOSED_ACTION');
+            closeStep.Input_Value__c = '';
+            closeStep.Output_Value__c = '';
+            closeStep.Telemetry_Trace_Span_Id__c = endIt.Telemetry_Trace__c;
+            closeStep.Start_Days__c = daysOffset(sessionEnd);
+            closeStep.Start_Time__c = formatTime(sessionEnd);
+            closeStep.End_Days__c = daysOffset(sessionEnd);
+            closeStep.End_Time__c = formatTime(sessionEnd);
+            steps.add(closeStep);
         }
 
         Database.insert(sessions, false);

@@ -513,11 +513,29 @@ def generate(org_id, planner_id, user_ids, agent_version="v50", now=None):
                 "AiAgentSessionStartTimestamp": _iso(session_start), "CreatedDate": _iso(moment_end),
                 "DataSourceId": DATA_SOURCE_PREFIX, "ExternalSourceId": ES})
 
+        end_int_id = _uid(hkey, "int", "end")
         rows["AiAgentInteraction"].append({
-            "Id": _uid(hkey, "int", "end"), "AiAgentSessionId": sess_id, "TopicApiName": "NOT_SET",
+            "Id": end_int_id, "AiAgentSessionId": sess_id, "TopicApiName": "NOT_SET",
             "AiAgentInteractionType": "SESSION_END", "SessionOwnerId": user_id,
             "SessionOwnerObject": user_obj, "StartTimestamp": _iso(session_end),
             "EndTimestamp": _iso(session_end), "TraceId": _hex(rng, 32), "SpandId": _hex(rng, 16),
+            "DataSourceId": DATA_SOURCE_PREFIX, "ExternalSourceId": ES})
+
+        # Session-closure step — the SESSION_END-type step whose Name is the SIGNAL
+        # the Escalation Rate KPI reads: Escalation Status counts a session as
+        # escalated iff it has a SESSION_END-type step named 'CLOSED_TRANSFERRED'
+        # (verified from the semantic model formula). Type=SESSION_END satisfies the
+        # calc's OR-branch so even <24h-old sessions count. Non-escalated closures
+        # use a different code so they never read as escalated.
+        close_name = ("CLOSED_TRANSFERRED" if end_type == "Escalated"
+                      else "CLOSED_USER_REQUEST" if end_type == "Abandoned"
+                      else "CLOSED_ACTION")
+        rows["AiAgentInteractionStep"].append({
+            "id": _uid(hkey, "step", "end"), "aiAgentInteractionId": end_int_id,
+            "AiAgentInteractionStepType": "SESSION_END", "name": close_name,
+            "inputValueText": "", "outputValueText": "",
+            "startTimestamp": _iso(session_end), "endTimestamp": _iso(session_end),
+            "prevStepId": "", "errorMessageText": "", "attributeText": "",
             "DataSourceId": DATA_SOURCE_PREFIX, "ExternalSourceId": ES})
 
         rows["AiAgentSessionParticipant"].append({

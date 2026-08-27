@@ -1123,9 +1123,10 @@ are NOT driven by `ssot__AiAgentSessionEndType__c` alone — the Optimization *S
 Outcome* is derived from two platform-provisioned **Predefined** score tags,
 `std_Deflection_Score_<agent>_V1` (Number 0–5) and `std_Abandonment_Score_<agent>_V1`
 (TRUE/FALSE/Unsure): **Deflected** = deflection 4–5; **Abandoned** = abandonment TRUE
-or deflection < 3; **Escalated** = the session's `agent_router` LLM step invoked the
-**`escalate_to_human`** transition tool (NOT the end-type, NOT the `__human__` topic —
-see below). The analyzer
+or deflection < 3; **Escalated** = the session has a `SESSION_END`-type interaction
+step named **`CLOSED_TRANSFERRED`** (the session-end reason; NOT the end-type field,
+NOT the `__human__` topic, NOT the `escalate_to_human` router tool — see below). The
+analyzer
 never scores synthetic data and the associations orphan whenever an SObject reseed
 regenerates unified ids, so `seed_heroes.py outcomes` (re)creates **session-level**
 score associations (null moment) for every synthetic session via the Ingestion API —
@@ -1142,19 +1143,35 @@ the `AiAgentTagAssociation` ingestion schema + generator. **Reinstall gotcha:** 
 DLO→DMO field mappings must be added **manually in the Data Cloud UI** (the mapping is
 create-only, can't be API-edited once it has dependents): `ValueText__c → ValueText__c`
 and `SourceType__c → SourceType__c` on the `Skywave_Hero_TagAssoc_*` DLO →
-`ssot__AiAgentTagAssociation__dlm`. **Escalation Rate** counts sessions whose
-`agent_router` `LLM_STEP` output JSON carries **`"gen_ai.output.tool_names":
-"escalate_to_human"`** — the router invoking the escalation transition tool. This is
-NOT the end-type and NOT the bare `__human__` topic (both A/B-disproven against the
-live agents: `Skywave_Voice_Agent` renders 23 % escalation with **every** session
-end-type `NOT_SET`, and only its `escalate_to_human` tool-call turns — not all its
-`__human__` turns — are counted; `Skywave_Airlines_Agent` had 53 end-type `Escalated`
-+ 52 `__human__` sessions yet 0 % until the tool call was added). So escalated sessions
-append a `__human__` TURN interaction whose `agent_router` step emits that JSON (the
-SObject seeder `escalationRouterOutput()` for the bulk 51, hero3's final turn for the
-ingested set), and carry no deflection score (a deflection 4-5 would reclassify them
-Deflected). The step payloads are **double-quote JSON**, matching live AIPlatform rows
-(not python-repr) — required for the `tool_names` extraction to parse.
+`ssot__AiAgentTagAssociation__dlm`. **Escalation Rate** is driven by the semantic
+model's `Escalation_Status_clc` calc (retrieved verbatim from
+`Service_Agent_Analytics_SDM_e11` via the Tableau Semantics REST API
+`/ssot/semantic/models/…`, and independently confirmed against Salesforce's shipped
+SDM source + the `SessionEndReason` enum):
+
+```
+Escalation_Status = { FIXED session : MAX( IF
+    ( [Interaction Step].[Ai_Agent_Interaction_Step_Type]='SESSION_END'
+      OR DATEDIFF('HOUR', {FIXED session: MAX([Interaction].[End_Timestamp])}, NOW()) >= 24 )
+    AND [Interaction Step].[Name]='CLOSED_TRANSFERRED' THEN TRUE ELSE FALSE END )}
+Escalated Sessions = COUNTD(sessions where Escalation_Status);  Escalation Rate = Escalated / Unique Sessions
+```
+
+So a session counts as escalated iff it has an **interaction step with
+`ssot__AiAgentInteractionStepType__c='SESSION_END'` and `ssot__Name__c='CLOSED_TRANSFERRED'`**
+(the session-end reason). `CLOSED_TRANSFERRED`/`CLOSED_ACTION`/`CLOSED_USER_REQUEST` are
+the three `SessionEndReason` closure codes; the optimization runtime maps
+`ESCALATED → CLOSED_TRANSFERRED`. Setting the step type to `SESSION_END` satisfies the
+OR-branch, so sessions <24 h old still count. This is **NOT** the end-type field, the
+`__human__` topic, or the `escalate_to_human` router tool — those last two were A/B
+red herrings (`Skywave_Voice_Agent` renders escalation with end-type `NOT_SET`; the
+router's `escalate_to_human` is the runtime *cause*, `CLOSED_TRANSFERRED` is the
+downstream *consequence* the SDM measures). So each escalated session's `SESSION_END`
+interaction carries a `SESSION_END`-type `CLOSED_TRANSFERRED` closure step (SObject
+seeder + `hero_story.py`; existing rows patched by
+`scripts/apex/backfillEscalationClosureStep.apex`), and carries no deflection score (a
+deflection 4-5 would reclassify it Deflected). The realistic `escalate_to_human`
+router call + double-quote-JSON payloads are kept as trace fidelity, not KPI drivers.
 
 **Assessments are pre-baked and realistic across all sessions.** The Optimization
 analyzer never scores synthetic (`Salesforce_Home`) data, so the seeder writes the
