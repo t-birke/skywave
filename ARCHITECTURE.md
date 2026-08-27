@@ -1123,7 +1123,8 @@ are NOT driven by `ssot__AiAgentSessionEndType__c` alone — the Optimization *S
 Outcome* is derived from two platform-provisioned **Predefined** score tags,
 `std_Deflection_Score_<agent>_V1` (Number 0–5) and `std_Abandonment_Score_<agent>_V1`
 (TRUE/FALSE/Unsure): **Deflected** = deflection 4–5; **Abandoned** = abandonment TRUE
-or deflection < 3; **Escalated** = end-type `escalated` (lowercase). The analyzer
+or deflection < 3; **Escalated** = the session invoked the **`__human__` system topic**
+(NOT the end-type — see below). The analyzer
 never scores synthetic data and the associations orphan whenever an SObject reseed
 regenerates unified ids, so `seed_heroes.py outcomes` (re)creates **session-level**
 score associations (null moment) for every synthetic session via the Ingestion API —
@@ -1140,9 +1141,12 @@ the `AiAgentTagAssociation` ingestion schema + generator. **Reinstall gotcha:** 
 DLO→DMO field mappings must be added **manually in the Data Cloud UI** (the mapping is
 create-only, can't be API-edited once it has dependents): `ValueText__c → ValueText__c`
 and `SourceType__c → SourceType__c` on the `Skywave_Hero_TagAssoc_*` DLO →
-`ssot__AiAgentTagAssociation__dlm`. **Escalation** has no score tag — it reads end-type
-`Escalated`; no real escalated session exists in-org to A/B against, so if Escalation
-Rate stays 0 the driver is a transfer/routing signal that can't be synthesised.
+`ssot__AiAgentTagAssociation__dlm`. **Escalation** is driven by the **`__human__`
+system topic**, NOT the end-type (A/B-confirmed against the live Voice agent: its
+escalated sessions are all end-type `NOT_SET` yet escalate via a `__human__`
+interaction). So escalated sessions append a `__human__` TURN interaction (the seeder
+for the bulk, hero3's final turn for the ingested set), and carry no deflection score
+(a deflection 4-5 would reclassify them Deflected).
 
 **Assessments are pre-baked and realistic across all sessions.** The Optimization
 analyzer never scores synthetic (`Salesforce_Home`) data, so the seeder writes the
