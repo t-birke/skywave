@@ -11,8 +11,11 @@
  *   2. Creates a System Administrator User. Admin is required by design: the
  *      presenter drives the entire demo (advances stages, owns Demo_Session__c
  *      rows, runs the monitors). Each admin user consumes a Salesforce license.
- *   3. Assigns the Skywave_Presenter permission-set group — the single bundle
- *      carrying every grant needed to run the demo (see the PSG description).
+ *   3. Assigns the Skywave_Presenter permission-set group — the core bundle
+ *      carrying every grant needed to run the demo (see the PSG description) —
+ *      then layers on any optional-tier permsets/PSGs that exist in this org,
+ *      best-effort: the globe monitor plus the observability stack (the SDO
+ *      admin has these, so presenters get dashboard + scorer parity too).
  *   4. Emails a set-password link via System.resetPassword, DEFERRED to a
  *      Queueable — resetPassword can't run in the same transaction that created
  *      the user, so it fires after this transaction commits.
@@ -41,10 +44,23 @@ global without sharing class Skywave_PresenterProvision {
     // Optional-tier permsets granted best-effort — assigned only when the tier
     // is installed (the permset exists), skipped silently otherwise. These are
     // deliberately NOT in the Skywave_Presenter PSG: they're .forceignored on
-    // installs without that tier, so a PSG referencing them would fail to deploy
-    // there. Presenters run the whole demo, so grant every tier they can use.
+    // installs without that tier (or provided only by the SDO template, never
+    // by our repo), so a PSG referencing them would fail to deploy there.
+    // Presenters run the whole demo, so grant every tier they can use.
     @TestVisible private static final Set<String> OPTIONAL_PERMSETS = new Set<String>{
-        'Skywave_Globe_App'   // App Launcher visibility for the 3D globe monitor
+        'Skywave_Globe_App',              // App Launcher visibility for the 3D globe monitor
+        // --- Observability parity (the SDO admin has these; presenters didn't) ---
+        'SDO_Agentforce_Analytics',       // FLS/object/Apex on the SDO_Analytics_* objects → Observability Demo app
+        'SDO_Data_Cloud_Default_Data_Space', // Data Cloud data-space access for the STDM-backed dashboards
+        'AgentforceInteractionExplorer',  // "Access Agentforce Optimization" (Observe & Optimize)
+        'AgentforceScorerActivation'      // "Activate Agentforce Scorer (Beta)" — matches the admin's scorer perm
+    };
+    // Optional-tier permission-set GROUPS, same best-effort contract. PSGs can't
+    // be nested inside Skywave_Presenter, and these ship only with the SDO
+    // template, so they're layered on here when present.
+    @TestVisible private static final Set<String> OPTIONAL_PSGS = new Set<String>{
+        'xDO_DataCloud_Base_PSG',         // Data Cloud User — read STDM behind Observe & Optimize
+        'SDO_Analytics_Base_Permissions'  // CRM Analytics viewing for any analytics-backed dashboard
     };
 
     @HttpPost
@@ -129,15 +145,22 @@ global without sharing class Skywave_PresenterProvision {
         PermissionSetGroup psg = [
             SELECT Id FROM PermissionSetGroup WHERE DeveloperName = :PSG_DEVNAME LIMIT 1
         ];
-        List<PermissionSetAssignment> grants = new List<PermissionSetAssignment>{
-            new PermissionSetAssignment(AssigneeId = u.Id, PermissionSetGroupId = psg.Id)
-        };
-        // Layer on any optional-tier permsets that exist in this org (globe, …).
+        // The core grant must succeed — it's what makes the account a presenter.
+        insert new PermissionSetAssignment(AssigneeId = u.Id, PermissionSetGroupId = psg.Id);
+
+        // Optional-tier grants are best-effort: a tier that isn't installed (its
+        // permset/PSG is absent) or a PSG that isn't yet calculated must NEVER
+        // block core provisioning, so allow partial success (allOrNone=false).
+        List<PermissionSetAssignment> optional = new List<PermissionSetAssignment>();
         for (PermissionSet ps : [
                 SELECT Id FROM PermissionSet WHERE Name IN :OPTIONAL_PERMSETS]) {
-            grants.add(new PermissionSetAssignment(AssigneeId = u.Id, PermissionSetId = ps.Id));
+            optional.add(new PermissionSetAssignment(AssigneeId = u.Id, PermissionSetId = ps.Id));
         }
-        insert grants;
+        for (PermissionSetGroup g : [
+                SELECT Id FROM PermissionSetGroup WHERE DeveloperName IN :OPTIONAL_PSGS]) {
+            optional.add(new PermissionSetAssignment(AssigneeId = u.Id, PermissionSetGroupId = g.Id));
+        }
+        if (!optional.isEmpty()) Database.insert(optional, false);
         return u.Id;
     }
 

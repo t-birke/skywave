@@ -1000,12 +1000,25 @@ surface: that mints **Contacts** (audience identities); this mints Salesforce
    **`Skywave_Presenter` permission-set group** in a single
    `PermissionSetAssignment` (one-assignment bundle = `Skywave_Demo_Admin`
    custom-field FLS + `Demo` Agentforce/Einstein access). It then best-effort
-   assigns any **optional-tier permset that exists in the org** (currently
-   `Skywave_Globe_App` — App Launcher visibility for the 3D globe monitor);
-   these are kept OUT of the PSG because they're `.forceignore`d on installs
-   without that tier, so a PSG referencing them would fail to deploy there —
-   assigning them directly at provision time stays portable (skips silently
-   where the tier is absent). Idempotency keys on the **derived username only** (never on
+   assigns any **optional-tier permset _or_ PSG that exists in the org**
+   (`OPTIONAL_PERMSETS` / `OPTIONAL_PSGS`): `Skywave_Globe_App` (App Launcher
+   visibility for the 3D globe monitor) **plus the observability stack** so
+   presenters get the same dashboard + scorer visibility the SDO admin has —
+   `SDO_Agentforce_Analytics` (FLS/object/Apex on the `SDO_Analytics_*`
+   objects), `SDO_Data_Cloud_Default_Data_Space` + `xDO_DataCloud_Base_PSG`
+   (Data Cloud, which backs the STDM dashboards), `SDO_Analytics_Base_Permissions`
+   (CRM Analytics), `AgentforceInteractionExplorer` (Observe & Optimize) and
+   `AgentforceScorerActivation` (Scorers Beta). These are kept OUT of the
+   `Skywave_Presenter` PSG because they're `.forceignore`d (or SDO-template-only)
+   on installs without that tier, so a PSG referencing them would fail to deploy
+   there — assigning them directly at provision time stays portable, with the
+   optional grants inserted `allOrNone=false` so a missing tier or an
+   unavailable PSL never blocks the core presenter grant. (Scorers is further
+   planner-gated: the menu won't render for the Atlas/AgentScript Skywave agents
+   even with the perm — parity with the admin, not a new capability.) Existing
+   presenters (provisioned before this) are brought to parity by the idempotent
+   `scripts/apex/backfillPresenterObservability.apex`, which targets exactly the
+   holders of the `Skywave_Presenter` PSG. Idempotency keys on the **derived username only** (never on
    Email — infra users reuse a placeholder corp address, which would false-match
    and reset the wrong user's password): a re-request re-sends the reset mail
    instead of erroring (`status: resent`).

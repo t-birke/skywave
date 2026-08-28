@@ -2,7 +2,8 @@
  * Covers the self-service presenter provisioning endpoint:
  *   - @salesforce.com domain gate (accepts salesforce.com, rejects lookalikes)
  *   - happy path: User created with handle@skywave.demo username + admin
- *     profile + Skywave_Presenter PSG assigned
+ *     profile + Skywave_Presenter PSG assigned, plus the observability tier
+ *     layered on best-effort when installed
  *   - idempotent re-request returns "resent" without creating a second user
  *
  * The Queueable's System.resetPassword is a no-op under test (guarded by
@@ -64,5 +65,19 @@ private class Skywave_PresenterProvision_Test {
             SELECT COUNT() FROM PermissionSetAssignment
             WHERE AssigneeId = :users[0].Id AND PermissionSetGroupId = :psgId
         ], 'presenter PSG assigned exactly once');
+
+        // Observability parity: when the tier is installed, the presenter must
+        // get SDO_Agentforce_Analytics (a license-free custom permset, so this
+        // is deterministic). The PSL-gated tiers — Data Cloud, Agentforce
+        // optimization/scorer, CRM Analytics — are best-effort (allOrNone=false)
+        // and intentionally NOT asserted here, since a test org may lack the PSL.
+        List<PermissionSet> obs = [
+            SELECT Id FROM PermissionSet WHERE Name = 'SDO_Agentforce_Analytics'];
+        if (!obs.isEmpty()) {
+            System.assertEquals(1, [
+                SELECT COUNT() FROM PermissionSetAssignment
+                WHERE AssigneeId = :users[0].Id AND PermissionSetId = :obs[0].Id
+            ], 'observability permset layered onto the presenter when installed');
+        }
     }
 }
