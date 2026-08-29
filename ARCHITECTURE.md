@@ -1113,9 +1113,17 @@ step choreography — `VARIABLE_UPDATE_STEP` → `TOPIC_STEP` → `LLM_STEP` →
 `TRUST_GUARDRAILS_STEP` — with **real millisecond durations** sampled from a live
 session (actions ~150–650 ms, LLM ~0.5–1.5 s, a deliberately hung ~18 s failed
 `present_seat_map`, 15–35 s user think-time gaps) and populated `Error_Message__c`
-on the failing steps. Timings are RNG-seeded (deterministic) and row Ids are stable,
-so the daily re-push UPSERTs the same rows with today-relative timestamps rather than
-duplicating. They are dated **day `-1`, hours apart** (18:40 / 16:20 / 14:05) so they
+on the failing steps. Timings are RNG-seeded (deterministic) and row Ids are stable.
+⚠️ **Only the two `Profile`-category DLOs (`AiAgentSession`, `AiAgentInteractionStep`)
+dedupe on the primary key** — for them the daily re-push UPSERTs the same rows with
+today-relative timestamps. The other STDM DLOs are **`Engagement` (event/time-series),
+keyed on `(Id + event time)`**, so re-pushing a stable Id with a *new* timestamp
+APPENDS a second event row rather than overwriting it — yesterday's + today's copies
+then coexist and the session spans yesterday→today on the dashboard (the ~900-min
+bogus "duration"). `seed_heroes.py push` therefore **delete-then-inserts the Engagement
+objects** (delete every present hero Id, wait for the delete to drain to the DMO, then
+insert one clean copy); Profile objects keep the plain UPSERT. They are dated **day
+`-1`, hours apart** (18:40 / 16:20 / 14:05) so they
 top the list; the SObject population is pushed to `-15..-2`. The three tell the
 Chapter-6 story: **#1** a booking that *Completes* (Q5) then a seat change that fails
 and is *Abandoned* (Q1); **#2** a clean booking that *Completes* (Q5); **#3** a seat

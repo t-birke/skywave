@@ -8,7 +8,10 @@ Subcommands:
   setup     Create the 11 IngestApi sources/schemas/streams/DLO->DMO mappings
             (idempotent; state cached in source_state.json).
   push      Generate the 3 heroes (now-relative, ms-precise) and ingest them.
-            Re-run daily to keep them the most-recent sessions (UPSERT, stable Ids).
+            Re-run daily to keep them the most-recent sessions. Profile DLOs UPSERT
+            on the stable Ids; the Engagement DLOs (event/time-series, keyed on Id +
+            event time) are delete-then-inserted so the new timestamps don't append a
+            duplicate copy of every row (which would stretch the session's duration).
   outcomes  Seed session-level Deflection/Abandonment score associations for EVERY
             synthetic session so the Optimization Session Outcome / Deflection /
             Abandon / Escalation KPIs populate. Run daily + after any reseed.
@@ -144,9 +147,48 @@ def cmd_setup(dc, target_org):
     print("setup: %d/%d objects mapped" % (mapped, len(S.OBJECTS)))
 
 
+# The STDM DLOs split by category (S.CATEGORY). Profile DLOs (AiAgentSession,
+# AiAgentInteractionStep) dedupe on the primary key, so a daily re-push with
+# today-relative timestamps UPSERTs the same Ids — one clean row. Engagement DLOs
+# (interactions/messages/moments/participants/tag-associations) are event/time-series
+# DLOs keyed on (primary key + event time), so re-pushing a stable Id with a NEW
+# timestamp APPENDS a second event row instead of overwriting — yesterday's + today's
+# copies then coexist and the session spans yesterday→today on the dashboard (the
+# ~900-min "duration" bug). So for the Engagement objects we DELETE the existing hero
+# rows and wait for the delete to drain to the DMO before inserting one fresh copy.
+# (delete-by-Id clears ALL time-variants of an Id — verified.)
+ENGAGEMENT_OBJECTS = [o["object"] for o in S.OBJECTS if S.CATEGORY.get(o["object"]) == "Engagement"]
+
+
 def cmd_push(dc, target_org):
     org_id, planner_id, user_ids = resolve_identities(target_org)
     rows_by_obj = hero_story.generate(org_id, planner_id, user_ids)
+    obj_def = {o["object"]: o for o in S.OBJECTS}
+
+    # 1. Purge the Engagement objects' prior copies before inserting (see note above).
+    #    Scope the delete to EXACTLY the Ids we are about to re-insert — not every row
+    #    under the hero DataSourceId — because AiAgentTagAssociation's hero source is
+    #    SHARED with the `outcomes` step's session-level score rows (one per synthetic
+    #    session), which push must not touch. Submit every delete, then wait for those
+    #    Ids to drain before inserting: a same-Id delete and insert would otherwise
+    #    race (the insert could be deleted, or re-duplicate). delete-by-Id clears all
+    #    time-variants of an Id.
+    drain_checks = []
+    for obj in ENGAGEMENT_OBJECTS:
+        o = obj_def[obj]
+        ids = [r.get(o["pk"]) for r in rows_by_obj.get(obj, []) if r.get(o["pk"])]
+        if not ids:
+            continue
+        buf = io.StringIO(); w = csv.writer(buf); w.writerow([o["pk"]])
+        for i in ids:
+            w.writerow([i])
+        job = dc.ingest_csv(obj, conn_name(obj), buf.getvalue().encode(), operation="delete")
+        inlist = "('" + "','".join(ids) + "')"
+        drain_checks.append((obj, "SELECT COUNT(*) FROM %s WHERE ssot__Id__c IN %s" % (o["dmo"], inlist)))
+        print("  purged %-32s ids=%-4d job=%s" % (obj, len(ids), job))
+    _await_zero(dc, drain_checks)
+
+    # 2. Insert one fresh copy of every object (Profile objects just UPSERT in place).
     for o in S.OBJECTS:
         obj = o["object"]
         rows = rows_by_obj.get(obj, [])
@@ -163,6 +205,26 @@ def _edge_rows(dc, sql):
     return (r.get("data") if isinstance(r, dict) else None) or []
 
 
+def _await_zero(dc, checks, timeout=360, interval=20):
+    """Block until each (label, count_sql) query returns 0 — i.e. a submitted delete
+    has fully propagated to the DMO — or give up after `timeout` s. This is the gate
+    that lets a delete and a same-Id insert on one Ingestion source run back-to-back
+    without racing (the delete job holds the source and lags into the DMO for minutes;
+    inserting before it drains would re-duplicate or clobber). Returns True iff all
+    drained."""
+    pending, deadline = list(checks), time.time() + timeout
+    while pending and time.time() < deadline:
+        time.sleep(interval)
+        still = [(label, sql) for label, sql in pending
+                 if (_edge_rows(dc, sql) or [[0]])[0][0]]
+        pending = still
+        print("    drained %d/%d" % (len(checks) - len(pending), len(checks)))
+    if pending:
+        print("    WARN: %s not drained after %ds — proceeding anyway (may re-duplicate)"
+              % (", ".join(label for label, _ in pending), timeout))
+    return not pending
+
+
 def cmd_outcomes(dc, target_org):
     """Seed per-session Deflection + Abandonment score associations so the
     Optimization dashboard's Session Outcome / Deflection / Abandon / Escalation
@@ -173,7 +235,10 @@ def cmd_outcomes(dc, target_org):
        Abandoned -> Abandoned (deflection 0-2, abandonment TRUE)
        escalated -> Escalated (via end-type; deflection 4, abandonment FALSE)
     Re-run after any SObject reseed (session unified ids change) — the daily
-    cron runs it too (idempotent UPSERT keyed on stable UUID5 ids)."""
+    cron runs it too. Idempotent: the score associations are Engagement (event-keyed
+    on their timestamp), so a re-upsert with a fresh timestamp APPENDS rather than
+    overwrites — this purges the existing synthetic score rows and waits for the delete
+    to drain before inserting one clean copy (keyed on stable UUID5 ids)."""
     import hashlib
     org_id = sf_json(target_org, org_display=True)["result"]["id"]
     agent = hero_story.AGENT_API_NAME
@@ -215,7 +280,6 @@ def cmd_outcomes(dc, target_org):
     now_iso = hero_story._iso(__import__("datetime").datetime.now(__import__("datetime").timezone.utc))
     ta_obj = next(o for o in S.OBJECTS if o["object"] == "AiAgentTagAssociation")
     rows = []
-    del_ids = []   # escalated sessions: delete any stale deflection/abandonment score assoc
     counts = {"Deflected": 0, "Abandoned": 0, "Escalated": 0}
     for sid, end_type, start_ts in sessions:
         et = (end_type or "").lower()
@@ -223,10 +287,8 @@ def cmd_outcomes(dc, target_org):
             # Escalated: end-type ('Escalated') is the SOLE classifier. Do NOT give it a
             # deflection/abandonment score — a deflection 4-5 reads as "resolved by agent"
             # and reclassifies the session as Deflected, suppressing Escalation Rate.
-            # Purge any score assoc left from a prior run (UPSERT never deletes).
+            # (Any score assoc left from a prior run is removed by the purge below.)
             counts["Escalated"] += 1
-            del_ids.append(hero_story._uid("score", sid, "defl"))
-            del_ids.append(hero_story._uid("score", sid, "aband"))
             continue
         if et.startswith("aband"):
             dv, av, outcome = _pick(sid, ["0", "1", "1", "2"]), "TRUE", "Abandoned"
@@ -252,18 +314,29 @@ def cmd_outcomes(dc, target_org):
                          "AiAgentSessionStartTimestamp": now_iso, "CreatedDate": now_iso,
                          "DataSourceId": hero_story.DATA_SOURCE_PREFIX, "ExternalSourceId": org_id})
     print("  outcome mix: %s" % counts)
-    # One open ingest job per source at a time. Push the SMALL delete FIRST (it
-    # drains in ~30s), then the large upsert — the upsert's job-create 409-retries
-    # ride out the delete's drain. (Doing it the other way round, the big upsert
-    # stays open past the delete's retry window and the delete 409s out.)
-    if del_ids:
+    # The score associations are Engagement (event-keyed on CreatedDate=now), so a plain
+    # daily re-upsert APPENDS a new copy every run instead of overwriting — they pile up
+    # one copy/session/day and skew the KPI counts. So purge EVERY existing synthetic
+    # score association first (this run's + all prior days' + escalated sessions', which
+    # we don't re-insert), wait for the delete to fully drain to the DMO, then insert one
+    # clean copy of the non-escalated scores. Scope the purge to THIS agent's Deflection/
+    # Abandonment def-assocs under the hero DataSourceId, so the hero moment intent/quality
+    # tags (different def-assocs) and the real analyzer-scored rows (other DataSourceId)
+    # are left untouched. The drain gate makes the same-source delete→insert race-free
+    # (one open job per source; the delete lags into the DMO for minutes).
+    where = ("ssot__DataSourceId__c LIKE '%s%%' AND ssot__AiAgentTagDefinitionAssociationId__c "
+             "IN ('%s','%s')" % (hero_story.DATA_SOURCE_PREFIX, defl_da, aband_da))
+    existing = [r[0] for r in _edge_rows(dc, "SELECT ssot__Id__c FROM "
+                "ssot__AiAgentTagAssociation__dlm WHERE " + where) if r and r[0]]
+    if existing:
         buf = io.StringIO(); w = csv.writer(buf); w.writerow(["Id"])
-        for i in del_ids:
+        for i in existing:
             w.writerow([i])
         job = dc.ingest_csv("AiAgentTagAssociation", conn_name("AiAgentTagAssociation"),
                             buf.getvalue().encode(), operation="delete")
-        print("  deleted %d escalated-session score associations (job=%s)" % (len(del_ids), job))
-        time.sleep(45)
+        print("  purged %d existing score associations (job=%s)" % (len(existing), job))
+        _await_zero(dc, [("AiAgentTagAssociation", "SELECT COUNT(*) FROM "
+                          "ssot__AiAgentTagAssociation__dlm WHERE " + where)], timeout=420)
     if rows:
         job = dc.ingest_csv("AiAgentTagAssociation", conn_name("AiAgentTagAssociation"), to_csv(ta_obj, rows))
         print("  pushed %d score associations (job=%s)" % (len(rows), job))
