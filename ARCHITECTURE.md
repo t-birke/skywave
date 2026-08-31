@@ -650,6 +650,15 @@ full topic graph and action contracts are in the `.agent` file; this section
 captures the runtime mechanics that the source does *not* make obvious — the
 parts that have bitten us and must not be "cleaned up" without re-reading this.
 
+> **Diagnostic clone — `Skywave_Airlines_Agent_Test`.** A byte-for-byte copy of
+> this bundle (dev-name/label changed only) exists to isolate whether the ECv2
+> CLT-rendering break is agent-instance state or a surface-level gate (ASA /
+> ExternalCopilot on `enhancedWebChat` needing Es-Type support). It is driven
+> through its **own** parallel MIAW stack (`Skywave_Test_Channel` +
+> `Skywave_MIAW_Test`, `authMode=None`, direct-ASA routing — no flow) surfaced at
+> `app.skywave.flights/test`, so the live demo chat is never touched. Delete the
+> bundle + its `sfdx-project.json` replacement entry once the question is answered.
+
 **Hub-and-spoke topic graph.** `start_agent agent_router` is the entry node; it
 routes by intent to spoke subagents and never answers directly:
 
