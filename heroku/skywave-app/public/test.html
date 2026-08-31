@@ -81,6 +81,29 @@
                     set('err', 'embeddedservice_bootstrap undefined after load — check the deployment siteUrl.');
                     return;
                 }
+
+                // The test channel runs authMode=Auth (mirrors live — the proven
+                // config in this org), so present a signed identity token. Minted
+                // server-side with a random sub against the shared Skywave_Identity
+                // keyset. Must be set AFTER onEmbeddedMessagingReady; re-set on expiry.
+                const setToken = async (reason) => {
+                    try {
+                        const r = await fetch('/api/test-identity-token', { credentials: 'same-origin' });
+                        const d = await r.json();
+                        if (!d || !d.configured || !d.customerIdentityToken) {
+                            console.warn('[test] identity token not configured (' + reason + ')', d);
+                            set('warn', 'Identity token not configured on the server — conversation cannot start.');
+                            return;
+                        }
+                        window.embeddedservice_bootstrap.userVerificationAPI.setIdentityToken({
+                            identityTokenType: 'JWT', identityToken: d.customerIdentityToken
+                        });
+                        console.log('[test] identity token set (' + reason + ')');
+                    } catch (e) { console.warn('[test] setIdentityToken failed (' + reason + ')', e); }
+                };
+                window.addEventListener('onEmbeddedMessagingReady', () => setToken('Ready'), { once: true });
+                window.addEventListener('onEmbeddedMessagingIdentityTokenExpired', () => setToken('Expired'));
+
                 window.embeddedservice_bootstrap.settings.language = 'en_US';
                 window.embeddedservice_bootstrap.init(c.orgId, c.escName, c.siteUrl, { scrt2URL: c.scrt2Url });
                 set('ok', 'Test deployment loaded. Open the chat bubble (bottom-right) and send the prompt above.');

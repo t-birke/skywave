@@ -15,6 +15,8 @@ import { buildWebsiteRouter } from './website-routes.js';
 import { buildOnboardRouter } from './onboard-routes.js';
 import { buildPreflightRouter } from './preflight.js';
 import { readProofCookie } from './proof-cookie.js';
+import { mintIdentityToken, isIdentityConfigured } from './miaw-identity.js';
+import { randomUUID } from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -100,6 +102,23 @@ app.get('/api/test-config', (_, res) => {
         siteUrl:  process.env.SF_ESW_TEST_SITE_URL  || null,
         scrt2Url: process.env.SF_ESW_TEST_SCRT2_URL || null
     });
+});
+
+// Identity token for the /test CLT-diagnostic page. The test channel runs
+// authMode=Auth (mirroring the live channel — the proven-working config in this
+// org), so ECv2 needs a signed identity JWT to start a conversation. We mint one
+// with a RANDOM sub (a fresh verified visitor per load) using the same
+// Skywave_Identity_Keyset signing as the live site — but WITHOUT the proof-cookie
+// gate, since the diagnostic just needs *a* verified identity, not a specific
+// Contact. Response shape matches what the ECv2 client expects.
+app.get('/api/test-identity-token', (_req, res) => {
+    if (!isIdentityConfigured()) return res.json({ configured: false });
+    try {
+        const token = mintIdentityToken('test-' + randomUUID());
+        res.json({ configured: true, customerIdentityToken: token });
+    } catch (e) {
+        res.json({ configured: false, error: String((e && e.message) || e) });
+    }
 });
 
 // Phones call the relay; the relay forwards to Apex via the shared sfApi
