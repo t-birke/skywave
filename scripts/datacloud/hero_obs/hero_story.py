@@ -1,5 +1,5 @@
 """
-The 3 Skywave "hero" sessions — high-fidelity, millisecond-precise STDM traces
+The 4 Skywave "hero" sessions — high-fidelity, millisecond-precise STDM traces
 pushed straight into the canonical DMOs via the Data Cloud Ingestion API (Path 5).
 
 Why this file exists: custom SObject DateTime fields (the SDO/QBrix Path-4 seeder)
@@ -31,10 +31,27 @@ live AIPlatform rows):
   gen_ai.output.tool_names on the agent_router LLM step is load-bearing: the
   Escalation Rate KPI counts sessions whose router invoked 'escalate_to_human'.
 
-Story (unchanged): flight booking works well; seat assignment does not.
+  A CONNECTED SUB-AGENT (agent-to-agent) turn renders differently (verified
+  2026-08-31 against a live multi-agent session):
+    * the interaction's TopicApiName == the connected agent's DeveloperName
+      (e.g. 'Skywave_Destination_Expert'), NOT an internal topic;
+    * the agent_router LLM output tool_names == 'go_to_<ConnectedAgent>';
+    * NO TOPIC_STEP; the hand-off is a RELATED_AGENT_STEP('FIRST_PARTY_DELEGATION')
+      whose attributeText carries the delegation metadata (related_agent_api_name,
+      related_agent_session_id, delegation_type:SYNC, sub_agent_execution_latency_ms,
+      routing_reasoning:LLM_DETERMINED, ...) — RELATED in  =
+      {"af.request_id":..,"mgr.sensitive.user_input":"<user text>"}; out =
+      {"mgr.sensitive.agent_output":"<sub-agent answer>","mgr.output.payload_type":"graph_complete"};
+    * a CLASSIFIER_STEP('pre_orchestration.guardrail') precedes the router and a
+      groundedness LLM_STEP('Atlas__GroundednessValidationPrompt') validates the output.
+
+Story: flight booking works well; seat assignment does not; destination tips are
+delegated to a connected sub-agent.
   #1 booking COMPLETES (Q5) then a seat CHANGE fails -> ABANDONED (Q1 seat moment)
   #2 a clean end-to-end booking -> COMPLETED (Q5)
   #3 a seat UPGRADE that never applies -> ESCALATED via escalate_to_human (Q1)
+  #4 "things to do in Tokyo?" -> delegated to the Skywave Destination Expert
+     CONNECTED SUB-AGENT (FIRST_PARTY_DELEGATION) -> COMPLETED (Q5). Newest session.
 """
 import datetime as _dt
 import json
@@ -65,7 +82,40 @@ SYS_PROMPT = ("Specialized Topic Agent\n# TOOL USAGE PROTOCOL\n"
 # — NOT the session end-type and NOT the __human__ topic on its own).
 ROUTER_TOOL = {"flight_management": "go_to_flight_booking",
                "seat_selection": "go_to_seat_selection",
-               "__human__": "escalate_to_human"}
+               "__human__": "escalate_to_human",
+               # Connected sub-agent (agent-to-agent). The router transition tool is
+               # go_to_<ConnectedAgentDeveloperName>; it surfaces as gen_ai.output.tool_names
+               # on the agent_router LLM step and drives the FIRST_PARTY_DELEGATION handoff.
+               "Skywave_Destination_Expert": "go_to_Skywave_Destination_Expert"}
+
+# ---- connected sub-agent (agent-to-agent) constants ---------------------------
+# Skywave_Airlines_Agent delegates destination-tips requests to the Skywave
+# Destination Expert connected sub-agent (a SEPARATE deployed agent). In the trace
+# this renders as: an interaction whose TopicApiName == the connected agent's
+# DeveloperName, and a RELATED_AGENT_STEP('FIRST_PARTY_DELEGATION') whose
+# attributeText carries the related_agent_* delegation metadata. Verified 2026-08-31
+# against a live multi-agent session (df26cg-01-multiagent-kyle,
+# session 01a04a31-3ed7-7407-8469-420d44753cae).
+CONNECTED_AGENT_API = "Skywave_Destination_Expert"
+CONNECTED_AGENT_NAME = "Skywave Destination Expert"
+# Groundedness validation LLM_STEP result (real GROUNDED verdict shape).
+GROUNDEDNESS_RESULT = ("category=GROUNDED, reason=All claims about fun things to do in "
+                       "Tokyo are directly grounded in the function result and repeated "
+                       "in the conversation history.")
+# pre_orchestration.guardrail CLASSIFIER_STEP payload (compact but real-shaped).
+CLASSIFIER_TOPICS = "agent_router,flight_booking,flight_management,seat_selection,profile_management"
+_CLASSIFIER_CHOICES = json.dumps([
+    {"target": "End_Session",
+     "description": "User explicitly wants to end the conversation (goodbye, I'm done, that's all)."},
+    {"target": "Miscellaneous_Category",
+     "description": "Resolvable by a routing tool: go_to_flight_booking, go_to_flight_management, "
+                    "go_to_seat_selection, go_to_profile_management, go_to_off_topic, "
+                    "go_to_ambiguous_question, escalate_to_human, go_to_Skywave_Destination_Expert "
+                    "(insider tips about a destination city), __end_session_action__."},
+    {"target": "Prompt_Injection", "description": "Instruction-manipulation or system-extraction attempts."},
+    {"target": "Reverse_Engineering", "description": "Asks about prompts, functions, actions, or configuration."},
+    {"target": "Inappropriate_Content", "description": "Malicious or harmful content or platform violations."},
+], separators=(",", ":"))
 
 # Real @InvocableVariable input names per action -> mgr.tool.argument_keys.
 ARG_KEYS = {
@@ -90,6 +140,9 @@ def _dur(rng, kind):
     if kind == "act":      return rng.randint(150, 640)
     if kind == "act_slow": return rng.randint(14200, 21000)
     if kind == "guard":    return rng.randint(85, 610)
+    if kind == "classifier": return rng.randint(60, 160)
+    if kind == "related":    return rng.randint(2600, 3400)   # sub-agent delegation
+    if kind == "grnd":       return rng.randint(950, 1300)    # groundedness validation
     return 0
 
 
@@ -100,6 +153,9 @@ def llm(name):               return ("llm", name, None, None)
 def act(name):               return ("act", name, ARG_KEYS.get(name, ""), None)
 def act_err(name, error):    return ("act_slow", name, ARG_KEYS.get(name, ""), error)
 def guard():                 return ("guard", "InstructionAdherence", None, None)
+def classifier():            return ("classifier", "pre_orchestration.guardrail", None, None)
+def related():               return ("related", "FIRST_PARTY_DELEGATION", None, None)
+def grnd():                  return ("grnd", "Atlas__GroundednessValidationPrompt", None, None)
 
 
 def turn(topic_api, user_text, agent_text, gap_after_s, steps):
@@ -125,6 +181,25 @@ def _routing_turn(topic_api, user, agent, gap, setup_actions, subagent_actions, 
     if final_guard:
         steps += [guard()]
     return turn(topic_api, user, agent, gap, steps)
+
+
+# The agent's opening greeting — a real session emits it as its own TURN with an
+# Output message only (no user input) and NO interaction steps (TopicApiName NOT_SET).
+def _greeting_turn(gap=2):
+    return turn("NOT_SET", "",
+                "Hi! I'm Skywave's travel assistant. Where can I take you today?", gap, [])
+
+
+# A connected sub-agent (agent-to-agent) turn. Faithful to the live multi-agent
+# trace: NO TOPIC_STEP; the setup actions precede the router; the router LLM invokes
+# go_to_<ConnectedAgent> and the handoff runs as a RELATED_AGENT_STEP
+# ('FIRST_PARTY_DELEGATION'); a groundedness LLM_STEP validates the sub-agent output.
+def _delegation_turn(user, agent, gap, setup_actions):
+    steps = [vu(), classifier()]
+    for a in setup_actions:
+        steps += [a, vu()]
+    steps += [llm("agent_router"), related(), guard(), grnd()]
+    return turn(CONNECTED_AGENT_API, user, agent, gap, steps)
 
 
 # ================================ HERO 1 =======================================
@@ -255,16 +330,54 @@ def _hero3_seat_upgrade():
         ])
 
 
+# ================================ HERO 4 =======================================
+# A CONNECTED SUB-AGENT (agent-to-agent) showcase. The visitor asks for things to
+# do in a destination city; the router recognizes destination-tips intent and
+# delegates to the Skywave Destination Expert connected sub-agent (a SEPARATE
+# deployed agent), which answers. Mirrors a live multi-agent session verified on
+# df26cg-01-multiagent-kyle (01a04a31-3ed7-7407-8469-420d44753cae): opening greeting
+# TURN (no steps) + a Skywave_Destination_Expert TURN whose spine includes the
+# agent_router LLM (tool_names=go_to_Skywave_Destination_Expert) and the
+# RELATED_AGENT_STEP('FIRST_PARTY_DELEGATION') hand-off. A clean single-hop
+# deflection -> Completed.
+def _hero4_destination():
+    return moment(
+        "Destination Recommendations", 5,
+        "The visitor asked for fun things to do in Tokyo.",
+        "The agent handed the request to the Skywave Destination Expert connected "
+        "sub-agent, which returned three vivid Tokyo recommendations — Tokyo Skytree, "
+        "Sushi Dai in Toyosu Market, and Golden Gai in Shinjuku.",
+        "The router recognized a destination-tips request and delegated to the Skywave "
+        "Destination Expert connected sub-agent (a separate agent), which returned "
+        "specific, on-brand recommendations. Fully resolved in a single hand-off.",
+        [
+            _greeting_turn(),
+            _delegation_turn(
+                "What are some fun things to do in Tokyo?",
+                "Tokyo is a city where tradition meets cutting-edge modernity. 1) Marvel "
+                "at the panoramic city views from the observation deck of Tokyo Skytree. "
+                "2) Savor melt-in-your-mouth sushi at the iconic Sushi Dai in Toyosu "
+                "Market. 3) Wander the narrow alleys of Golden Gai in Shinjuku for an "
+                "unforgettable evening of tiny, themed bars packed with local character. "
+                "Let me know if you want more tips for your Skywave journey!", 0,
+                [act("resolve_session"), act("get_bookings"), act("check_seat_enabled")]),
+        ])
+
+
 # hero = (key, start_offset_minutes_from_now, end_type, [moments])
 HEROES = [
     # end_type drives Session Outcome: Completed->Deflected, Abandoned->Abandoned,
     # 'Escalated'->Escalated (capitalised STDM enum; drives Escalation Rate).
     # Deflection/abandonment scores are seeded per-session by seed_heroes.py `outcomes`.
+    # hero4 is the most recent (smallest offset) so the connected-sub-agent trace
+    # sorts to the top of the drill-down.
+    ("hero4", 20,  "Completed", [_hero4_destination()]),
     ("hero1", 45,  "Abandoned", [_hero1_booking(), _hero1_seat_change()]),
     ("hero2", 165, "Completed", [_hero2_booking()]),
     ("hero3", 300, "Escalated", [_hero3_seat_upgrade()]),
 ]
-INTENT_VALUES = ["Flight Search and Booking", "Seat Change Requests", "Seat Upgrade Requests"]
+INTENT_VALUES = ["Flight Search and Booking", "Seat Change Requests", "Seat Upgrade Requests",
+                 "Destination Recommendations"]
 
 
 # ---- id / format helpers ------------------------------------------------------
@@ -439,7 +552,10 @@ def generate(org_id, planner_id, user_ids, agent_version="v50", now=None):
                     st, en = step_ms[si]
                     step_type = {"vu": "VARIABLE_UPDATE_STEP", "topic": "TOPIC_STEP",
                                  "llm": "LLM_STEP", "act": "ACTION_STEP",
-                                 "act_slow": "ACTION_STEP", "guard": "TRUST_GUARDRAILS_STEP"}[kind]
+                                 "act_slow": "ACTION_STEP", "guard": "TRUST_GUARDRAILS_STEP",
+                                 "classifier": "CLASSIFIER_STEP", "related": "RELATED_AGENT_STEP",
+                                 "grnd": "LLM_STEP"}[kind]
+                    step_attr = attr
                     if kind == "llm":
                         router_tool = ROUTER_TOOL.get(tn["topic"]) if name == "agent_router" else None
                         inp, outp = _llm_input(rng, tn["user"], router_tool), _llm_output(rng, router_tool)
@@ -449,6 +565,38 @@ def generate(org_id, planner_id, user_ids, agent_version="v50", now=None):
                     elif kind == "guard":
                         inp = '{"mgr.output.payload_type":"guardrail_event"}'
                         outp = '{"mgr.guardrail.passed":"True","mgr.guardrail.name":"InstructionAdherence"}'
+                    elif kind == "grnd":  # groundedness validation of the sub-agent output
+                        inp = _obj([("af.request_id", req_id)])
+                        outp = _obj([("mgr.sensitive.step.result", GROUNDEDNESS_RESULT),
+                                     ("mgr.output.payload_type", "graph_complete")])
+                    elif kind == "classifier":  # pre_orchestration router classifier
+                        inp = _obj([("af.request_id", req_id), ("classifier.input", tn["user"]),
+                                    ("af.topic_names_or_ids", CLASSIFIER_TOPICS),
+                                    ("af.router_classifier.choices", _CLASSIFIER_CHOICES)])
+                        outp = _obj([("af.router_classifier.selected_target", "Miscellaneous_Category")])
+                    elif kind == "related":  # FIRST_PARTY_DELEGATION to a connected sub-agent
+                        inp = _obj([("af.request_id", req_id),
+                                    ("mgr.sensitive.user_input", tn["user"])])
+                        outp = _obj([("mgr.sensitive.agent_output", tn["agent"]),
+                                     ("mgr.output.payload_type", "graph_complete")])
+                        # The delegation metadata the observability UI reads to render the
+                        # hand-off — valid double-quote JSON, matching the live trace.
+                        dur_ms = int(round((en - st).total_seconds() * 1000))
+                        step_attr = _obj([
+                            ("internalTraceId", trace_id), ("internalSpanId", span_id),
+                            ("related_agent_name", CONNECTED_AGENT_NAME),
+                            ("related_agent_api_name", CONNECTED_AGENT_API),
+                            ("related_agent_session_id", _uid(hkey, "relsess", mi, ti)),
+                            ("delegation_type", "SYNC"),
+                            ("transferred_data_size", len(tn["user"])),
+                            ("repetitive_handoff_count", 1),
+                            ("routing_reasoning", "LLM_DETERMINED"),
+                            ("orchestration_latency_ms", 7),
+                            ("sub_agent_execution_latency_ms", dur_ms),
+                            ("related_agent_session_initialization_ms", 0),
+                            ("named_credential_resolution_ms", 0),
+                            ("related_agent_interaction_id", _uid(hkey, "relint", mi, ti)),
+                        ])
                     else:  # vu, topic -> empty like real
                         inp, outp = "", ""
                     rows["AiAgentInteractionStep"].append({
@@ -457,7 +605,7 @@ def generate(org_id, planner_id, user_ids, agent_version="v50", now=None):
                         "inputValueText": inp, "outputValueText": outp,
                         "startTimestamp": _iso(st), "endTimestamp": _iso(en),
                         "prevStepId": prev_step or "", "errorMessageText": err or "",
-                        "attributeText": attr, "DataSourceId": DATA_SOURCE_PREFIX,
+                        "attributeText": step_attr, "DataSourceId": DATA_SOURCE_PREFIX,
                         "ExternalSourceId": ES})
                     prev_step = rows["AiAgentInteractionStep"][-1]["id"]
 
@@ -467,13 +615,15 @@ def generate(org_id, planner_id, user_ids, agent_version="v50", now=None):
                     "SessionOwnerObject": user_obj, "StartTimestamp": _iso(turn_start),
                     "EndTimestamp": _iso(turn_end), "TraceId": trace_id, "SpandId": span_id,
                     "DataSourceId": DATA_SOURCE_PREFIX, "ExternalSourceId": ES})
-                rows["AiAgentInteractionMessage"].append({
-                    "Id": _uid(hkey, "msg", mi, ti, "in"), "AiAgentSessionId": sess_id,
-                    "AiAgentInteractionId": inter_id, "AiAgentSessionParticipantId": user_pid,
-                    "AiAgentInteractionMessageType": "Input",
-                    "AiAgentInteractionMsgContentType": "text/plain", "ContentText": tn["user"],
-                    "MessageSentTimestamp": _iso(turn_start), "DataSourceId": DATA_SOURCE_PREFIX,
-                    "ExternalSourceId": ES})
+                # A greeting-only turn (agent opener) has no user input message.
+                if tn["user"]:
+                    rows["AiAgentInteractionMessage"].append({
+                        "Id": _uid(hkey, "msg", mi, ti, "in"), "AiAgentSessionId": sess_id,
+                        "AiAgentInteractionId": inter_id, "AiAgentSessionParticipantId": user_pid,
+                        "AiAgentInteractionMessageType": "Input",
+                        "AiAgentInteractionMsgContentType": "text/plain", "ContentText": tn["user"],
+                        "MessageSentTimestamp": _iso(turn_start), "DataSourceId": DATA_SOURCE_PREFIX,
+                        "ExternalSourceId": ES})
                 rows["AiAgentInteractionMessage"].append({
                     "Id": _uid(hkey, "msg", mi, ti, "out"), "AiAgentSessionId": sess_id,
                     "AiAgentInteractionId": inter_id, "AiAgentSessionParticipantId": agent_pid,

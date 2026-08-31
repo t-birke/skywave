@@ -1099,7 +1099,7 @@ Rate** (an interaction executed an action with no error; seat's action errors �
 on-story). But their *timings* are whole-second and can never be otherwise, because
 **custom SObject `DateTime` fields truncate to whole seconds on save** (verified: writing
 `…:56.789` persists as `…:56.000`). A real trace has *sub-second, random* step timings, so the
-three drill-down "hero" sessions are written **natively into the STDM DMOs with true
+four drill-down "hero" sessions are written **natively into the STDM DMOs with true
 millisecond precision via the Data Cloud Ingestion API** (`scripts/datacloud/hero_obs/`,
 the "Path 5" of the `agentforce-observability-data` skill) — bypassing the SObject
 layer entirely. They carry a distinct `ssot__DataSourceId__c` (`Skywave_Hero_*`) so
@@ -1113,7 +1113,14 @@ step choreography — `VARIABLE_UPDATE_STEP` → `TOPIC_STEP` → `LLM_STEP` →
 `TRUST_GUARDRAILS_STEP` — with **real millisecond durations** sampled from a live
 session (actions ~150–650 ms, LLM ~0.5–1.5 s, a deliberately hung ~18 s failed
 `present_seat_map`, 15–35 s user think-time gaps) and populated `Error_Message__c`
-on the failing steps. Timings are RNG-seeded (deterministic) and row Ids are stable.
+on the failing steps. The **connected-sub-agent** hero (#4) replays the agent-to-agent
+shape instead: no `TOPIC_STEP`, and the hand-off is a
+`RELATED_AGENT_STEP` (`FIRST_PARTY_DELEGATION`, ~2.6–3.4 s) whose `attributeText` carries
+the delegation metadata (`related_agent_api_name`, `delegation_type:SYNC`,
+`sub_agent_execution_latency_ms`, …), preceded by a `CLASSIFIER_STEP`
+(`pre_orchestration.guardrail`) and closed by a groundedness `LLM_STEP`
+(`Atlas__GroundednessValidationPrompt`) — verified against a live multi-agent session.
+Timings are RNG-seeded (deterministic) and row Ids are stable.
 ⚠️ **Only the two `Profile`-category DLOs (`AiAgentSession`, `AiAgentInteractionStep`)
 dedupe on the primary key** — for them the daily re-push UPSERTs the same rows with
 today-relative timestamps. The other STDM DLOs are **`Engagement` (event/time-series),
@@ -1124,15 +1131,17 @@ bogus "duration"). `seed_heroes.py push` therefore **delete-then-inserts the Eng
 objects** (delete every present hero Id, wait for the delete to drain to the DMO, then
 insert one clean copy); Profile objects keep the plain UPSERT. They are dated **day
 `-1`, hours apart** (18:40 / 16:20 / 14:05) so they
-top the list; the SObject population is pushed to `-15..-2`. The three tell the
+top the list; the SObject population is pushed to `-15..-2`. The four tell the
 Chapter-6 story: **#1** a booking that *Completes* (Q5) then a seat change that fails
 and is *Abandoned* (Q1); **#2** a clean booking that *Completes* (Q5); **#3** a seat
-upgrade that fails and is *Escalated* (Q1).
+upgrade that fails and is *Escalated* (Q1); **#4** (the newest) a "things to do in
+Tokyo?" ask *delegated to the `Skywave_Destination_Expert` connected sub-agent* that
+*Completes* (Q5) — the multi-agent showcase.
 
 The module: `dc_ingest.py` (client-credentials → CDP edge client), `stdm_schema.py`
-(the 11-object DLO→DMO field-map spec), `hero_story.py` (the 3 scripted sessions +
+(the 11-object DLO→DMO field-map spec), `hero_story.py` (the 4 scripted sessions +
 generator), `seed_heroes.py` (`setup` = one-time source/stream/mapping stand-up;
-`push` = generate + ingest the 3 heroes, run daily; `outcomes` = score EVERY
+`push` = generate + ingest the 4 heroes, run daily; `outcomes` = score EVERY
 synthetic session for the Optimization KPIs, run daily; `verify`/`teardown`). Auth
 reuses the `Skywave_Heroku_Relay` client-credentials + cdp scopes (`.secrets/dc.env`,
 or `DC_*` env vars in CI). The daily `refresh-observability` workflow re-runs `push`
