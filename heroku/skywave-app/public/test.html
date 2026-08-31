@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex,nofollow">
+    <title>Skywave · CLT Diagnostic (Test Agent)</title>
+    <style>
+        :root { color-scheme: dark; }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0; background: #0b1020; color: #e7ecf3; line-height: 1.5;
+        }
+        .wrap { max-width: 760px; margin: 0 auto; padding: 56px 24px 120px; }
+        h1 { font-size: 1.5rem; margin: 0 0 4px; }
+        .sub { color: #93a1bd; font-size: .95rem; margin: 0 0 28px; }
+        .card {
+            background: #121a2e; border: 1px solid #22304d; border-radius: 14px;
+            padding: 22px 26px; margin: 18px 0;
+        }
+        code {
+            background: #1a2233; padding: 2px 7px; border-radius: 5px;
+            font-size: .88em; color: #cfe0ff;
+        }
+        .muted { color: #93a1bd; font-size: .9rem; }
+        ol { padding-left: 20px; } ol li { margin: 8px 0; }
+        .prompt { display: inline-block; background: #172447; border: 1px solid #2c3f6b;
+            border-radius: 8px; padding: 8px 12px; margin-top: 6px; font-family: monospace; }
+        #status { margin-top: 14px; font-size: .88rem; }
+        .ok { color: #7ee0a0; } .warn { color: #ffcf7a; } .err { color: #ff8a8a; }
+        .pill { display:inline-block; background:#1c2b12; color:#a9e26b; border:1px solid #3a5a20;
+            border-radius: 999px; padding: 2px 10px; font-size: .78rem; margin-left: 8px; vertical-align: middle; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <h1>Skywave · CLT rendering diagnostic <span class="pill">test surface</span></h1>
+        <p class="sub">Agent: <strong>Skywave Airlines Agent (Test)</strong> · Deployment: <code>Skywave_MIAW_Test</code> · isolated from the live demo</p>
+
+        <div class="card">
+            <p>This page loads a <strong>brand-new cloned agent</strong> on its own ECv2 (Enhanced
+            Messaging for Web) deployment. It exists to answer one question:</p>
+            <p><em>Does a fresh <code>ExternalCopilot</code> render Conversational Lightning Types on
+            the <code>enhancedWebChat</code> surface, or does it hit the same rendering gate as the live agent?</em></p>
+        </div>
+
+        <div class="card">
+            <p><strong>How to test</strong> — open the chat (bubble, bottom-right) and send:</p>
+            <ol>
+                <li>
+                    <span class="prompt">Search flights from JFK to LAX on December 20</span>
+                    <div class="muted">Should render the <strong>flight-options card</strong> (SkywaveFlightOptions CLT).</div>
+                </li>
+            </ol>
+            <p class="muted"><strong>Card renders</strong> → the break was agent-instance state; the clone fixes it.<br>
+            <strong>Comes back as plain text / "thinking"</strong> → the ECv2 surface gate is confirmed (a fresh agent doesn't escape it).</p>
+        </div>
+
+        <div id="status" class="muted">Loading test deployment…</div>
+    </div>
+
+    <script>
+        (async () => {
+            const status = document.getElementById('status');
+            const set = (cls, msg) => { status.className = cls; status.textContent = msg; };
+            try {
+                const r = await fetch('/api/test-config', { credentials: 'same-origin' });
+                const c = await r.json();
+                if (!c || !c.orgId || !c.escName || !c.siteUrl || !c.scrt2Url) {
+                    set('warn', 'Test ECv2 config not set yet (SF_ESW_TEST_* Heroku vars). The chat bubble will appear once the deployment is wired.');
+                    return;
+                }
+                await new Promise((resolve) => {
+                    const s = document.createElement('script');
+                    s.src = `${c.siteUrl}/assets/js/bootstrap.min.js`;
+                    s.async = true; s.onload = resolve; s.onerror = () => { set('err', 'bootstrap.min.js failed to load from ' + c.siteUrl); resolve(); };
+                    document.head.appendChild(s);
+                });
+                if (!window.embeddedservice_bootstrap) {
+                    set('err', 'embeddedservice_bootstrap undefined after load — check the deployment siteUrl.');
+                    return;
+                }
+                window.embeddedservice_bootstrap.settings.language = 'en_US';
+                window.embeddedservice_bootstrap.init(c.orgId, c.escName, c.siteUrl, { scrt2URL: c.scrt2Url });
+                set('ok', 'Test deployment loaded. Open the chat bubble (bottom-right) and send the prompt above.');
+            } catch (e) {
+                set('err', 'init failed: ' + ((e && e.message) || e));
+            }
+        })();
+    </script>
+</body>
+</html>

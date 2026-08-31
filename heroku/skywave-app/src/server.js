@@ -43,6 +43,15 @@ app.get('/request-access', (_, res) => {
     res.sendFile(path.resolve(__dirname, '../public/request-access.html'));
 });
 
+// CLT rendering diagnostic surface. Standalone page (NOT the demo SPA) that
+// loads the cloned Skywave_Airlines_Agent_Test on its own ECv2 deployment
+// (Skywave_MIAW_Test) — isolated from the live chat so it can never affect the
+// demo. Purpose: check whether a fresh ExternalCopilot renders CLTs on
+// enhancedWebChat. Remove with the diagnostic once the question is answered.
+app.get('/test', (_, res) => {
+    res.sendFile(path.resolve(__dirname, '../public/test.html'));
+});
+
 app.get('/healthz', (_, res) => {
     res.json({ ok: true, activeWs: activeCount() });
 });
@@ -77,6 +86,19 @@ app.get('/api/config', (_, res) => {
             siteUrl:  process.env.SF_ESW_SITE_URL  || null,
             scrt2Url: process.env.SF_ESW_SCRT2_URL || null
         }
+    });
+});
+
+// ECv2 config for the /test CLT-diagnostic page only. Kept separate from the
+// live `esw` block above so the test surface can never point the real chat at
+// the clone. All values from Heroku Config Vars (SF_ESW_TEST_*), populated once
+// the Skywave_MIAW_Test deployment is created + published in Setup.
+app.get('/api/test-config', (_, res) => {
+    res.json({
+        orgId:    process.env.SF_ESW_TEST_ORG_ID    || null,
+        escName:  process.env.SF_ESW_TEST_ESC_NAME  || null,
+        siteUrl:  process.env.SF_ESW_TEST_SITE_URL  || null,
+        scrt2Url: process.env.SF_ESW_TEST_SCRT2_URL || null
     });
 });
 
