@@ -274,9 +274,11 @@ async function loadEswSnippet(deviceId) {
 // preconnecting during the consent window moves it off. We also PREFETCH the
 // bootstrap entry itself so it's sitting in cache when step 2 requests it —
 // prefetch (not preload) so there's no "unused preload" warning when the
-// eligibility window runs long, and it follows the platform's 307
-// (bootstrap.min.js → init.min.js) into cache too. All hints are inert: they
-// never call embeddedservice_bootstrap.init(), so nothing renders early.
+// bootstrap.min.js → init.min.js). The hint is inert: it never calls
+// embeddedservice_bootstrap.init(), so nothing renders early. We deliberately
+// only PRECONNECT (not preload/prefetch the script): bootstrap.min.js is a
+// no-cors <script>, and a crossorigin/CORS-mode prefetch of it CORS-errors on
+// the ESW host (no ACAO header) and isn't reused — see addPreconnect below.
 // No-op unless the ecv2 transport is selected and the site URL is known.
 let chatOriginsWarmed = false;
 function warmChatOrigins() {
@@ -287,23 +289,25 @@ function warmChatOrigins() {
     const head = document.head || document.getElementsByTagName('head')[0];
     if (!head) return;
     chatOriginsWarmed = true;
-    const addLink = (rel, href, asAttr) => {
+    // preconnect ONLY, and WITHOUT crossorigin. bootstrap.min.js loads as a
+    // plain (no-cors) <script>, so a crossorigin/CORS-mode hint mismatches its
+    // request; on a prefetch that also makes the browser fetch the file in CORS
+    // mode, and the ESW host does NOT send Access-Control-Allow-Origin for it →
+    // a CORS console error + a discarded (unreused) prefetch. Preconnect is a
+    // bare connection warm-up (no response is read), so it never CORS-errors,
+    // and the warmed DNS+TCP+TLS is shared by the later no-cors script load —
+    // which is where the "Requesting chat widget" cost actually was.
+    const addPreconnect = (href) => {
         try {
             const l = document.createElement('link');
-            l.rel = rel;
+            l.rel = 'preconnect';
             l.href = href;
-            l.crossOrigin = 'anonymous';
-            if (asAttr) l.as = asAttr;
             head.appendChild(l);
         } catch (_) { /* best effort */ }
     };
-    try {
-        const siteOrigin = new URL(esw.siteUrl).origin;
-        addLink('preconnect', siteOrigin);
-        addLink('prefetch', `${esw.siteUrl}/assets/js/bootstrap.min.js`, 'script');
-    } catch (_) { /* bad siteUrl — skip */ }
+    try { addPreconnect(new URL(esw.siteUrl).origin); } catch (_) { /* bad siteUrl — skip */ }
     if (esw.scrt2Url) {
-        try { addLink('preconnect', new URL(esw.scrt2Url).origin); } catch (_) { /* skip */ }
+        try { addPreconnect(new URL(esw.scrt2Url).origin); } catch (_) { /* skip */ }
     }
 }
 
