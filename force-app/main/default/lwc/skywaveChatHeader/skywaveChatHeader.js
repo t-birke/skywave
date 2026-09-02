@@ -39,6 +39,22 @@ const HOST_FIRST_BOT_EVENT = "onEmbeddedMessagingFirstBotMessageSent";
  * sends a message, and can be re-opened/hidden anytime via the header toggle.
  */
 export default class SkywaveChatHeader extends LightningElement {
+    // ── DIAGNOSTIC (registration probe) ──────────────────────────────────
+    // Proves whether the ECv2 runtime actually instantiates + mounts this
+    // custom header. Read the console when the chat opens:
+    //   • "[skywaveChatHeader] constructor"      → the deployment registered
+    //     and SELECTED this component; ECv2 built it. Any non-appearance is
+    //     then CSS/visibility (rendered-but-hidden) or a later render throw.
+    //   • "[skywaveChatHeader] connectedCallback"→ it was inserted into the DOM.
+    //   • "[skywaveChatHeader] renderedCallback"  → it painted (phase logged).
+    //   • NONE of these ever logs                → the runtime is not mounting
+    //     it at all → registration/publish/version issue, NOT our code/CSS.
+    constructor() {
+        super();
+        // eslint-disable-next-line no-console
+        console.log('[skywaveChatHeader] constructor — ECv2 instantiated the custom header');
+    }
+
     /** Deployment configuration data (channel, util methods, auth mode). */
     @api configuration = {};
 
@@ -70,6 +86,7 @@ export default class SkywaveChatHeader extends LightningElement {
     _settleTimer;
     _safetyTimer;
     _onHostFirstBot;
+    _loggedFirstRender = false;  // diagnostic: log renderedCallback once
 
     // ---- render getters --------------------------------------------------
     get isLoading() {
@@ -106,6 +123,14 @@ export default class SkywaveChatHeader extends LightningElement {
     }
 
     connectedCallback() {
+        // eslint-disable-next-line no-console
+        console.log(
+            '[skywaveChatHeader] connectedCallback — mounted in DOM; authMode=' +
+            (this.configuration &&
+                this.configuration.embeddedServiceMessagingChannel &&
+                this.configuration.embeddedServiceMessagingChannel.authMode) +
+            ', conversationStatus=' + this._conversationStatus
+        );
         // Bot / rep joined → bot is live (a beat before its first message).
         assignMessagingEventHandler(MESSAGING_EVENT.PARTICIPANT_JOINED, () =>
             this._scheduleReveal(SETTLE_MS)
@@ -135,6 +160,13 @@ export default class SkywaveChatHeader extends LightningElement {
                 this._onHostFirstBot
             );
         }
+    }
+
+    renderedCallback() {
+        if (this._loggedFirstRender) return;
+        this._loggedFirstRender = true;
+        // eslint-disable-next-line no-console
+        console.log('[skywaveChatHeader] renderedCallback — first paint, phase=' + this._phase);
     }
 
     // ---- reveal gate -----------------------------------------------------
