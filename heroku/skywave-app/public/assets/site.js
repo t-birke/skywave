@@ -131,6 +131,8 @@ let warmingBubbleEl = null;  // ECv2 pre-warm loading bubble (FAB look-alike)
 let warmSafetyTimer = null;  // reveal-anyway net if the welcome event never fires
 let chatStatusEl = null;     // presenter-facing load-step indicator (#skywave-chat-status)
 let chatLoadStepKey = null;  // current ECv2 load step key (see CHAT_LOAD_STEPS)
+let chatLoadTStart = 0;      // perf-clock ms at the FIRST load step (for elapsed)
+let chatLoadTPrev = 0;       // perf-clock ms at the PREVIOUS load step (for per-step Δ)
 let chatRevealing = false;   // guards the minimize→reveal handoff
 let eswButtonCreated = false; // onEmbeddedMessagingButtonCreated fired — launchChat() usable
 let eswIdentityReady = false; // identity token set — verified session ready for launchChat()
@@ -726,7 +728,19 @@ function setChatLoadStep(key, opts) {
         else                 txt.textContent = `Preparing chat — step ${n}/${total}: ${label}…`;
     }
     el.dataset.state = opts.error ? 'error' : (opts.warn ? 'warn' : 'load');
-    console.log(`[esw] load step ${n}/${total}: ${key}${opts.error ? ' — ERROR: ' + opts.error : (opts.warn ? ' — WARN: ' + opts.warn : '')}`);
+    // Timestamped, delta-annotated so a presenter (or we) can see EXACTLY which
+    // step ate the wall-clock time — untimed logs can't tell a 60s bootstrap
+    // fetch from an instant one. `+Ns` = since the first step; `Δ` = since the
+    // previous step (the slow step is the one with the big Δ). Wall-clock time
+    // too, to correlate with anything else in the console.
+    const nowMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    if (!chatLoadTStart) { chatLoadTStart = nowMs; chatLoadTPrev = nowMs; }
+    const sinceStart = ((nowMs - chatLoadTStart) / 1000).toFixed(2);
+    const sincePrev = Math.round(nowMs - chatLoadTPrev);
+    chatLoadTPrev = nowMs;
+    const wall = new Date().toISOString().slice(11, 23);  // HH:MM:SS.mmm (UTC)
+    const suffix = opts.error ? ' — ERROR: ' + opts.error : (opts.warn ? ' — WARN: ' + opts.warn : '');
+    console.log(`[esw] ${wall} +${sinceStart}s (Δ${sincePrev}ms) load step ${n}/${total}: ${key}${suffix}`);
     syncEswButtonVisibility();
 }
 
