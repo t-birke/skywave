@@ -129,6 +129,8 @@ let sdkReady = false;
 let eswReady = false;        // custom chat client mounted
 let warmingBubbleEl = null;  // ECv2 pre-warm loading bubble (FAB look-alike)
 let warmSafetyTimer = null;  // reveal-anyway net if the welcome event never fires
+let chatStatusEl = null;     // presenter-facing load-step indicator (#skywave-chat-status)
+let chatLoadStepKey = null;  // current ECv2 load step key (see CHAT_LOAD_STEPS)
 let chatRevealing = false;   // guards the minimize→reveal handoff
 let eswButtonCreated = false; // onEmbeddedMessagingButtonCreated fired — launchChat() usable
 let eswIdentityReady = false; // identity token set — verified session ready for launchChat()
@@ -275,18 +277,25 @@ async function loadEcv2Snippet(deviceId) {
         return false;
     }
     eswReady = true;  // claim the slot before any await (prevents double inject)
+    setChatLoadStep('init');
 
+    setChatLoadStep('bootstrap');
     await new Promise((resolve) => {
         const s = document.createElement('script');
         s.src = `${esw.siteUrl}/assets/js/bootstrap.min.js`;
         s.async = true;
-        s.onload = () => resolve();
-        s.onerror = () => { console.warn('[esw] bootstrap.min.js failed to load'); resolve(); };
+        s.onload = () => { setChatLoadStep('loaded'); resolve(); };
+        s.onerror = () => {
+            console.warn('[esw] bootstrap.min.js failed to load');
+            setChatLoadStep('bootstrap', { error: 'chat widget script failed to load (network / chat-site domain)' });
+            resolve();
+        };
         document.head.appendChild(s);
     });
 
     if (!window.embeddedservice_bootstrap) {
         console.warn('[esw] embeddedservice_bootstrap undefined after script load');
+        setChatLoadStep('loaded', { error: 'chat widget loaded but did not initialise (embeddedservice_bootstrap undefined)' });
         eswReady = false;
         return false;
     }
@@ -302,7 +311,7 @@ async function loadEcv2Snippet(deviceId) {
             }
         } catch (e) { console.warn(`[esw] setHiddenPrechatFields failed on ${eventName}`, e); }
     };
-    window.addEventListener('onEmbeddedMessagingReady', () => setSessionPrechat('Ready'), { once: true });
+    window.addEventListener('onEmbeddedMessagingReady', () => { setChatLoadStep('ready'); setSessionPrechat('Ready'); }, { once: true });
 
     // --- User Verification (PRIMARY identity path) -------------------------
     // Present a signed identity token (JWT, sub=deviceId) so the session is
@@ -316,12 +325,18 @@ async function loadEcv2Snippet(deviceId) {
     // REQUIRED: without a token the conversation can't start. setIdentityToken
     // must be called AFTER onEmbeddedMessagingReady; re-call on token expiry.
     const setEcv2IdentityToken = async (reason) => {
+        if (reason === 'Ready') setChatLoadStep('identity');
         try {
             const r = await fetch('/api/website/chat-identity-token', { credentials: 'same-origin' });
-            if (!r.ok) { console.warn(`[esw] identity-token fetch ${r.status} (${reason})`); return; }
+            if (!r.ok) {
+                console.warn(`[esw] identity-token fetch ${r.status} (${reason})`);
+                setChatLoadStep('identity', { error: `identity-token endpoint returned ${r.status} — the conversation can’t start (authMode=Auth)` });
+                return;
+            }
             const data = await r.json();
             if (!data || !data.configured || !data.customerIdentityToken) {
                 console.warn(`[esw] identity token not configured — session stays UNAUTH (${reason})`);
+                setChatLoadStep('identity', { error: 'identity token not configured (relay SF_MIAW_JWT_*/keyset) — conversation can’t start (authMode=Auth)' });
                 return;
             }
             window.embeddedservice_bootstrap.userVerificationAPI.setIdentityToken({
@@ -342,7 +357,7 @@ async function loadEcv2Snippet(deviceId) {
     // onEmbeddedMessagingButtonCreated event is fired" until the FAB exists.
     // That event fires AFTER onEmbeddedMessagingReady — gate the pre-warm on it
     // (either it or the identity token can land first; maybePreWarm needs both).
-    window.addEventListener('onEmbeddedMessagingButtonCreated', () => { eswButtonCreated = true; maybePreWarm(); }, { once: true });
+    window.addEventListener('onEmbeddedMessagingButtonCreated', () => { setChatLoadStep('button'); eswButtonCreated = true; maybePreWarm(); }, { once: true });
 
     // WORKAROUND: ECv2 doesn't propagate custom hidden prechat params to the
     // session-handler flow (they drop between scrt2 and the routing flow). So
@@ -350,6 +365,7 @@ async function loadEcv2Snippet(deviceId) {
     // upsert endpoint; the trigger stamps the Contact so Skywave_ResolveSession
     // matches. Drop this listener once the platform gap closes.
     window.addEventListener('onEmbeddedMessagingConversationStarted', (e) => {
+        setChatLoadStep('welcome');
         setSessionPrechat('ConversationStarted');
         // A conversation now exists — leave the reload breadcrumb (see
         // hasResumableConversation) so a refresh reveals the FAB immediately
@@ -407,8 +423,10 @@ async function loadEcv2Snippet(deviceId) {
         window.embeddedservice_bootstrap.init(
             esw.orgId, esw.escName, esw.siteUrl, { scrt2URL: esw.scrt2Url }
         );
+        setChatLoadStep('engine');
     } catch (e) {
         console.warn('[esw] init failed', e);
+        setChatLoadStep('engine', { error: 'embeddedservice_bootstrap.init() threw — check ECv2 config (org/esConfig/site/scrt2)' });
         eswReady = false;
         return false;
     }
@@ -568,6 +586,15 @@ function syncEswButtonVisibility() {
     if (warmingBubbleEl) {
         warmingBubbleEl.dataset.on = (eligible && gateOnWelcome) ? '1' : '0';
     }
+    // Presenter-facing load-step indicator (ecv2 only): show it from the moment
+    // the visitor is eligible (modal closed / no modal) until the chat welcome
+    // has landed — so a stall anywhere in the boot is visible. A hard-error step
+    // stays sticky (dataset.state='error') even past eligibility changes.
+    if (chatStatusEl) {
+        const errored = chatStatusEl.dataset.state === 'error';
+        const loading = (config.chatClient === 'ecv2') && chatLoadStepKey && !state.chatWelcomeReady;
+        chatStatusEl.dataset.on = ((eligible && loading) || errored) ? '1' : '0';
+    }
     // Drive the actual client root (explicit value — CSS default is none).
     // While the panel is open we keep it visible regardless of stage (the
     // FAB hides itself when open); otherwise show only when eligible.
@@ -596,6 +623,62 @@ function ensureWarmingBubble() {
     document.body.appendChild(el);
     warmingBubbleEl = el;
     return el;
+}
+
+// ── Presenter-facing load-step indicator ────────────────────────────────────
+// The chat widget is the single most important thing that must work in a live
+// demo. When it hangs, a presenter needs to know EXACTLY which step stalled —
+// not stare at a featureless spinner. So we surface the current ECv2 boot step
+// as text (e.g. "Preparing chat — step 4/9: Starting chat engine…"), and turn
+// it red + sticky on a hard failure (e.g. identity token unavailable, which on
+// an authMode=Auth channel means the conversation simply can't start). Steps
+// are the real boot lifecycle; identity/button can interleave, so the counter
+// is a progress hint, not a strict gate.
+const CHAT_LOAD_STEPS = [
+    ['init',         'Initialising chat'],
+    ['bootstrap',    'Requesting chat widget'],
+    ['loaded',       'Chat widget loaded'],
+    ['engine',       'Starting chat engine'],
+    ['ready',        'Chat engine ready'],
+    ['identity',     'Verifying identity'],
+    ['button',       'Chat ready to open'],
+    ['conversation', 'Connecting to agent'],
+    ['welcome',      'Waiting for agent’s first reply'],
+];
+function ensureChatStatusEl() {
+    if (chatStatusEl) return chatStatusEl;
+    if (typeof document === 'undefined' || !document.body) return null;
+    const el = document.createElement('div');
+    el.id = 'skywave-chat-status';
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    el.dataset.on = '0';
+    el.innerHTML = '<span class="scs-dot" aria-hidden="true"></span><span class="scs-text"></span>';
+    document.body.appendChild(el);
+    chatStatusEl = el;
+    return el;
+}
+// Advance/annotate the load indicator. key = a CHAT_LOAD_STEPS key.
+// opts.error (string): hard failure — red + sticky (advancing later clears it).
+// opts.warn  (string): soft warning — amber (e.g. safety-timeout reveal).
+function setChatLoadStep(key, opts) {
+    opts = opts || {};
+    chatLoadStepKey = key;
+    const el = ensureChatStatusEl();
+    if (!el) return;
+    const idx = CHAT_LOAD_STEPS.findIndex((s) => s[0] === key);
+    const label = idx >= 0 ? CHAT_LOAD_STEPS[idx][1] : key;
+    const n = idx >= 0 ? String(idx + 1) : '?';
+    const total = CHAT_LOAD_STEPS.length;
+    const txt = el.querySelector('.scs-text');
+    if (txt) {
+        if (opts.error)      txt.textContent = `Chat stalled at step ${n}/${total} (${label}): ${opts.error}`;
+        else if (opts.warn)  txt.textContent = `Step ${n}/${total} (${label}) — ${opts.warn}`;
+        else                 txt.textContent = `Preparing chat — step ${n}/${total}: ${label}…`;
+    }
+    el.dataset.state = opts.error ? 'error' : (opts.warn ? 'warn' : 'load');
+    console.log(`[esw] load step ${n}/${total}: ${key}${opts.error ? ' — ERROR: ' + opts.error : (opts.warn ? ' — WARN: ' + opts.warn : '')}`);
+    syncEswButtonVisibility();
 }
 
 // ── Reload-resume detection ─────────────────────────────────────────────────
@@ -667,6 +750,7 @@ function preWarmChat() {
     const boot = window.embeddedservice_bootstrap;
     if (!boot || !boot.utilAPI || typeof boot.utilAPI.launchChat !== 'function') return;
     state.chatPreWarmed = true;
+    setChatLoadStep('conversation');
     ensureWarmingBubble();
     syncEswButtonVisibility();   // show the loading bubble, keep the real FAB hidden
     // Reveal the real FAB the instant the agent's first (welcome) message
@@ -679,6 +763,7 @@ function preWarmChat() {
     // WARM_SAFETY_TIMEOUT_MS cap.
     warmSafetyTimer = setTimeout(() => {
         console.warn(`[esw] FirstBotMessageSent not seen in ${WARM_SAFETY_TIMEOUT_MS / 1000}s — revealing FAB anyway`);
+        setChatLoadStep(chatLoadStepKey || 'welcome', { warn: `no agent reply in ${WARM_SAFETY_TIMEOUT_MS / 1000}s — opening chat anyway` });
         onWelcomeReady();
     }, WARM_SAFETY_TIMEOUT_MS);
     console.log('[esw] pre-warming conversation (hidden)…');

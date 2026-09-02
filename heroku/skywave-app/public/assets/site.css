@@ -284,3 +284,43 @@ body:not([data-esw-visible="1"]) embedded-messaging {
 @media (prefers-reduced-motion: reduce) {
     #skywave-chat-warming .swc-spinner { animation: none; opacity: 0.5; }
 }
+
+/* Presenter-facing chat load-step indicator — sits just above the FAB, shows
+   exactly which boot step is in progress so a stall is diagnosable at a glance.
+   Green dot = loading, amber = soft warning (safety-timeout reveal), red +
+   sticky = hard failure (e.g. identity token unavailable → conversation can't
+   start on an authMode=Auth channel). */
+#skywave-chat-status {
+    position: fixed;
+    right: 20px;
+    bottom: 86px;                        /* clears the 56px FAB/bubble at bottom:20px */
+    max-width: min(320px, calc(100vw - 40px));
+    display: none;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 13px;
+    border-radius: 13px;
+    background: #1A1B1E;
+    color: rgba(255, 255, 255, 0.92);
+    font: 500 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.30);
+    z-index: 2147483000;                 /* above the ECv2 widget iframe */
+    pointer-events: none;
+}
+#skywave-chat-status[data-on="1"] { display: flex; }
+#skywave-chat-status .scs-dot {
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4ec9a5;                  /* Skywave teal — loading */
+    animation: scs-pulse 1.1s ease-in-out infinite;
+}
+#skywave-chat-status .scs-text { white-space: normal; }
+#skywave-chat-status[data-state="warn"]  .scs-dot { background: #e0a53a; }
+#skywave-chat-status[data-state="error"] .scs-dot { background: #e5533c; animation: none; }
+#skywave-chat-status[data-state="error"] { background: #3a1d1a; color: #ffd7cf; }
+@keyframes scs-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.65); } }
+@media (prefers-reduced-motion: reduce) {
+    #skywave-chat-status .scs-dot { animation: none; }
+}
