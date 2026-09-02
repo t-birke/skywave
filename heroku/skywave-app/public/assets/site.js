@@ -262,6 +262,51 @@ async function loadEswSnippet(deviceId) {
         : loadMiawClient(deviceId);
 }
 
+// Warm the ECv2 chat origins the moment we know them (right after loadConfig),
+// long before the widget is actually eligible to load. bootstrap.min.js lives
+// on a DIFFERENT origin than this page (the Salesforce Experience site; the
+// messaging session then talks to scrt2), so without this the FIRST request
+// pays a full cold DNS+TCP+TLS handshake — the dominant cost of the
+// "Requesting chat widget" step (measured ~0.9s cold vs ~0s warm on the raw
+// file, and materially worse behind a TLS-inspecting corporate proxy hitting a
+// never-seen *.my.site.com host). Because loadEswSnippet doesn't fire until
+// after consent + survey, that handshake normally lands on the critical path;
+// preconnecting during the consent window moves it off. We also PREFETCH the
+// bootstrap entry itself so it's sitting in cache when step 2 requests it —
+// prefetch (not preload) so there's no "unused preload" warning when the
+// eligibility window runs long, and it follows the platform's 307
+// (bootstrap.min.js → init.min.js) into cache too. All hints are inert: they
+// never call embeddedservice_bootstrap.init(), so nothing renders early.
+// No-op unless the ecv2 transport is selected and the site URL is known.
+let chatOriginsWarmed = false;
+function warmChatOrigins() {
+    if (chatOriginsWarmed) return;
+    if ((config.chatClient || 'miaw') !== 'ecv2') return;
+    const esw = config.esw || {};
+    if (!esw.siteUrl) return;
+    const head = document.head || document.getElementsByTagName('head')[0];
+    if (!head) return;
+    chatOriginsWarmed = true;
+    const addLink = (rel, href, asAttr) => {
+        try {
+            const l = document.createElement('link');
+            l.rel = rel;
+            l.href = href;
+            l.crossOrigin = 'anonymous';
+            if (asAttr) l.as = asAttr;
+            head.appendChild(l);
+        } catch (_) { /* best effort */ }
+    };
+    try {
+        const siteOrigin = new URL(esw.siteUrl).origin;
+        addLink('preconnect', siteOrigin);
+        addLink('prefetch', `${esw.siteUrl}/assets/js/bootstrap.min.js`, 'script');
+    } catch (_) { /* bad siteUrl — skip */ }
+    if (esw.scrt2Url) {
+        try { addLink('preconnect', new URL(esw.scrt2Url).origin); } catch (_) { /* skip */ }
+    }
+}
+
 // --- 'ecv2' transport: official Embedded Service for Web v2 widget. -------
 // Loads bootstrap.min.js from the published chat site (esw.siteUrl — set via
 // SF_ESW_SITE_URL, which becomes chat.skywave.flights at cutover), passes the
@@ -1633,6 +1678,10 @@ async function resumeSession({ sdkId, surveyAlreadyComplete }) {
 
 (async () => {
     await loadConfig();
+    // Warm the chat origins NOW (we just learned esw.siteUrl/scrt2Url) so the
+    // cold DNS+TCP+TLS handshake happens during the consent/survey window
+    // instead of on the critical path of the "Requesting chat widget" step.
+    warmChatOrigins();
     // Kick off IP geolocation in the background — don't block the consent
     // screen on it. It just needs to be resolved by survey-complete.
     loadGeo();
